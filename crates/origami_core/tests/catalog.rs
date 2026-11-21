@@ -7,10 +7,9 @@
 use origami_core::{Code, Language, LanguageHint, Options, format};
 use std::path::Path;
 
-/// Statements without a grammar today: 18 dynpro flow-logic statements
-/// (`PROCESS …`, `FIELD …`, `CHAIN`), which are not ABAP source, plus a few
-/// contrived cases (a variable named `mod`, dynamic `MERGE (x)`).
-const MAX_W003: usize = 21;
+/// Statements without a grammar today: two contrived cases (a variable named
+/// `mod`, dynamic `MERGE (x)`).
+const MAX_W003: usize = 2;
 
 fn catalog(name: &str) -> serde_json::Value {
     let p = Path::new(env!("CARGO_MANIFEST_DIR"))

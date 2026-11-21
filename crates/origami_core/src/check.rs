@@ -193,3 +193,60 @@ fn apply_fault(output: String, opts: &Options, pass: u8) -> String {
 fn apply_fault(output: String, _opts: &Options, _pass: u8) -> String {
     output
 }
+
+/// Keeps only the changes of `r.output` that touch `ranges` (1-based,
+/// inclusive input lines). First tries line by line within changed blocks
+/// of equal length, then whole changed blocks; returns `None` if neither
+/// result is token-equivalent to the input.
+pub fn select_lines(
+    src: &SourceText,
+    lang: Language,
+    r: &LangResult,
+    ranges: &[(u32, u32)],
+) -> Option<String> {
+    for fine in [true, false] {
+        let mixed = mix_lines(src.text(), &r.output, ranges, fine);
+        if let Ok(stream) = relex(lang, &mixed)
+            && equivalent(&r.input_tokens, src.text(), &stream, &mixed).is_ok()
+        {
+            return Some(mixed);
+        }
+    }
+    None
+}
+
+fn mix_lines(old: &str, new: &str, ranges: &[(u32, u32)], fine: bool) -> String {
+    use similar::{DiffTag, TextDiff};
+    let diff = TextDiff::from_lines(old, new);
+    let o: Vec<&str> = diff.iter_old_slices().collect();
+    let n: Vec<&str> = diff.iter_new_slices().collect();
+    // Old lines `a..b` (0-based); an insertion (a == b) touches the lines
+    // on both sides.
+    let touches = |a: usize, b: usize| {
+        ranges.iter().any(|&(s, e)| {
+            let (s, e) = (s as usize, e as usize);
+            if a == b {
+                s <= a + 1 && e >= a
+            } else {
+                s <= b && e > a
+            }
+        })
+    };
+    let mut out = String::with_capacity(new.len());
+    for op in diff.ops() {
+        let (tag, or, nr) = op.as_tag_tuple();
+        if tag == DiffTag::Equal {
+            o[or].iter().for_each(|l| out.push_str(l));
+        } else if fine && or.len() == nr.len() {
+            for (i, (ol, nl)) in o[or.clone()].iter().zip(&n[nr]).enumerate() {
+                let k = or.start + i;
+                out.push_str(if touches(k, k + 1) { nl } else { ol });
+            }
+        } else if touches(or.start, or.end) {
+            n[nr].iter().for_each(|l| out.push_str(l));
+        } else {
+            o[or].iter().for_each(|l| out.push_str(l));
+        }
+    }
+    out
+}

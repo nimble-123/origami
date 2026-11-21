@@ -1,0 +1,89 @@
+name: origami
+description: Check or format ABAP and CDS sources with origami, a layout-only formatter.
+branding:
+  icon: check-square
+  color: blue
+
+inputs:
+  version:
+    description: Release tag (e.g. v1.0.0) or "latest". Default - the tag this action is used at, else latest.
+    default: ""
+  args:
+    description: Arguments for origami.
+    default: --check
+  sarif:
+    description: Also upload the diagnostics to GitHub code scanning ("true" / "false").
+    default: "false"
+  token:
+    description: Token for downloading the release.
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Download origami
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        VERSION: ${{ inputs.version }}
+        ACTION_REF: ${{ github.action_ref }}
+        REPO: ${{ github.action_repository }}
+        OS: ${{ runner.os }}
+        ARCH: ${{ runner.arch }}
+      run: |
+        set -euo pipefail
+        case "$OS-$ARCH" in
+          Linux-X64) triple=x86_64-unknown-linux-gnu ;;
+          Linux-ARM64) triple=aarch64-unknown-linux-gnu ;;
+          macOS-X64) triple=x86_64-apple-darwin ;;
+          macOS-ARM64) triple=aarch64-apple-darwin ;;
+          Windows-X64) triple=x86_64-pc-windows-msvc ;;
+          Windows-ARM64) triple=aarch64-pc-windows-msvc ;;
+          *) echo "origami: unsupported runner $OS-$ARCH" >&2; exit 1 ;;
+        esac
+        tag="$VERSION"
+        if [ -z "$tag" ]; then
+          if [[ "$ACTION_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then tag="$ACTION_REF"; else tag=latest; fi
+        fi
+        if [ "$tag" = latest ]; then
+          tag=$(gh release view --repo "$REPO" --json tagName -q .tagName)
+        fi
+        dir="$RUNNER_TEMP/origami"
+        mkdir -p "$dir"
+        gh release download "$tag" --repo "$REPO" --pattern "origami-*-${triple}*" --dir "$dir" --clobber
+        cd "$dir"
+        if command -v sha256sum >/dev/null; then sha256sum -c ./*.sha256; else shasum -a 256 -c ./*.sha256; fi
+        bin=$(ls origami-* | grep -v '\.sha256$' | head -1)
+        ext=""; [[ "$triple" == *windows* ]] && ext=".exe"
+        mv "$bin" "origami$ext"
+        chmod +x "origami$ext"
+        echo "$dir" >> "$GITHUB_PATH"
+        echo "origami $tag ($triple)"
+
+    - name: Run origami
+      id: run
+      shell: bash
+      env:
+        ARGS: ${{ inputs.args }}
+        SARIF: ${{ inputs.sarif }}
+      run: |
+        set +e
+        if [ "$SARIF" = true ]; then
+          origami $ARGS --diagnostics sarif 2> origami.sarif
+        else
+          origami $ARGS
+        fi
+        echo "code=$?" >> "$GITHUB_OUTPUT"
+
+    - name: Upload SARIF
+      if: always() && inputs.sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: origami.sarif
+        category: origami
+
+    - name: Result
+      shell: bash
+      env:
+        CODE: ${{ steps.run.outputs.code }}
+      run: exit "${CODE:-70}"

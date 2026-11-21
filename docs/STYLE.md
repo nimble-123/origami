@@ -381,8 +381,11 @@ FORM read_flights
 Other classic statements (`REPORT`, `PARAMETERS`, `SELECT-OPTIONS`,
 `SELECTION-SCREEN`, `PERFORM`, `WRITE`, `FUNCTION`, `RAISE`, list and dataset
 statements, …) follow the general keyword-statement and chain rules.
-Dynpro flow logic (`*.screen_<nr>.abap`, `PROCESS BEFORE OUTPUT.`) is a
-different language and is not formatted.
+Dynpro flow logic (`*.screen_<nr>.abap`) follows the same rules: a
+`PROCESS BEFORE OUTPUT` / `AFTER INPUT` / `ON HELP-REQUEST` /
+`ON VALUE-REQUEST` block is indented like an event block (ABAP-EVENT-001),
+`CHAIN … ENDCHAIN` and `LOOP … ENDLOOP` like other blocks, and `MODULE x.`
+is a call.
 
 ### ABAP-METHODS-001: Method signatures
 Milestone: M1

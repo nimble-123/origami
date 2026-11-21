@@ -19,14 +19,28 @@ export interface Outcome {
 
 const TIMEOUT_MS = 2000;
 
+/** 1-based inclusive line ranges for `--lines`; a range that ends at
+ * column 0 of a later line does not include that line. */
+export function linesArgs(ranges: readonly vscode.Range[]): string[] {
+  return ranges.flatMap((r) => {
+    const start = r.start.line + 1;
+    let end = r.end.line + 1;
+    if (r.end.character === 0 && r.end.line > r.start.line) {
+      end -= 1;
+    }
+    return ["--lines", `${start}:${end}`];
+  });
+}
+
 export function formatDocument(
   document: vscode.TextDocument,
   resolved: Resolved,
   token: vscode.CancellationToken,
   log: (m: string) => void,
+  ranges: readonly vscode.Range[] = [],
 ): Promise<Outcome> {
   const target = targetFor(document);
-  const args = ["--stdin", "--stdin-filepath", target.name, "--diagnostics=json"];
+  const args = ["--stdin", "--stdin-filepath", target.name, "--diagnostics=json", ...linesArgs(ranges)];
   if (target.language) {
     args.push("--language", target.language);
   }

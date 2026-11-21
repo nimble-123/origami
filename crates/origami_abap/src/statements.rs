@@ -281,6 +281,9 @@ static SPECS: &[Spec] = &[
             "DESCENDING",
             "AS",
             "LOOP",
+            // Table controls in dynpro flow logic.
+            "WITH CONTROL",
+            "CURSOR",
         ],
         logical_clauses: LOGIC_WHERE,
         bare: false,
@@ -960,9 +963,54 @@ static SPECS: &[Spec] = &[
     },
     spec(&["ENDFUNCTION"]),
     Spec {
-        words: &["OUTPUT", "INPUT"],
+        words: &[
+            "OUTPUT",
+            "INPUT",
+            // Calls in dynpro flow logic.
+            "ON INPUT",
+            "ON REQUEST",
+            "ON CHAIN-INPUT",
+            "ON CHAIN-REQUEST",
+            "ON *-INPUT",
+            "AT EXIT-COMMAND",
+            "AT CURSOR-SELECTION",
+            "SWITCH",
+        ],
         bare: false,
         ..spec(&["MODULE"])
+    },
+    // ---- dynpro flow logic ----------------------------------------------
+    spec(&["PROCESS", "BEFORE", "OUTPUT"]),
+    spec(&["PROCESS", "AFTER", "INPUT"]),
+    spec(&["PROCESS", "ON", "HELP-REQUEST"]),
+    spec(&["PROCESS", "ON", "VALUE-REQUEST"]),
+    spec(&["CHAIN"]),
+    spec(&["ENDCHAIN"]),
+    Spec {
+        clauses: &["MODULE", "SELECT", "WHERE", "INTO", "WHENEVER NOT FOUND"],
+        words: &[
+            "ON INPUT",
+            "ON REQUEST",
+            "ON CHAIN-INPUT",
+            "ON CHAIN-REQUEST",
+            "ON *-INPUT",
+            "AT CURSOR-SELECTION",
+            "WITH",
+            "VALUES",
+            "BETWEEN",
+            "AND",
+            "NOT",
+            "FROM",
+            "SEND ERRORMESSAGE",
+            "SEND WARNING",
+            "*",
+        ],
+        bare: false,
+        ..spec(&["FIELD"])
+    },
+    Spec {
+        words: &["WITH CONTROL", "CURSOR"],
+        ..spec(&["LOOP"])
     },
     spec(&["ENDMODULE"]),
     Spec {

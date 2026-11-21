@@ -40,14 +40,33 @@ export function activate(context: vscode.ExtensionContext): void {
     status.show();
   };
 
-  const provider: vscode.DocumentFormattingEditProvider = {
-    async provideDocumentFormattingEdits(document, _options, token) {
+  const provider: vscode.DocumentFormattingEditProvider &
+    vscode.DocumentRangeFormattingEditProvider = {
+    provideDocumentFormattingEdits(document, _options, token) {
+      return run(document, token, []);
+    },
+    // Format Selection, and "format on save: modifications" (only the lines
+    // changed since the last commit).
+    provideDocumentRangeFormattingEdits(document, range, _options, token) {
+      return run(document, token, [range]);
+    },
+    provideDocumentRangesFormattingEdits(document, ranges, _options, token) {
+      return run(document, token, ranges);
+    },
+  };
+
+  async function run(
+    document: vscode.TextDocument,
+    token: vscode.CancellationToken,
+    ranges: readonly vscode.Range[],
+  ): Promise<vscode.TextEdit[]> {
+    {
       const resolved = await resolver.resolve(document);
       if (!resolved) {
         setStatus("origami: version mismatch", "No origami binary satisfies required_version in origami.toml.");
         return [];
       }
-      const outcome = await formatDocument(document, resolved, token, log);
+      const outcome = await formatDocument(document, resolved, token, log, ranges);
       // Diagnostics from every run, including warnings from successful runs.
       const items = (outcome.run?.files[0]?.diagnostics ?? []).map((d) => {
         const r = toEditorRange(d);
@@ -83,14 +102,15 @@ export function activate(context: vscode.ExtensionContext): void {
           break;
       }
       return outcome.edits;
-    },
-  };
+    }
+  }
 
   context.subscriptions.push(
     output,
     diagnostics,
     status,
     vscode.languages.registerDocumentFormattingEditProvider(SELECTOR, provider),
+    vscode.languages.registerDocumentRangeFormattingEditProvider(SELECTOR, provider),
     vscode.commands.registerCommand("origami.showOutput", () => output.show()),
     vscode.workspace.onDidGrantWorkspaceTrust(() => resolver.invalidate()),
     vscode.workspace.onDidChangeConfiguration((e) => {

@@ -4,7 +4,7 @@ use crate::args::{Args, DiagFormat};
 use crate::config::{self, ConfigIssue, FileConfig, Resolver};
 use crate::report::{self, FileReport, Run};
 use origami_core::detect::LanguageHint;
-use origami_core::{Code, Edition, Language, Options, Reported, Severity, Status, format};
+use origami_core::{Code, Edition, Language, Options, Reported, Severity, Status, format_lines};
 use rayon::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -47,7 +47,14 @@ fn exit_code(f: &FileReport, check: bool, strict: bool) -> i32 {
     code
 }
 
+/// When the run started (for the human summary).
+pub static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
 pub fn run(args: &Args) -> i32 {
+    START.get_or_init(std::time::Instant::now);
+    if args.mcp {
+        return crate::mcp::serve();
+    }
     if args.version {
         return version(args);
     }
@@ -74,6 +81,7 @@ fn usage_error(args: &Args, msg: &str) -> i32 {
         changed: false,
         status: Status::Error,
         diagnostics: vec![Reported::at_start(Code::E021, msg)],
+        source: None,
     };
     print_diagnostics(args, &[f]);
     3
@@ -123,14 +131,14 @@ fn version(args: &Args) -> i32 {
 type Loaded = Result<(Options, FileConfig), ConfigIssue>;
 
 /// Loads, caches and resolves options per directory.
-struct Configs<'a> {
+pub(crate) struct Configs<'a> {
     args: &'a Args,
     resolver: Resolver,
     loaded: Mutex<HashMap<PathBuf, Loaded>>,
 }
 
 impl<'a> Configs<'a> {
-    fn new(args: &'a Args) -> Configs<'a> {
+    pub(crate) fn new(args: &'a Args) -> Configs<'a> {
         Configs {
             args,
             resolver: Resolver::default(),
@@ -139,7 +147,7 @@ impl<'a> Configs<'a> {
     }
 
     /// Options for files in `dir`, plus the config file used.
-    fn for_dir(&self, dir: &Path) -> Result<(Options, Option<PathBuf>), ConfigIssue> {
+    pub(crate) fn for_dir(&self, dir: &Path) -> Result<(Options, Option<PathBuf>), ConfigIssue> {
         let path = if self.args.no_config {
             None
         } else if let Some(p) = &self.args.config {
@@ -188,6 +196,7 @@ impl<'a> Configs<'a> {
                     .iter()
                     .map(|k| Reported::at_start(Code::W101, format!("Unknown config key `{k}`")))
                     .collect(),
+                source: None,
             })
             .collect();
         out.sort_by(|a, b| a.path.cmp(&b.path));
@@ -202,6 +211,7 @@ fn config_error(args: &Args, issue: ConfigIssue) -> i32 {
         changed: false,
         status: Status::Error,
         diagnostics: vec![Reported::at_start(issue.code, issue.message)],
+        source: None,
     };
     print_diagnostics(args, &[f]);
     3
@@ -223,7 +233,38 @@ fn annotate_panic(diags: &mut [Reported]) {
     }
 }
 
+/// `--lines START:END` values as 1-based inclusive ranges.
+fn parse_lines(args: &Args) -> Result<Vec<(u32, u32)>, String> {
+    args.lines
+        .iter()
+        .map(|v| {
+            let (a, b) = v
+                .split_once(':')
+                .ok_or(format!("--lines {v}: expected START:END"))?;
+            let a: u32 = a
+                .trim()
+                .parse()
+                .map_err(|_| format!("--lines {v}: bad start"))?;
+            let b: u32 = b
+                .trim()
+                .parse()
+                .map_err(|_| format!("--lines {v}: bad end"))?;
+            if a == 0 || b < a {
+                return Err(format!("--lines {v}: need 1 <= START <= END"));
+            }
+            Ok((a, b))
+        })
+        .collect()
+}
+
 fn stdin_mode(args: &Args) -> i32 {
+    if args.changed.is_some() {
+        return usage_error(args, "--changed works on files, not on stdin");
+    }
+    let ranges = match parse_lines(args) {
+        Ok(r) => r,
+        Err(m) => return usage_error(args, &m),
+    };
     let mut input = Vec::new();
     if let Err(e) = std::io::stdin().read_to_end(&mut input) {
         eprintln!("origami: cannot read stdin: {e}");
@@ -244,13 +285,14 @@ fn stdin_mode(args: &Args) -> i32 {
         Some(n) => LanguageHint::StdinPath(n.clone()),
         None => LanguageHint::None,
     });
-    let r = format(&input, &hint, &opts);
+    let r = format_lines(&input, &hint, &opts, &ranges);
     let mut report = FileReport {
         path: name.unwrap_or_else(|| "<stdin>".into()),
         language: r.language,
         changed: r.changed,
         status: r.status,
         diagnostics: r.diagnostics,
+        source: (r.status == Status::Error).then(|| String::from_utf8_lossy(&input).into_owned()),
     };
     annotate_panic(&mut report.diagnostics);
     let success = matches!(report.status, Status::Formatted | Status::Unchanged);
@@ -284,7 +326,29 @@ fn path_mode(args: &Args) -> i32 {
     } else {
         args.paths.clone()
     };
-    let files = crate::walk::files(&roots);
+    let line_ranges = match parse_lines(args) {
+        Ok(r) => r,
+        Err(m) => return usage_error(args, &m),
+    };
+    // Files with the line ranges to format (`None`: the whole file).
+    let selected: Vec<(PathBuf, crate::changed::Ranges)> = if let Some(rev) = &args.changed {
+        match crate::changed::files(rev, &args.paths) {
+            Ok(f) => f,
+            Err(m) => return usage_error(args, &m),
+        }
+    } else if !line_ranges.is_empty() {
+        if args.paths.len() != 1 || !args.paths[0].is_file() {
+            return usage_error(args, "--lines needs stdin mode or exactly one file");
+        }
+        vec![(args.paths[0].clone(), Some(line_ranges))]
+    } else {
+        crate::walk::files(&roots)
+            .into_iter()
+            .map(|f| (f, None))
+            .collect()
+    };
+    let ranges_of: HashMap<PathBuf, crate::changed::Ranges> = selected.iter().cloned().collect();
+    let files: Vec<PathBuf> = selected.into_iter().map(|(f, _)| f).collect();
     let configs = Configs::new(args);
 
     // Resolve every config before touching any file: config errors abort.
@@ -316,13 +380,15 @@ fn path_mode(args: &Args) -> i32 {
             changed: false,
             status: Status::Error,
             diagnostics: vec![Reported::at_start(code, msg)],
+            source: None,
         };
         let input = match std::fs::read(path) {
             Ok(b) => b,
             Err(e) => return (fail(Code::E030, format!("Cannot read file: {e}")), None),
         };
         let opts = &opts_by_dir[&dir_of(path)];
-        let r = format(&input, &LanguageHint::Path(display.clone()), opts);
+        let ranges = ranges_of[path].as_deref().unwrap_or(&[]);
+        let r = format_lines(&input, &LanguageHint::Path(display.clone()), opts, ranges);
         let mut diagnostics = r.diagnostics;
         annotate_panic(&mut diagnostics);
         let mut diff = None;
@@ -341,6 +407,8 @@ fn path_mode(args: &Args) -> i32 {
             changed: r.changed,
             status: r.status,
             diagnostics,
+            source: (r.status == Status::Error)
+                .then(|| String::from_utf8_lossy(&input).into_owned()),
         };
         (report, diff)
     };
@@ -377,9 +445,10 @@ fn print_diagnostics(args: &Args, files: &[FileReport]) {
         check: args.check,
     };
     let mut err = std::io::stderr().lock();
-    let _ = match args.diagnostics {
+    let _ = match args.diag_format() {
         DiagFormat::Human => report::human::write(&run, &mut err),
         DiagFormat::Json => report::json::write(&run, &mut err),
         DiagFormat::Sarif => report::sarif::write(&run, &mut err),
+        DiagFormat::Agent => report::agent::write(&run, &mut err),
     };
 }

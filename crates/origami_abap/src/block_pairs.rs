@@ -36,6 +36,7 @@ const CLOSERS: &[&str] = &[
     "END-ENHANCEMENT-SECTION",
     "END-OF-DEFINITION",
     "ENDEXEC",
+    "ENDCHAIN",
 ];
 
 /// Classifies a statement. `words` are the statement's words in upper case
@@ -75,6 +76,8 @@ pub fn classify(words: &[String], depth0: &[String]) -> Option<Role> {
         "IF" => opener("ENDIF"),
         "CASE" => opener("ENDCASE"),
         "LOOP" => opener("ENDLOOP"),
+        // Dynpro flow logic.
+        "CHAIN" => opener("ENDCHAIN"),
         "DO" => opener("ENDDO"),
         "WHILE" => opener("ENDWHILE"),
         "TRY" => opener("ENDTRY"),

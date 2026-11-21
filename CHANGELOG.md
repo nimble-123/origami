@@ -29,10 +29,28 @@ edition, every output change is listed with its STYLE rule ID.
   call arguments with an unhandled keyword group fall back instead of
   dropping tokens; `message = …` and other assignments to variables named
   like statements are assignments; `TYPE any` / `TYPE line` stay type names.
+- Output: new human format (per-file blocks with symbols, code frames for
+  errors, compact W003, summary with counts and run time, next-step hint;
+  colors on terminals, `NO_COLOR` / `CLICOLOR_FORCE`) and a new
+  `--diagnostics agent` format for AI agents (one line per finding with a
+  fix hint, a final `NEXT:` line); agent output is the default when
+  `CLAUDECODE` is set; `ORIGAMI_DIAGNOSTICS` sets the default.
+- CI: GitHub Action (`action.yml`: downloads the release binary, checks the
+  checksum, optional SARIF upload to code scanning) and GitLab / Azure
+  Pipelines templates (`docs/ci.md`).
+- MCP server: `origami --mcp` with the tools `format` and `format_files`
+  (check or write, optionally only changed lines).
+- Partial formatting: `--lines START:END`, `--changed [REF]` (git), core
+  `format_lines`; VS Code *Format Selection* and format-on-save for modified
+  lines only. The kept changes pass the self-check; otherwise the file stays
+  as written (W001).
+- Dynpro flow logic (`*.screen_<nr>.abap`) is formatted: `PROCESS` blocks
+  indented like event blocks, `CHAIN … ENDCHAIN`, table-control loops,
+  `MODULE` calls, `FIELD`.
 - Statement catalog up to SAP_BASIS 8.16: all 4,576 example statements and
   333 CDS sources from abaplint's tests (`corpus/catalog/`, MIT) run in a
-  test; no internal errors, no false structural errors, idempotent; 21
-  statements without grammar (18 of them dynpro flow logic). New: ABAP SQL
+  test; no internal errors, no false structural errors, idempotent; 2
+  statements without grammar (both contrived). New: ABAP SQL
   `MERGE INTO` (8.16), `WITH +cte … ` incl. `WITH ASSOCIATIONS`/`HIERARCHY`
   (ABAP-SQL-002), `OPEN CURSOR … FOR SELECT`, `DELETE … ORDER BY`,
   SQL functions and path expressions; EML `OPERATIONS`; `RAISE RESUMABLE`,

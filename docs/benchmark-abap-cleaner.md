@@ -32,11 +32,14 @@ Whole corpus, warm (third of three passes; ABAP Cleaner after JIT warm-up):
 
 | Tool | Time | Per file | origami is faster by |
 |---|---:|---:|---:|
-| ABAP Cleaner, default profile | 10.44 s | 6.3 ms | 17× |
-| ABAP Cleaner, essential profile | 6.69 s | 4.0 ms | 11× |
-| ABAP Cleaner, parse only | 1.93 s | 1.2 ms | 3.1× |
-| origami, 1 thread (CLI, `--check`, incl. file reading) | 0.62 s | 0.38 ms | – |
-| origami, 10 threads (CLI, `--check`) | 0.14 s | – | 77× vs default |
+| ABAP Cleaner, default profile | 10.44 s | 6.3 ms | 15× |
+| ABAP Cleaner, essential profile | 6.69 s | 4.0 ms | 9.6× |
+| ABAP Cleaner, parse only | 1.93 s | 1.2 ms | 2.8× |
+| origami, 1 thread (CLI, `--check`, incl. file reading) | 0.70 s | 0.42 ms | – |
+| origami, 10 threads (CLI, `--check`) | 0.19 s | – | 55× vs default |
+
+origami numbers re-measured on 2026-11-21 after the classic-ABAP and 8.16
+grammar (first measurement at `3e595ca`: 0.62 s and 0.14 s).
 
 One file, cold (a new process per call, as in a pre-commit hook or a
 format-on-save without a running server), median-sized class (81 lines):
@@ -44,7 +47,7 @@ format-on-save without a running server), median-sized class (81 lines):
 | Tool | Time |
 |---|---:|
 | ABAP Cleaner (JVM start + one file, default profile) | 356 ms |
-| origami | 1.7 ms |
+| origami | 1.8 ms |
 
 ABAP Cleaner 1.29 also has a daemon mode that keeps the JVM running; with
 it, a call costs about the warm per-file time above (4–6 ms) plus the

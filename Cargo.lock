@@ -1267,6 +1267,7 @@ dependencies = [
  "origami_syntax",
  "serde",
  "serde_json",
+ "similar",
 ]
 
 [[package]]
