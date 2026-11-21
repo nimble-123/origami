@@ -10,15 +10,17 @@ of ABAP keywords. It never adds or removes a gap between two tokens, never
 re-cases identifiers and never rewrites statements. After every run it re-lexes
 its own output and refuses to write if anything but layout changed.
 
-> **Status: M1 complete for ABAP, structural layout for the CDS family.**
-> All six languages are formatted. ABAP uses statement parsers (assignments,
-> calls, constructor expressions, declarations, method signatures, control
-> statements, ABAP SQL `SELECT`, …); statements without a parser keep their
-> own line breaks and are re-indented (W003). The CDS family (DDLS, DDLX,
-> DCL, BDEF, SRVD) uses a structural layout: one annotation or element per
-> line, block indentation, `key` alignment. On the test corpus (1,835 files)
-> every file passes the self-check and is idempotent, and the independent
-> abaplint lexer finds no token changes. See [the design](docs/designs/origami.md).
+> **Status: feature-complete for v1.0, not yet released.** All six
+> languages are formatted by grammar: ABAP (modern and classic: classes,
+> interfaces, RAP handlers, EML, ABAP SQL, reports, selection screens, event
+> blocks, `FORM` routines, function modules) and the CDS family (annotations,
+> view headers, `case` expressions, DCL grants, BDEF and SRVD). Statements
+> without a parser keep their own line breaks and are re-indented (W003); on
+> the test corpus that is 0.2% of ABAP statements. Every corpus file (1,891
+> ABAP and 227 CDS-family files) passes the self-check and is idempotent, and
+> the independent abaplint lexer finds no token changes. Formatting is about
+> 17× faster than ABAP Cleaner ([comparison](docs/benchmark-abap-cleaner.md)).
+> See [the design](docs/designs/origami.md) and [the style guide](docs/STYLE.md).
 
 ## Install
 
@@ -72,14 +74,14 @@ it skip a write-back through the ADT MCP server.
 
 | abapGit file | Language | Status |
 |---|---|---|
-| `*.clas.abap` (incl. `locals_def`, `locals_imp`, `testclasses`, `macros`), `*.intf.abap` | ABAP | M1 |
+| `*.clas.abap` (incl. `locals_def`, `locals_imp`, `testclasses`, `macros`), `*.intf.abap` | ABAP | formatted |
 | `*.prog.abap`, `*.fugr.*.abap`, `*.type.abap` | ABAP | formatted, including reports, selection screens, event blocks, `FORM` routines and function modules |
 | `*.screen_<nr>.abap` | dynpro flow logic | not formatted (skipped) |
-| `*.ddls.asddls`, `*.drty.acds` | CDS DDL | M2 |
-| `*.ddlx.asddlxs` | DDLX | M2 |
-| `*.dcls.asdcls` | DCL | M2 |
-| `*.bdef.asbdef` | BDEF | M3 |
-| `*.srvd.srvdsrv` | SRVD | M3 |
+| `*.ddls.asddls`, `*.drty.acds` | CDS DDL | formatted |
+| `*.ddlx.asddlxs` | DDLX | formatted |
+| `*.dcls.asdcls` | DCL | formatted |
+| `*.bdef.asbdef` | BDEF | formatted |
+| `*.srvd.srvdsrv` | SRVD | formatted |
 
 ## Configuration
 

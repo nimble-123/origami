@@ -75,12 +75,15 @@ pub struct Args {
     #[arg(long)]
     pub no_config: bool,
 
+    /// Maximum line width, 40..=255 (default 120)
     #[arg(long, value_name = "N")]
     pub line_width: Option<u16>,
 
+    /// Spaces per indent level, 1..=8 (default 2)
     #[arg(long, value_name = "N")]
     pub indent_width: Option<u8>,
 
+    /// Case of ABAP keywords (default upper)
     #[arg(long, value_enum, value_name = "CASE")]
     pub keyword_case: Option<CaseArg>,
 
