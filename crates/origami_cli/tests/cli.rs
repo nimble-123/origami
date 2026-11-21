@@ -8,7 +8,12 @@ use std::path::Path;
 const CLASS: &str = "CLASS lcl DEFINITION.\n  PUBLIC SECTION.\nENDCLASS.\n";
 
 fn origami() -> Command {
-    Command::cargo_bin("origami").unwrap()
+    let mut c = Command::cargo_bin("origami").unwrap();
+    // The default diagnostics format depends on the environment.
+    c.env_remove("CLAUDECODE")
+        .env_remove("ORIGAMI_DIAGNOSTICS")
+        .env_remove("CLICOLOR_FORCE");
+    c
 }
 
 fn dir() -> tempfile::TempDir {
@@ -414,4 +419,234 @@ fn write_mode_rewrites_changed_files() {
         fs::read_to_string(d.path().join("z.prog.abap")).unwrap(),
         "lv_a = 1.\n"
     );
+}
+
+#[test]
+fn lines_formats_only_touched_statements() {
+    let input = "lv_a   =   1.\nlv_b   =   2.\nlv_c   =   3.\n";
+    let out = origami()
+        .args([
+            "--no-config",
+            "--stdin-filepath",
+            "z.prog.abap",
+            "--lines",
+            "2:2",
+        ])
+        .write_stdin(input)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "lv_a   =   1.\nlv_b = 2.\nlv_c   =   3.\n"
+    );
+}
+
+#[test]
+fn lines_rejects_bad_ranges_and_directories() {
+    origami()
+        .args([
+            "--no-config",
+            "--stdin-filepath",
+            "z.prog.abap",
+            "--lines",
+            "3:1",
+        ])
+        .write_stdin("x = 1.\n")
+        .assert()
+        .code(3);
+    let d = dir();
+    origami()
+        .current_dir(d.path())
+        .args(["--lines", "1:1", "."])
+        .assert()
+        .code(3);
+}
+
+#[test]
+fn changed_formats_changed_lines_and_untracked_files() {
+    let d = dir();
+    let git = |args: &[&str]| {
+        let ok = std::process::Command::new("git")
+            .args(["-c", "user.email=t@example.com", "-c", "user.name=t"])
+            .args(args)
+            .current_dir(d.path())
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(ok, "git {args:?}");
+    };
+    git(&["init", "-q"]);
+    write(d.path(), "z.prog.abap", "lv_a   =   1.\nlv_b   =   2.\n");
+    git(&["add", "."]);
+    git(&["commit", "-qm", "init"]);
+    write(d.path(), "z.prog.abap", "lv_a   =   1.\nlv_b   =   3.\n");
+    write(d.path(), "y.prog.abap", "lv_c   =   4.\n");
+    origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--changed"])
+        .assert()
+        .code(0);
+    assert_eq!(
+        fs::read_to_string(d.path().join("z.prog.abap")).unwrap(),
+        "lv_a   =   1.\nlv_b = 3.\n"
+    );
+    assert_eq!(
+        fs::read_to_string(d.path().join("y.prog.abap")).unwrap(),
+        "lv_c = 4.\n"
+    );
+}
+
+#[test]
+fn changed_outside_git_is_a_usage_error() {
+    let d = dir();
+    origami()
+        .current_dir(d.path())
+        .env("GIT_CEILING_DIRECTORIES", d.path())
+        .args(["--no-config", "--changed"])
+        .assert()
+        .code(3);
+}
+
+#[test]
+fn mcp_server_formats_source() {
+    let session = [
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}"#,
+        r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#,
+        r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"format","arguments":{"source":"x   =   1.\n","filename":"z.prog.abap"}}}"#,
+        r#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"format","arguments":{"source":"x = 1\n","filename":"z.prog.abap"}}}"#,
+    ]
+    .join("\n");
+    let out = origami()
+        .arg("--mcp")
+        .write_stdin(session)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let replies: Vec<serde_json::Value> = String::from_utf8(out.stdout)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    // The notification gets no reply.
+    assert_eq!(replies.len(), 4);
+    assert_eq!(replies[0]["result"]["protocolVersion"], "2025-06-18");
+    assert_eq!(replies[1]["result"]["tools"].as_array().unwrap().len(), 2);
+    assert_eq!(replies[2]["result"]["content"][0]["text"], "x = 1.\n");
+    assert_eq!(replies[2]["result"]["isError"], false);
+    assert_eq!(replies[3]["result"]["isError"], true);
+    assert_eq!(
+        replies[3]["result"]["structuredContent"]["diagnostics"][0]["code"],
+        "E003"
+    );
+}
+
+fn project() -> tempfile::TempDir {
+    let d = dir();
+    write(
+        d.path(),
+        "src/zcl_ok.clas.abap",
+        "CLASS zcl_ok DEFINITION.\nENDCLASS.\n",
+    );
+    write(d.path(), "src/zcl_a.clas.abap", "lv_a   =   1.\n");
+    write(d.path(), "src/zcl_b.prog.abap", "lv_x = ( 1 .\n");
+    d
+}
+
+#[test]
+fn human_output_lists_files_with_a_code_frame_and_a_summary() {
+    let d = project();
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--check", "src"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        !err.contains('\x1b'),
+        "no colors when stderr is not a terminal"
+    );
+    assert!(err.contains("✎ src/zcl_a.clas.abap  would change"), "{err}");
+    assert!(
+        err.contains("✗ src/zcl_b.prog.abap  not formatted, left unchanged"),
+        "{err}"
+    );
+    assert!(err.contains("1 │ lv_x = ( 1 ."), "{err}");
+    assert!(
+        err.contains("✓ 1 unchanged · ✎ 1 would change · ✗ 1 error  (3 files)"),
+        "{err}"
+    );
+}
+
+#[test]
+fn colors_can_be_forced_and_disabled() {
+    let d = project();
+    let run = |env: (&str, &str)| {
+        let out = origami()
+            .current_dir(d.path())
+            .env(env.0, env.1)
+            .args(["--no-config", "--check", "src"])
+            .output()
+            .unwrap();
+        String::from_utf8(out.stderr).unwrap()
+    };
+    assert!(run(("CLICOLOR_FORCE", "1")).contains("\x1b[31m"));
+    assert!(!run(("NO_COLOR", "1")).contains('\x1b'));
+}
+
+#[test]
+fn agent_output_is_compact_with_hints_and_next_step() {
+    let d = project();
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--check", "--diagnostics", "agent", "src"])
+        .output()
+        .unwrap();
+    let err = String::from_utf8(out.stderr).unwrap();
+    let lines: Vec<&str> = err.lines().collect();
+    assert_eq!(
+        lines[0],
+        "origami: 3 files, 1 would change, 1 with errors, 0 warnings"
+    );
+    assert!(lines.contains(&"CHANGE src/zcl_a.clas.abap"), "{err}");
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("ERROR src/zcl_b.prog.abap:1:")
+                && l.contains("Fix: balance the brackets.")
+                && l.ends_with("The file was not changed.")),
+        "{err}"
+    );
+    assert!(
+        lines
+            .last()
+            .unwrap()
+            .starts_with("NEXT: fix the errors above"),
+        "{err}"
+    );
+}
+
+#[test]
+fn agent_output_is_the_default_for_claude_code_and_can_be_overridden() {
+    let d = project();
+    let run = |envs: &[(&str, &str)], args: &[&str]| {
+        let mut c = origami();
+        c.current_dir(d.path());
+        for (k, v) in envs {
+            c.env(k, v);
+        }
+        let out = c
+            .args(["--no-config", "--check"])
+            .args(args)
+            .arg("src")
+            .output()
+            .unwrap();
+        String::from_utf8(out.stderr).unwrap()
+    };
+    assert!(run(&[("CLAUDECODE", "1")], &[]).starts_with("origami: 3 files"));
+    assert!(run(&[("ORIGAMI_DIAGNOSTICS", "agent")], &[]).starts_with("origami: 3 files"));
+    assert!(run(&[("CLAUDECODE", "1")], &["--diagnostics", "human"]).contains("✎ src/zcl_a"));
 }

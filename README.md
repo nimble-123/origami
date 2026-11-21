@@ -19,8 +19,13 @@ its own output and refuses to write if anything but layout changed.
 > the test corpus that is 0.2% of ABAP statements. Every corpus file (1,891
 > ABAP and 227 CDS-family files) passes the self-check and is idempotent, and
 > the independent abaplint lexer finds no token changes. Formatting is about
-> 17× faster than ABAP Cleaner ([comparison](docs/benchmark-abap-cleaner.md)).
+> 15× faster than ABAP Cleaner ([comparison](docs/benchmark-abap-cleaner.md)).
 > See [the design](docs/designs/origami.md) and [the style guide](docs/STYLE.md).
+
+Existing code does not have to be reformatted in one go: `--changed` formats
+only what you touched. In VS Code, *Format Selection* works, and
+`"editor.formatOnSaveMode": "modifications"` formats only changed lines on
+save.
 
 ## Install
 
@@ -48,10 +53,17 @@ origami --check               # CI: exit 1 if anything would change
 origami --check --diff        # show what would change
 cat zcl_foo.clas.abap | origami --stdin-filepath zcl_foo.clas.abap
 origami --check --diagnostics json src/   # machine-readable, on stderr
+origami --changed             # only lines changed since HEAD (+ new files)
+origami --changed main        # only lines changed against main
+origami --lines 40:75 zcl_foo.clas.abap   # only these lines
 ```
 
 The full contract (flags, exit codes, diagnostic codes, JSON schema, config) is
 in [docs/CLI.md](docs/CLI.md).
+
+### CI
+
+GitHub Action, GitLab CI and Azure Pipelines templates: [docs/ci.md](docs/ci.md).
 
 ### pre-commit
 
@@ -66,7 +78,16 @@ repos:
 
 ### AI agents
 
-Pipe source through stdin. On any error stdout stays empty, so an agent never
+origami is also an MCP server: `origami --mcp` offers the tools `format`
+(source text in, formatted text and diagnostics out) and `format_files`
+(check or rewrite files, optionally only lines changed against a git
+revision). For Claude Code:
+
+```sh
+claude mcp add origami -- origami --mcp
+```
+
+Without MCP, pipe source through stdin. On any error stdout stays empty, so an agent never
 writes an empty object back. `"changed": false` in the JSON diagnostics lets
 it skip a write-back through the ADT MCP server.
 
@@ -76,7 +97,7 @@ it skip a write-back through the ADT MCP server.
 |---|---|---|
 | `*.clas.abap` (incl. `locals_def`, `locals_imp`, `testclasses`, `macros`), `*.intf.abap` | ABAP | formatted |
 | `*.prog.abap`, `*.fugr.*.abap`, `*.type.abap` | ABAP | formatted, including reports, selection screens, event blocks, `FORM` routines and function modules |
-| `*.screen_<nr>.abap` | dynpro flow logic | not formatted (skipped) |
+| `*.screen_<nr>.abap` | dynpro flow logic | formatted (`PROCESS` blocks, `MODULE`, `FIELD`, `CHAIN`, table-control loops) |
 | `*.ddls.asddls`, `*.drty.acds` | CDS DDL | formatted |
 | `*.ddlx.asddlxs` | DDLX | formatted |
 | `*.dcls.asdcls` | DCL | formatted |

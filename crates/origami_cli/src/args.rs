@@ -8,6 +8,8 @@ pub enum DiagFormat {
     Human,
     Json,
     Sarif,
+    /// Compact lines for AI agents: findings with fix hints, a NEXT step.
+    Agent,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -55,13 +57,24 @@ pub struct Args {
     #[arg(long)]
     pub strict: bool,
 
+    /// Format only changes that touch these lines, START:END (1-based,
+    /// inclusive; repeatable). Needs stdin mode or exactly one file.
+    #[arg(long, value_name = "START:END", conflicts_with = "changed")]
+    pub lines: Vec<String>,
+
+    /// Format only lines changed against a git revision (default HEAD), plus
+    /// untracked files in full.
+    #[arg(long, value_name = "REF", num_args = 0..=1, default_missing_value = "HEAD")]
+    pub changed: Option<String>,
+
     /// Apply style rules that are still in preview.
     #[arg(long)]
     pub preview: bool,
 
-    /// Diagnostics format; always written to stderr.
-    #[arg(long, value_enum, default_value_t = DiagFormat::Human, value_name = "FORMAT")]
-    pub diagnostics: DiagFormat,
+    /// Diagnostics format; always written to stderr. Default: human, or
+    /// agent when run by an AI agent (CLAUDECODE is set).
+    #[arg(long, value_enum, value_name = "FORMAT", env = "ORIGAMI_DIAGNOSTICS")]
+    pub diagnostics: Option<DiagFormat>,
 
     /// Cap the number of diagnostics per run.
     #[arg(long, default_value_t = 200, value_name = "N")]
@@ -91,6 +104,10 @@ pub struct Args {
     #[arg(short = 'j', long = "jobs", value_name = "N")]
     pub jobs: Option<usize>,
 
+    /// Run as an MCP server on stdin/stdout (tools `format`, `format_files`).
+    #[arg(long)]
+    pub mcp: bool,
+
     /// Print version and style edition.
     #[arg(long)]
     pub version: bool,
@@ -101,6 +118,18 @@ pub struct Args {
 }
 
 impl Args {
+    /// The diagnostics format: as given, else agent output for AI agents,
+    /// else human output.
+    pub fn diag_format(&self) -> DiagFormat {
+        self.diagnostics.unwrap_or_else(|| {
+            if std::env::var_os("CLAUDECODE").is_some() {
+                DiagFormat::Agent
+            } else {
+                DiagFormat::Human
+            }
+        })
+    }
+
     pub fn stdin_mode(&self) -> bool {
         self.stdin || self.stdin_filepath.is_some()
     }

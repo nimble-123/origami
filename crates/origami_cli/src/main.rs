@@ -1,8 +1,10 @@
 //! `origami`: layout-only formatter for ABAP and the CDS family.
 
 mod args;
+mod changed;
 mod config;
 mod io;
+mod mcp;
 mod report;
 mod run;
 mod walk;

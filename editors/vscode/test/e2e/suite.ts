@@ -87,6 +87,27 @@ const tests: Test[] = [
     },
   ],
   [
+    "formats only the selected lines",
+    async () => {
+      const dir = process.env.ORIGAMI_E2E_WORKSPACE;
+      assert.ok(dir);
+      const file = path.join(dir, "z_e2e_range.prog.abap");
+      fs.writeFileSync(file, "lv_a   =   1.\nlv_b   =   2.\nlv_c   =   3.\n");
+      const doc = await vscode.workspace.openTextDocument(file);
+      await vscode.window.showTextDocument(doc);
+      const edits = await vscode.commands.executeCommand<vscode.TextEdit[]>(
+        "vscode.executeFormatRangeProvider",
+        doc.uri,
+        new vscode.Range(1, 0, 1, 5),
+        { tabSize: 2, insertSpaces: true },
+      );
+      const we = new vscode.WorkspaceEdit();
+      we.set(doc.uri, edits ?? []);
+      assert.ok(await vscode.workspace.applyEdit(we));
+      assert.equal(doc.getText(), "lv_a   =   1.\nlv_b = 2.\nlv_c   =   3.\n");
+    },
+  ],
+  [
     "is idempotent: a formatted file gets no edits",
     async () => {
       const doc = await openAndFormat("z_e2e_ok.prog.abap", "lv_a = 1.\n");

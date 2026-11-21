@@ -52,6 +52,9 @@ fn is_event(words: &[String]) -> bool {
     match w(0) {
         "LOAD-OF-PROGRAM" | "INITIALIZATION" | "START-OF-SELECTION" | "END-OF-SELECTION"
         | "TOP-OF-PAGE" | "END-OF-PAGE" => true,
+        // Dynpro flow logic: PROCESS BEFORE OUTPUT / AFTER INPUT /
+        // ON HELP-REQUEST / ON VALUE-REQUEST.
+        "PROCESS" => matches!(w(1), "BEFORE" | "AFTER" | "ON"),
         "AT" => {
             matches!(w(1), "SELECTION-SCREEN" | "LINE-SELECTION" | "USER-COMMAND")
                 || (w(1).starts_with("PF") && w(1)[2..].parse::<u8>().is_ok())
@@ -106,6 +109,11 @@ pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnos
     let mut blocks: Vec<(&'static str, u32, u32)> = Vec::new(); // (closer, opener offset, levels)
     let mut brackets: Vec<(u16, u32)> = Vec::new(); // (closing kind, offset)
     let mut start = 0usize;
+    // Dynpro flow logic starts with PROCESS; there `MODULE x.` calls a
+    // module instead of defining one.
+    let flow_logic = tokens
+        .first()
+        .is_some_and(|t| t.kind == WORD && t.text(text).eq_ignore_ascii_case("PROCESS"));
 
     let err = |code: Code, msg: String, at: u32| Diagnostic::new(code, msg, at..at + 1);
 
@@ -147,10 +155,11 @@ pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnos
                 // ABAP has no reserved words: `do( ).`, `if = 1.` or
                 // `case->m( ).` are calls or assignments, never blocks.
                 let keyword = keyword_position(text, tokens, start, k);
-                let role = if keyword {
-                    classify(&words, &depth0)
-                } else {
+                let module_call = flow_logic && words.first().is_some_and(|w| w == "MODULE");
+                let role = if !keyword || module_call {
                     None
+                } else {
+                    classify(&words, &depth0)
                 };
                 // An event block ends at the next event or processing block
                 // on its level, and before a closer meant for an outer block.

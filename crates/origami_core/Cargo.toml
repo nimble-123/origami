@@ -15,6 +15,7 @@ origami_syntax.workspace = true
 origami_abap.workspace = true
 origami_cds.workspace = true
 serde.workspace = true
+similar.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

@@ -1,6 +1,7 @@
 //! Output: diagnostics in every format go to stderr; stdout carries only
 //! formatted text (stdin mode) or the diff (`--diff`).
 
+pub mod agent;
 pub mod diff;
 pub mod human;
 pub mod json;
@@ -16,6 +17,8 @@ pub struct FileReport {
     pub changed: bool,
     pub status: Status,
     pub diagnostics: Vec<Reported>,
+    /// The source text, kept for files with errors (code frames).
+    pub source: Option<String>,
 }
 
 pub struct Run<'a> {

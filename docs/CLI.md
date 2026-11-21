@@ -18,8 +18,14 @@ origami [OPTIONS] [PATHS...]
   --check               write nothing; exit 1 if any file would change
   --diff                with --check: print a unified diff to stdout
   --strict              exit 5 if any warning was emitted
+  --lines START:END     format only changes that touch these lines (1-based,
+                        inclusive, repeatable); stdin mode or one file
+  --changed [REF]       format only lines changed against a git revision
+                        (default HEAD) and untracked files in full
   --preview             apply style rules that are still in preview
-  --diagnostics F       human (default) | json | sarif; always on stderr
+  --diagnostics F       human | agent | json | sarif; always on stderr.
+                        Default: agent if CLAUDECODE is set, else human;
+                        env ORIGAMI_DIAGNOSTICS sets it too
   --max-diagnostics N   cap diagnostics per run (default 200)
   --config FILE         use only this config file, no discovery
   --no-config           ignore all config files
@@ -27,8 +33,49 @@ origami [OPTIONS] [PATHS...]
   --indent-width N      1..=8
   --keyword-case C      upper | lower (ABAP keywords only)
   -j, --jobs N          worker threads for directory mode (default: CPU count)
+  --mcp                 run as an MCP server on stdin/stdout
   --version [--json] [--config FILE]
 ```
+
+## Partial formatting
+
+`--lines` and `--changed` format the whole source internally, then keep only
+the changes that touch the requested lines (a statement that starts or ends
+in the range is reformatted completely). The result passes the same
+self-check as a full run; if the selected changes cannot stand on their own,
+the file stays as written and W001 is reported. `--changed` runs
+`git diff -U0 --relative REF` and `git ls-files --others --exclude-standard`
+in the current directory; outside a git repository it is a usage error.
+
+## Diagnostics formats
+
+* **human**: one block per file that changed or has findings (`✎` changed,
+  `✗` error with a code frame, `!` warnings; at most three W003 lines per
+  file), a summary line and the next step. Colors only when stderr is a
+  terminal; `NO_COLOR` turns them off, `CLICOLOR_FORCE=1` on. The layout is
+  for people and may change between releases.
+* **agent**: for AI agents. First line `origami: N files, …`; then one line
+  per finding, prefixed `ERROR` / `WARN` with `path:line:column`, code,
+  message and a fix hint, and `CHANGE` / `FORMATTED` per changed file; W003
+  only as one `NOTE` count; last line `NEXT: …` says what to do. Stable
+  within a major version.
+* **json**: the schema in `schemas/diagnostics.v1.json` (frozen).
+* **sarif**: SARIF 2.1.0.
+
+## MCP server
+
+`origami --mcp` runs a Model Context Protocol server on stdin/stdout
+(JSON-RPC 2.0, one message per line; protocol versions 2025-06-18,
+2025-03-26, 2024-11-05). Tools:
+
+| Tool | Arguments | Result |
+|---|---|---|
+| `format` | `source`, optional `filename`, `language`, `lines` (`[[start, end]]`) | formatted text; `structuredContent`: `source`, `changed`, `status`, `diagnostics`. A structural error returns `isError: true` and the diagnostics. |
+| `format_files` | optional `paths`, `write` (default false), `changed` (git revision) | summary and unified diffs; `structuredContent.files`: per file `path`, `status`, `changed`, `diagnostics`, `diff` |
+
+Configuration discovery, the self-check and the diagnostic codes are the same
+as on the command line. Nothing is written unless `format_files` gets
+`"write": true`.
 
 ## Streams
 

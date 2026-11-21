@@ -123,7 +123,7 @@ Questions 1 to 3 are experiments. They are scheduled as spikes in milestone M0, 
 3.  **S3 – Pilot workflow.**
     *   Who adopts first, and are they system-first (abapGit pushes from SAP) or git-first?
     *   Are agents and CI the primary users, or editor users?
-4.  **Programs and classic function groups.** Full grammar, fallback only, or out of v1? ABAP Cloud has no executable programs. Decided at M4 (2026-11-21): full grammar. Event blocks, selection screens, `FORM`/`PERFORM`, function modules, list and dataset statements are formatted; dynpro flow logic (`*.screen_<nr>.abap`) is skipped.
+4.  **Programs and classic function groups.** Full grammar, fallback only, or out of v1? ABAP Cloud has no executable programs. Decided at M4 (2026-11-21): full grammar. Event blocks, selection screens, `FORM`/`PERFORM`, function modules, list and dataset statements are formatted; dynpro flow logic (`*.screen_<nr>.abap`) is formatted as well (added later the same day).
 5.  **Validation system for BDEF and SRVD.** Who provides an SAP system (for example an ABAP Platform trial) to activate formatted sources as an oracle, and under which license terms?
 6.  **Project license.** Dual MIT/Apache-2.0 is compatible with both references.
 7.  **Code-signing certificates.** Who owns the Apple Developer ID and the Windows signing certificate that D6 requires?

@@ -25,7 +25,21 @@ pub fn identity_mode(_lang: Language) -> bool {
 
 /// Formats one source. Never panics: a panic inside becomes X002.
 pub fn format(input: &[u8], hint: &LanguageHint, opts: &Options) -> FormatResult {
-    match catch_unwind(AssertUnwindSafe(|| format_inner(input, hint, opts))) {
+    format_lines(input, hint, opts, &[])
+}
+
+/// Formats only the changes that touch the given input lines (1-based,
+/// inclusive ranges; empty = the whole source). The source is formatted as a
+/// whole; of the resulting changes, only those that touch a range are kept,
+/// and the result passes the same self-check. If it cannot, the source stays
+/// as written and W001 is reported.
+pub fn format_lines(
+    input: &[u8],
+    hint: &LanguageHint,
+    opts: &Options,
+    lines: &[(u32, u32)],
+) -> FormatResult {
+    match catch_unwind(AssertUnwindSafe(|| format_inner(input, hint, opts, lines))) {
         Ok(r) => r,
         Err(payload) => {
             let msg = payload
@@ -39,7 +53,12 @@ pub fn format(input: &[u8], hint: &LanguageHint, opts: &Options) -> FormatResult
     }
 }
 
-fn format_inner(input: &[u8], hint: &LanguageHint, opts: &Options) -> FormatResult {
+fn format_inner(
+    input: &[u8],
+    hint: &LanguageHint,
+    opts: &Options,
+    lines: &[(u32, u32)],
+) -> FormatResult {
     if let Err(d) = opts.validate() {
         return error_result(None, &d, "");
     }
@@ -52,7 +71,24 @@ fn format_inner(input: &[u8], hint: &LanguageHint, opts: &Options) -> FormatResu
         Err(d) => return error_result(None, &d, src.text()),
     };
     let checked = check::run(&src, lang, opts, identity_mode(lang));
-    let r = checked.result;
+    let mut r = checked.result;
+    let failed_early = r
+        .diagnostics
+        .iter()
+        .any(|d| d.severity() >= Severity::Error);
+    if !lines.is_empty() && !failed_early {
+        match check::select_lines(&src, lang, &r, lines) {
+            Some(mixed) => r.output = mixed,
+            None => {
+                r.output = src.text().to_string();
+                r.diagnostics.push(Diagnostic::new(
+                    Code::W001,
+                    "The changes in the requested lines cannot be applied on their own; left as written",
+                    0..0,
+                ));
+            }
+        }
+    }
     let index = LineIndex::new(src.text());
     let diagnostics: Vec<Reported> = r
         .diagnostics
