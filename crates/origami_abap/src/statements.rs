@@ -118,6 +118,15 @@ const fn spec(lead: &'static [&'static str]) -> Spec {
 
 const LOGIC_WHERE: &[&str] = &["WHERE"];
 
+const CONVERT_WORDS: &[&str] = &[
+    "DATE",
+    "TIME STAMP",
+    "TIME",
+    "UTCLONG",
+    "DAYLIGHT SAVING TIME",
+    "FRACTIONAL SECONDS",
+];
+
 static SPECS: &[Spec] = &[
     // Block statements without operands.
     spec(&["ENDMETHOD"]),
@@ -559,6 +568,65 @@ static SPECS: &[Spec] = &[
         bare: false,
         ..spec(&["RAISE", "EVENT"])
     },
+    spec(&["END-TEST-SEAM"]),
+    spec(&["END-TEST-INJECTION"]),
+    Spec {
+        bare: false,
+        ..spec(&["TEST-SEAM"])
+    },
+    Spec {
+        bare: false,
+        ..spec(&["TEST-INJECTION"])
+    },
+    Spec {
+        words: &[
+            "BY",
+            "PLACES",
+            "LEFT",
+            "RIGHT",
+            "CIRCULAR",
+            "UP",
+            "TO",
+            "DELETING",
+            "LEADING",
+            "TRAILING",
+            "IN",
+            "CHARACTER",
+            "BYTE",
+            "MODE",
+        ],
+        bare: false,
+        ..spec(&["SHIFT"])
+    },
+    Spec {
+        clauses: &["TO"],
+        words: &["EXPANDING NESTED TABLES", "KEEPING TARGET LINES"],
+        bare: false,
+        ..spec(&["MOVE-CORRESPONDING"])
+    },
+    Spec {
+        words: &["SECONDS"],
+        bare: false,
+        ..spec(&["WAIT", "UP", "TO"])
+    },
+    Spec {
+        clauses: &["INTO", "TIME ZONE"],
+        words: CONVERT_WORDS,
+        bare: false,
+        ..spec(&["CONVERT", "DATE"])
+    },
+    Spec {
+        clauses: &["INTO", "TIME ZONE"],
+        words: CONVERT_WORDS,
+        bare: false,
+        ..spec(&["CONVERT", "TIME", "STAMP"])
+    },
+    Spec {
+        clauses: &["INTO", "TIME ZONE"],
+        words: CONVERT_WORDS,
+        bare: false,
+        ..spec(&["CONVERT", "UTCLONG"])
+    },
     Spec {
         words: &["FOR", "ACTIVATION", "ALL", "INSTANCES"],
         bare: false,
@@ -713,6 +781,22 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
             .bare
             .then(|| b::concat(vec![b::concat(head), p.period()]));
     }
+    if p.kind(p.pos) == COLON && !spec.commas {
+        return spec_chain(p, spec, b::concat(head));
+    }
+    let body = spec_body(p, spec, true)?;
+    Some(b::group(vec![b::concat(head), body, p.period()]))
+}
+
+/// The space before token `i`, except before the first token of a chain item
+/// (`skip`), whose gap the chain prints.
+fn gap(p: &P, i: usize, skip: Option<usize>) -> Doc {
+    if skip == Some(i) { b::empty() } else { p.sp(i) }
+}
+
+/// Operands and clauses of a keyword statement, from `p.pos` to `p.end`.
+fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
+    let skip = (!first_gap).then_some(p.pos);
     // Parts: the first follows the lead on its line; each clause starts one.
     let mut parts: Vec<Doc> = Vec::new();
     let mut current: Vec<Doc> = Vec::new();
@@ -736,7 +820,7 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
         prev_kw = None;
         if n_clause > 0 && n_clause >= n_word {
             parts.push(b::concat(std::mem::take(&mut current)));
-            current.push(p.ln(i));
+            current.push(if skip == Some(i) { b::empty() } else { p.ln(i) });
             for k in 0..n_clause {
                 if k > 0 {
                     current.push(p.sp(i + k));
@@ -758,7 +842,7 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
         }
         if n_word > 0 {
             for k in 0..n_word {
-                current.push(p.sp(i + k));
+                current.push(gap(p, i + k, skip));
                 current.push(p.kw(i + k));
             }
             p.pos = i + n_word;
@@ -766,7 +850,7 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
             continue;
         }
         if spec.commas && p.kind(i) == COMMA {
-            current.push(p.sp(i));
+            current.push(gap(p, i, skip));
             current.push(p.t(i));
             p.pos = i + 1;
             continue;
@@ -777,12 +861,12 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
         }
         // `*` as a field list (ABAP SQL).
         if spec.commas && p.kind(i) == WORD && p.text(i) == "*" {
-            current.push(p.sp(i));
+            current.push(gap(p, i, skip));
             current.push(p.t(i));
             p.pos = i + 1;
             continue;
         }
-        current.push(p.sp(i));
+        current.push(gap(p, i, skip));
         // Comparison or key assignment inside a clause (`WITH KEY a = b`).
         if p.kind(i) == WORD
             && mode == Operands::Expr
@@ -799,10 +883,9 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
         current.push(operand);
     }
     parts.push(b::concat(current));
-    let mut docs = vec![b::concat(head)];
     let first = parts.remove(0);
     // Breaks inside the first part continue at the continuation indent.
-    docs.push(b::cont(vec![first]));
+    let mut docs = vec![b::cont(vec![first])];
     if spec.all_clauses {
         docs.push(b::cont(parts));
     } else {
@@ -810,8 +893,62 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
         let clauses: Vec<(Doc, Doc)> = parts.into_iter().map(split_sep).collect();
         docs.push(b::cont(vec![b::fill(clauses)]));
     }
-    docs.push(p.period());
-    Some(b::group(docs))
+    Some(b::concat(docs))
+}
+
+/// Chain `CLEAR: a, b.` of a keyword statement (ABAP-CHAIN-001): on one line
+/// if it fits, otherwise one item per line, aligned after the colon.
+fn spec_chain(p: &mut P, spec: &Spec, head: Doc) -> Option<Doc> {
+    let colon = p.pos;
+    let mut items = Vec::new();
+    let mut a = colon + 1;
+    let mut depth = 0i32;
+    for i in colon + 1..p.end {
+        match p.kind(i) {
+            LPAREN | LBRACKET => depth += 1,
+            RPAREN | RBRACKET => depth -= 1,
+            COMMA if depth == 0 => {
+                items.push((a, i));
+                a = i + 1;
+            }
+            COLON => return None,
+            _ => {}
+        }
+    }
+    if a < p.end {
+        items.push((a, p.end));
+    }
+    if items.is_empty() || items.iter().any(|&(x, e)| x >= e || p.glued(x)) {
+        return None;
+    }
+    let end = p.end;
+    let mut docs = Vec::new();
+    for (n, &(x, e)) in items.iter().enumerate() {
+        p.pos = x;
+        p.end = e;
+        let item = spec_body(p, spec, false);
+        p.end = end;
+        let item = item?;
+        let mut d = Vec::new();
+        if n > 0 {
+            d.push(p.ln(x));
+        }
+        d.push(b::group(vec![item]));
+        if e < end && p.kind(e) == COMMA {
+            d.push(p.sp(e));
+            d.push(p.t(e));
+        }
+        docs.push(b::concat(d));
+    }
+    p.pos = end;
+    Some(b::group(vec![
+        head,
+        p.sp(colon),
+        p.t(colon),
+        p.sp(colon + 1),
+        b::hang(docs),
+        p.period(),
+    ]))
 }
 
 /// Splits a clause doc built as `concat([separator, …])` into its parts.
