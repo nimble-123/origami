@@ -55,7 +55,12 @@ line break after it.
   turn code into a comment);
 * a tab in leading indentation counts as one indent step; shifted lines are
   written with spaces;
-* verbatim regions are never shifted.
+* verbatim regions are never shifted;
+* a gap that contains a multi-line `/* */` comment is written unchanged;
+* a token that starts with `*` is never printed in column 1, and the other
+  lines of its unit are shifted by the same amount;
+* a statement glued to the previous one without a separator (only possible
+  in invalid code, such as `x.y` split at the period) keeps its bytes.
 
 ## 5. Structural errors
 

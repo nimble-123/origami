@@ -463,6 +463,11 @@ impl<'c, 'a> P<'c, 'a> {
         }
         if self.is_named_row(first) {
             let rows = self.rows()?;
+            // Rows must use up the whole list (a keyword group after named
+            // rows without a leading keyword is not handled).
+            if !self.at_end() {
+                return None;
+            }
             let a = b::align(rows);
             return Some(self.hanging(lp, rp, a.clone(), a));
         }

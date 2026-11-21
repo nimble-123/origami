@@ -454,8 +454,20 @@ impl<'c, 'a> Printer<'c, 'a> {
     fn token(&mut self, i: TokenIndex, indent: usize, blank: bool) {
         self.leading_comments(i, indent, blank);
         let text = self.ctx.token_text(i);
-        self.write(&text, indent);
+        self.write_token(&text, indent);
         self.trailing_comments(i, indent);
+    }
+
+    /// Writes token text. A token that starts with `*` is never written in
+    /// column 1, where ABAP would read the line as a comment (INVARIANTS 4).
+    fn write_token(&mut self, text: &str, indent: usize) {
+        if self.pending_eol {
+            self.newline(indent);
+        }
+        if text.starts_with('*') && self.column() == 0 {
+            self.pending_indent = Some(1);
+        }
+        self.write(text, indent);
     }
 
     /// Unknown / verbatim / opaque text of a unit.
@@ -481,7 +493,14 @@ impl<'c, 'a> Printer<'c, 'a> {
         let start = toks[first.0 as usize].start as usize;
         let line_start = src[..start].rfind('\n').map(|p| p + 1).unwrap_or(0);
         let orig = visual_width(&src[line_start..start], ctx.opts.indent as usize);
-        let target = self.column();
+        // A unit that starts with `*` never starts in column 1 (see
+        // write_token); shift its other lines by the same amount.
+        let star = ctx.token_text(first).starts_with('*');
+        let target = if star && self.column() == 0 {
+            1
+        } else {
+            self.column()
+        };
         let shift = target as isize - orig as isize;
         let min_indent = ctx.opts.indent as usize;
 
@@ -498,7 +517,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                 }
             }
             let text = ctx.token_text(TokenIndex(k as u32));
-            self.write(&text, indent);
+            self.write_token(&text, indent);
         }
         self.trailing_comments(last, indent);
     }
@@ -507,6 +526,13 @@ impl<'c, 'a> Printer<'c, 'a> {
     /// kept, every new line is shifted (`*` comments stay in column 1), and
     /// code continuation lines never land below `min_indent`.
     fn raw_gap(&mut self, gap: &str, shift: isize, min_indent: usize, indent: usize) {
+        // A block comment spanning lines keeps every byte: write the gap as
+        // it is (INVARIANTS 3: only the first line of a block comment moves).
+        if gap.contains("/*") {
+            self.pending_eol = false;
+            self.write(gap, indent);
+            return;
+        }
         let lines: Vec<&str> = gap.split('\n').collect();
         // Part before the first line break: end-of-line comment or spaces.
         let head = lines[0].trim();
