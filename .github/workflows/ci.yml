@@ -61,3 +61,25 @@ jobs:
       - run: cargo xtask oracle
       - run: cargo bench -p origami_core
       - run: scripts/bench-cli.sh
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cargo build --release -p abap-origami
+      - name: Typecheck, unit tests, bundle
+        working-directory: editors/vscode
+        run: |
+          npm ci
+          npx tsc --noEmit
+          npm test
+          npm run build
+      - name: Package VSIX (linux-x64)
+        working-directory: editors/vscode
+        run: |
+          mkdir -p bin && cp ../../target/release/origami bin/origami
+          npx vsce package --target linux-x64 --no-dependencies --allow-missing-repository
