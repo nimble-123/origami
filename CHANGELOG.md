@@ -29,6 +29,16 @@ edition, every output change is listed with its STYLE rule ID.
   call arguments with an unhandled keyword group fall back instead of
   dropping tokens; `message = …` and other assignments to variables named
   like statements are assignments; `TYPE any` / `TYPE line` stay type names.
+- Classic ABAP (M4 decision: full grammar): event blocks indented
+  (ABAP-EVENT-001), structures across `DATA`/`TYPES` statements
+  (ABAP-DECL-002), `FORM` signatures like `METHODS` (ABAP-FORM-001);
+  `REPORT`, `PARAMETERS`, `SELECT-OPTIONS`, `SELECTION-SCREEN`, `PERFORM`,
+  `FUNCTION`, `WRITE` (also `WRITE /: a, b.`), `RAISE`, `CONTROLS`, list,
+  memory, dataset and cursor statements. Chains may have keywords before the
+  colon and items glued to their comma. Obsolete `SELECT … ENDSELECT`
+  without `INTO` is a loop. Dynpro flow logic (`*.screen_<nr>.abap`) is
+  skipped. Corpus: two classic repositories added (abap2xlsx demos, ABAP
+  SDK for Azure); ABAP fallback 1.6% → 0.2%.
 - Fuzzing (cargo-fuzz, first local run): fixed four findings, kept as
   regression tests in `fuzz/found/`: line-break style could flip between
   runs with `\r\r\n`; a vertical tab ending a comment was dropped; a

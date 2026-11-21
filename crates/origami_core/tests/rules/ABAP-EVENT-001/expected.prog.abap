@@ -1,0 +1,14 @@
+REPORT zdemo MESSAGE-ID zz.
+PARAMETERS p_carr TYPE s_carr_id OBLIGATORY.
+INITIALIZATION.
+  p_carr = 'LH'.
+AT SELECTION-SCREEN.
+  IF p_carr IS INITIAL.
+    MESSAGE e001.
+  ENDIF.
+START-OF-SELECTION.
+  PERFORM load_data.
+  WRITE: / 'Done'.
+FORM load_data.
+  DATA lt_flights TYPE STANDARD TABLE OF sflight WITH EMPTY KEY.
+ENDFORM.

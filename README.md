@@ -73,7 +73,8 @@ it skip a write-back through the ADT MCP server.
 | abapGit file | Language | Status |
 |---|---|---|
 | `*.clas.abap` (incl. `locals_def`, `locals_imp`, `testclasses`, `macros`), `*.intf.abap` | ABAP | M1 |
-| `*.prog.abap`, `*.fugr.*.abap`, `*.type.abap` | ABAP | fallback until the M4 decision |
+| `*.prog.abap`, `*.fugr.*.abap`, `*.type.abap` | ABAP | formatted, including reports, selection screens, event blocks, `FORM` routines and function modules |
+| `*.screen_<nr>.abap` | dynpro flow logic | not formatted (skipped) |
 | `*.ddls.asddls`, `*.drty.acds` | CDS DDL | M2 |
 | `*.ddlx.asddlxs` | DDLX | M2 |
 | `*.dcls.asdcls` | DCL | M2 |

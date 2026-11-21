@@ -328,6 +328,62 @@ In a broken `DATA:`, `TYPES:`, `CONSTANTS:` or `CLASS-DATA:` chain, the
 ABAP-DECL-001). A blank line or comment line ends the group; nested
 `BEGIN OF` levels align separately.
 
+### ABAP-EVENT-001: Event blocks
+Milestone: M4
+
+Approved by the maintainer, Nils Lutz, on 2026-11-21. The statements of an event block
+(`LOAD-OF-PROGRAM`, `INITIALIZATION`, `AT SELECTION-SCREEN …`,
+`START-OF-SELECTION`, `END-OF-SELECTION`, `TOP-OF-PAGE`, `END-OF-PAGE`,
+`AT LINE-SELECTION`, `AT USER-COMMAND`, `AT PFnn`) are indented one level,
+as in the ADT pretty printer. An event block ends at the next event keyword or
+processing block (`FORM`, `MODULE`, `FUNCTION`, `CLASS`, `INTERFACE`).
+
+```abap
+START-OF-SELECTION.
+  PERFORM load_data.
+  PERFORM display.
+
+FORM load_data.
+  …
+ENDFORM.
+```
+
+### ABAP-DECL-002: Structures across statements
+Milestone: M4
+
+Approved by the maintainer, Nils Lutz, on 2026-11-21. When `BEGIN OF` and `END OF` are in
+different statements (`DATA: BEGIN OF s.` … `DATA: END OF s.`), the
+statements between them are indented one level.
+
+```abap
+DATA: BEGIN OF status_view.
+  INCLUDE STRUCTURE vimstatus.
+DATA: END OF status_view.
+```
+
+### ABAP-FORM-001: FORM signatures
+Milestone: M4
+
+Approved by the maintainer, Nils Lutz, on 2026-11-21. A `FORM` signature follows
+ABAP-METHODS-001 with the sections `TABLES`, `USING`, `CHANGING` and
+`RAISING`: on one line if it fits, otherwise each section on its own line at
+the continuation indent and each parameter one level deeper.
+
+```abap
+FORM read_flights
+    TABLES
+      et_flights STRUCTURE sflight
+    USING
+      iv_carrier TYPE s_carr_id
+      iv_date TYPE s_date.
+```
+
+Other classic statements (`REPORT`, `PARAMETERS`, `SELECT-OPTIONS`,
+`SELECTION-SCREEN`, `PERFORM`, `WRITE`, `FUNCTION`, `RAISE`, list and dataset
+statements, …) follow the general keyword-statement and chain rules.
+Dynpro flow logic (`*.screen_<nr>.abap`, `PROCESS BEFORE OUTPUT.`) is a
+different language and is not formatted.
+
 ### ABAP-METHODS-001: Method signatures
 Milestone: M1
 

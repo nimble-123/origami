@@ -5,17 +5,30 @@
 use origami_core::{Code, Language, LanguageHint, Options, format};
 use std::path::Path;
 
-const CDS: [Language; 5] =
-    [Language::Ddls, Language::Ddlx, Language::Dcl, Language::Bdef, Language::Srvd];
+const CDS: [Language; 5] = [
+    Language::Ddls,
+    Language::Ddlx,
+    Language::Dcl,
+    Language::Bdef,
+    Language::Srvd,
+];
 
 fn check(name: &str, lang: Language, data: &[u8]) {
     let hint = LanguageHint::Explicit(lang);
     let opts = Options::default();
     let r = format(data, &hint, &opts);
-    assert!(!r.has(Code::X001) && !r.has(Code::X002), "{name}: {:?}", r.diagnostics);
+    assert!(
+        !r.has(Code::X001) && !r.has(Code::X002),
+        "{name}: {:?}",
+        r.diagnostics
+    );
     if let Some(out) = r.output {
         let again = format(&out, &hint, &opts);
-        assert_eq!(again.output.as_deref(), Some(&out[..]), "{name}: not idempotent");
+        assert_eq!(
+            again.output.as_deref(),
+            Some(&out[..]),
+            "{name}: not idempotent"
+        );
     }
 }
 
