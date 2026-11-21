@@ -10,6 +10,8 @@ pub mod block_pairs;
 pub mod kinds;
 mod layout;
 mod lexer;
+mod statements;
+mod stmt;
 pub mod structure;
 pub mod verbatim;
 
@@ -28,7 +30,7 @@ pub fn format(
     opaque: &BTreeSet<UnitId>,
     identity: bool,
 ) -> LangResult {
-    let stream = match lex(src) {
+    let mut stream = match lex(src) {
         Ok(s) => s,
         Err(d) => return LangResult::failed(d),
     };
@@ -46,6 +48,11 @@ pub fn format(
         .collect();
 
     let laid = layout::layout(src.text(), &stream, &statements, quarantine, opaque);
+    if !identity {
+        for &k in &laid.keywords {
+            stream.tokens[k].keyword = true;
+        }
+    }
     let print_opts = PrintOptions {
         width: opts.line_width,
         indent: opts.indent_width,

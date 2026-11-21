@@ -1,0 +1,8 @@
+managed implementation in class zbp unique;
+define behavior for ZI_Travel alias Travel
+  persistent table ztravel
+  lock master
+{
+  create;
+  association _Booking { create; }
+}

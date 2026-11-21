@@ -1,1 +1,1 @@
-Data lv_Value TYPE i.
+Data lv_Value type i.

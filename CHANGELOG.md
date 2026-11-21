@@ -8,6 +8,13 @@ edition, every output change is listed with its STYLE rule ID.
 
 ### Added
 
+- M1 (ABAP): printer with groups, hanging indentation, fallback choice,
+  alignment groups and fill-style clauses; ADT-style block indentation; one
+  statement per line; blank-line rules; statement parsers for assignments,
+  calls, constructor expressions, logical expressions, declarations and
+  chains (A3), method signatures, ABAP SQL `SELECT` and about 50 keyword
+  statements; keyword upper case (STYLE ABAP-*, batch 1).
+- CDS family: structural layout (STYLE CDS-*, proposed).
 - M0 walking skeleton:
   - lossless lexers for ABAP and the CDS family;
   - structural checks (E001–E005), with the block-pair table and the

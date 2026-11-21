@@ -251,12 +251,18 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// End of a line comment: the line end, without trailing blanks (they are
+    /// whitespace, so the printer may drop them).
     fn line_end(&self, from: usize) -> usize {
-        self.b[from..]
+        let mut end = self.b[from..]
             .iter()
             .position(|&c| c == b'\n')
             .map(|p| from + p)
-            .unwrap_or(self.b.len())
+            .unwrap_or(self.b.len());
+        while end > from + 1 && matches!(self.b[end - 1], b' ' | b'\t' | b'\r') {
+            end -= 1;
+        }
+        end
     }
 
     /// End of a `'…'` or `` `…` `` literal; a doubled delimiter is an escape.

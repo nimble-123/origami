@@ -69,11 +69,15 @@ pub fn lex(src: &SourceText, lang: Language) -> Result<TokenStream, Diagnostic> 
             continue;
         }
         if (c == b'/' && at(i + 1) == b'/') || (dashes && c == b'-' && at(i + 1) == b'-') {
-            let end = b[i..]
+            let mut end = b[i..]
                 .iter()
                 .position(|&x| x == b'\n')
                 .map(|p| i + p)
                 .unwrap_or(b.len());
+            // Trailing blanks are whitespace, not comment text.
+            while end > i + 2 && matches!(b[end - 1], b' ' | b'\t' | b'\r') {
+                end -= 1;
+            }
             push_comment(CommentSyntax::CdsLine, end, &mut trivia);
             i = end;
             gap = true;
