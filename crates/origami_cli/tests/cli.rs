@@ -383,3 +383,35 @@ fn sarif_output_is_json() {
     assert_eq!(doc["version"], "2.1.0");
     assert_eq!(doc["runs"][0]["results"][0]["ruleId"], "E004");
 }
+
+#[test]
+fn check_diff_prints_a_unified_diff_to_stdout() {
+    let d = dir();
+    write(d.path(), "z.prog.abap", "lv_a   =   1.\n");
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--check", "--diff"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let diff = String::from_utf8(out.stdout).unwrap();
+    assert!(diff.contains("--- a/z.prog.abap"), "{diff}");
+    assert!(diff.contains("-lv_a   =   1."), "{diff}");
+    assert!(diff.contains("+lv_a = 1."), "{diff}");
+    // Nothing was written.
+    assert_eq!(
+        fs::read_to_string(d.path().join("z.prog.abap")).unwrap(),
+        "lv_a   =   1.\n"
+    );
+}
+
+#[test]
+fn write_mode_rewrites_changed_files() {
+    let d = dir();
+    write(d.path(), "z.prog.abap", "lv_a   =   1.\n");
+    origami().current_dir(d.path()).assert().code(0);
+    assert_eq!(
+        fs::read_to_string(d.path().join("z.prog.abap")).unwrap(),
+        "lv_a = 1.\n"
+    );
+}

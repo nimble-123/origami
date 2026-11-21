@@ -308,7 +308,8 @@ fn path_mode(args: &Args) -> i32 {
     }
 
     let process = |path: &PathBuf| -> (FileReport, Option<String>) {
-        let display = path.display().to_string();
+        // Paths found by walking `.` are shown without the `./` prefix.
+        let display = path.strip_prefix(".").unwrap_or(path).display().to_string();
         let fail = |code: Code, msg: String| FileReport {
             path: display.clone(),
             language: None,

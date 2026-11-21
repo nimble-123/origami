@@ -35,13 +35,12 @@ jobs:
         with:
           tool: cargo-deny,cargo-llvm-cov
       - run: cargo deny check
-      - name: Coverage per crate
-        run: |
-          cargo llvm-cov -p origami_syntax --fail-under-lines 85
-          cargo llvm-cov -p origami_layout --fail-under-lines 85
-          cargo llvm-cov -p origami_core --features fault-injection --fail-under-lines 85
-          cargo llvm-cov -p origami_abap --fail-under-lines 75
-          cargo llvm-cov -p origami_cds --fail-under-lines 75
+      # Workspace-wide: the language crates are tested through the rule
+      # harness and CLI tests in other crates, on purpose.
+      - name: Coverage
+        run: >
+          cargo llvm-cov --workspace --exclude xtask
+          --features origami_core/fault-injection --fail-under-lines 85
 
   corpus:
     runs-on: ubuntu-latest

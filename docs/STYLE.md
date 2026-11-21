@@ -532,8 +532,8 @@ Milestone: M2
 Approved by the maintainer, Nils Lutz, on 2026-11-21. In a DDLS header, `as select from`,
 `as projection on`, `provider contract`, `with parameters`, each `association`,
 each `composition` and each join start a line one level deeper than `define`;
-view parameters go one level deeper still. A long `on` condition breaks before
-`and` / `or`. In a BDEF `define behavior for` header, each clause
+view parameters go one level deeper still. A clause that does not fit breaks
+before `on`, `and` and `or`, two levels deeper. In a BDEF `define behavior for` header, each clause
 (`implementation in class`, `persistent table`, `draft table`, `lock`,
 `authorization`, `etag`, `total etag`, `early numbering`, `late numbering`,
 `with …`) starts a line one level deeper.
