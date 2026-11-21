@@ -3,8 +3,8 @@
     "abap": {
       "files": 1891,
       "statements": 209497,
-      "fallback": 333,
-      "fallback_rate": 0.0015895215683279474
+      "fallback": 196,
+      "fallback_rate": 0.0009355742564332663
     },
     "bdef": {
       "files": 36,
@@ -41,8 +41,8 @@
     "abap": {
       "files": 200,
       "statements": 35731,
-      "fallback": 126,
-      "fallback_rate": 0.00352634966835521
+      "fallback": 78,
+      "fallback_rate": 0.0021829783661246535
     },
     "bdef": {
       "files": 36,

@@ -40,7 +40,7 @@ const CONSTRUCTORS: &[&str] = &[
     "FILTER",
 ];
 const BINARY_OPS: &[&str] = &[
-    "+", "-", "*", "/", "**", "&&", "DIV", "MOD", "BIT-AND", "BIT-OR", "BIT-XOR",
+    "+", "-", "*", "/", "**", "&&", "&", "DIV", "MOD", "BIT-AND", "BIT-OR", "BIT-XOR",
 ];
 const ASSIGN_OPS: &[&str] = &["=", "?=", "+=", "-=", "*=", "/=", "&&="];
 
@@ -214,6 +214,17 @@ impl<'c, 'a> P<'c, 'a> {
         }
         self.last_call = false;
         let i = self.pos;
+        // Unary `BIT-NOT x`.
+        if self.kind(i) == WORD
+            && self.upper(i) == "BIT-NOT"
+            && i + 1 < self.end
+            && !self.glued(i + 1)
+        {
+            let kw = self.kw(i);
+            self.pos += 1;
+            let rhs = self.operand()?;
+            return Some(b::concat(vec![kw, self.sp(i + 1), rhs]));
+        }
         let mut docs = Vec::new();
         match self.kind(i) {
             CHAR_LITERAL | STRING_LITERAL | TEMPLATE_FULL => {
@@ -274,20 +285,31 @@ impl<'c, 'a> P<'c, 'a> {
             }
             WORD => {
                 let w = self.upper(i);
+                // The type may be qualified: `VALUE lo_obj->ty_list( … )`.
+                let mut type_end = i + 2;
+                while self.kind(type_end) == SELECTOR
+                    && self.glued(type_end)
+                    && self.kind(type_end + 1) == WORD
+                    && self.glued(type_end + 1)
+                {
+                    type_end += 2;
+                }
                 let ctor = CONSTRUCTORS.contains(&w.as_str())
                     && self.kind(i + 1) == WORD
                     && !self.glued(i + 1)
-                    && self.kind(i + 2) == LPAREN
-                    && self.glued(i + 2);
+                    && self.kind(type_end) == LPAREN
+                    && self.glued(type_end);
                 if ctor {
                     docs.push(self.kw(i));
                     docs.push(self.sp(i + 1));
-                    docs.push(self.t(i + 1));
-                    self.pos = i + 2;
+                    for k in i + 1..type_end {
+                        docs.push(self.t(k));
+                    }
+                    self.pos = type_end;
                     let body = self.parens(true)?;
                     docs.push(body);
                     self.last_call = true;
-                } else if (w == "-" || w == "+") && !self.glued(i + 1) {
+                } else if (w == "-" || w == "+") && i + 1 < self.end {
                     docs.push(self.t(i));
                     docs.push(self.sp(i + 1));
                     self.pos += 1;
@@ -543,6 +565,64 @@ impl<'c, 'a> P<'c, 'a> {
         self.call_args(lp, rp)
     }
 
+    /// Marks the keywords of a constructor body (`from..to`, bracket depth 0)
+    /// and, recursively, of nested constructor bodies. With `words` false,
+    /// only nested constructors are searched. A word right after a keyword
+    /// that takes an operand (`FOR line IN`, `BASE base`) is a name; so is a
+    /// word followed by `=` or by a glued `(`, `[` or selector.
+    pub fn mark_ctor_keywords(&mut self, from: usize, to: usize, words: bool) {
+        let mut prev: Option<String> = None;
+        let mut i = from;
+        while i < to {
+            let k = self.kind(i);
+            if matches!(k, LPAREN | LBRACKET) {
+                let Some(close) = self.matching(i).filter(|&c| c < to) else {
+                    return;
+                };
+                let ctor = k == LPAREN
+                    && i >= from + 2
+                    && self.glued(i)
+                    && !self.glued(i - 1)
+                    && self.kind(i - 2) == WORD
+                    && CTOR_OPS.contains(&self.upper(i - 2).as_str());
+                if !ctor && words && k == LPAREN && self.is(i + 1, "LINES") && self.is(i + 2, "OF")
+                {
+                    self.c.keywords.push(i + 1);
+                    self.c.keywords.push(i + 2);
+                }
+                self.mark_ctor_keywords(i + 1, close, ctor);
+                prev = None;
+                i = close + 1;
+                continue;
+            }
+            if words && k == WORD && !self.glued(i) {
+                let w = self.upper(i);
+                let next_eq = i + 1 < to && self.kind(i + 1) == WORD && self.text(i + 1) == "=";
+                let next_call = i + 1 < to
+                    && self.glued(i + 1)
+                    && matches!(self.kind(i + 1), LPAREN | LBRACKET | SELECTOR);
+                let operand = prev.as_deref().is_some_and(|p| {
+                    CTOR_TAKES_OPERAND.contains(&p)
+                        && !matches!(
+                            (p, w.as_str()),
+                            (_, "NOT" | "THROW")
+                                | ("IN", "GROUP" | "FOR")
+                                | ("EXCEPT", "IN")
+                                | ("FOR", "GROUPS")
+                        )
+                });
+                if CTOR_WORDS.contains(&w.as_str()) && !next_eq && !next_call && !operand {
+                    self.c.keywords.push(i);
+                    prev = Some(w);
+                    i += 1;
+                    continue;
+                }
+            }
+            prev = None;
+            i += 1;
+        }
+    }
+
     // ---- logical expressions --------------------------------------------
 
     /// A logical expression: predicates joined by `AND`, `OR`, `EQUIV`. A
@@ -656,7 +736,7 @@ impl<'c, 'a> P<'c, 'a> {
             }
             let k = self.pos;
             match self.upper(k).as_str() {
-                "INITIAL" | "BOUND" | "ASSIGNED" | "SUPPLIED" | "REQUESTED" => {
+                "INITIAL" | "BOUND" | "ASSIGNED" | "SUPPLIED" | "REQUESTED" | "NULL" => {
                     docs.push(self.sp(k));
                     docs.push(self.kw(k));
                     self.pos += 1;
@@ -726,18 +806,31 @@ impl<'c, 'a> P<'c, 'a> {
                 && ASSIGN_OPS.contains(&self.text(op))
             {
                 self.pos += 1;
-                let rhs = self.expr()?;
+                let mut rhs = vec![self.expr()?];
+                // Chained assignment `a = b = c.` (each `=` assigns to its left).
+                let mut ops = vec![op];
+                while !self.at_end()
+                    && !self.glued(self.pos)
+                    && self.kind(self.pos) == WORD
+                    && self.text(self.pos) == "="
+                    && self.text(op) == "="
+                {
+                    ops.push(self.pos);
+                    self.pos += 1;
+                    rhs.push(self.expr()?);
+                }
                 if !self.at_end() {
                     return None;
                 }
-                return Some(b::group(vec![
-                    target,
-                    self.sp(op),
-                    self.t(op),
-                    self.sp(op + 1),
-                    b::cont(vec![rhs]),
-                    self.period(),
-                ]));
+                let mut docs = vec![target];
+                for (o, r) in ops.into_iter().zip(rhs) {
+                    docs.push(self.sp(o));
+                    docs.push(self.t(o));
+                    docs.push(self.sp(o + 1));
+                    docs.push(b::cont(vec![r]));
+                }
+                docs.push(self.period());
+                return Some(b::group(docs));
             }
             if self.at_end() && self.last_call {
                 return Some(b::concat(vec![target, self.period()]));
@@ -748,3 +841,71 @@ impl<'c, 'a> P<'c, 'a> {
         None
     }
 }
+
+/// Constructor operators whose body may hold keywords.
+const CTOR_OPS: &[&str] = &[
+    "VALUE",
+    "CORRESPONDING",
+    "REDUCE",
+    "COND",
+    "SWITCH",
+    "FILTER",
+    "CONV",
+    "NEW",
+    "REF",
+    "EXACT",
+    "CAST",
+];
+
+/// Keywords inside constructor bodies.
+const CTOR_WORDS: &[&str] = &[
+    "BASE",
+    "FOR",
+    "IN",
+    "INTO",
+    "INDEX",
+    "WHERE",
+    "UNTIL",
+    "WHILE",
+    "THEN",
+    "NEXT",
+    "INIT",
+    "LET",
+    "MAPPING",
+    "EXCEPT",
+    "DISCARDING",
+    "DUPLICATES",
+    "DEEP",
+    "APPENDING",
+    "DEFAULT",
+    "OPTIONAL",
+    "WHEN",
+    "ELSE",
+    "USING",
+    "KEY",
+    "GROUPS",
+    "GROUP",
+    "OF",
+    "BY",
+    "ASCENDING",
+    "DESCENDING",
+    "WITHOUT",
+    "MEMBERS",
+    "STEP",
+    "THROW",
+    "AND",
+    "OR",
+    "NOT",
+    "EQUIV",
+    "IS",
+    "INITIAL",
+    "BOUND",
+    "ASSIGNED",
+    "SUPPLIED",
+];
+
+/// Keywords after which the next word is an operand.
+const CTOR_TAKES_OPERAND: &[&str] = &[
+    "BASE", "FOR", "IN", "INTO", "UNTIL", "WHILE", "THEN", "NEXT", "INIT", "LET", "MAPPING",
+    "EXCEPT", "DEFAULT", "WHEN", "ELSE", "KEY", "GROUPS", "OF", "BY", "STEP",
+];
