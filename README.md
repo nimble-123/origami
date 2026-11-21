@@ -98,6 +98,7 @@ keyword_case = "upper"
 * [Style](docs/STYLE.md): every output rule, with approval gate
 * [Invariants](docs/INVARIANTS.md): what "layout only" means and how it is checked
 * [CLI contract](docs/CLI.md)
+* [Adopting origami in a team](docs/adoption.md)
 * [Design](docs/designs/origami.md)
 
 ## Development
