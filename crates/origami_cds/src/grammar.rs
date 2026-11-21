@@ -309,4 +309,95 @@ impl G<'_> {
         docs.extend(segments);
         Some(b::concat(docs))
     }
+
+    // ---- select-list elements ------------------------------------------
+
+    /// A DDLS select-list element that contains `case` (CDS-ELEM-001). A case
+    /// with two or more `when` always breaks: each `when` / `else` one level
+    /// deeper than its `case`, `end` at the level of its `case`. A case with
+    /// one `when` stays on one line if it fits. Elements without `case`
+    /// return `None` and keep the author's line breaks.
+    pub fn element(&self, first: usize, last: usize) -> Option<Doc> {
+        if !(first..=last).any(|k| self.word(k) == "case") {
+            return None;
+        }
+        // Count `when`s per case (by the index of its `case`).
+        let mut stack: Vec<usize> = Vec::new();
+        let mut whens = std::collections::HashMap::new();
+        for k in first..=last {
+            match self.word(k).as_str() {
+                "case" => stack.push(k),
+                "when" => *whens.entry(*stack.last()?).or_insert(0) += 1,
+                "end" => {
+                    stack.pop()?;
+                }
+                _ => {}
+            }
+        }
+        if !stack.is_empty() {
+            return None;
+        }
+        let nest = |d: usize, doc: Doc| (0..d).fold(doc, |x, _| b::indent(vec![x]));
+        let mut docs = vec![self.t(first)];
+        let mut cases: Vec<(usize, bool)> = Vec::new(); // (case index, multi-when)
+        if self.word(first) == "case" {
+            cases.push((first, whens.get(&first).copied().unwrap_or(0) > 1));
+        }
+        for k in first + 1..=last {
+            let w = self.word(k);
+            match w.as_str() {
+                "when" | "else" if !cases.is_empty() && !self.glued(k) => {
+                    let (_, multi) = *cases.last().unwrap();
+                    let brk = if multi { self.hl(k) } else { self.ln(k) };
+                    docs.push(nest(cases.len(), b::concat(vec![brk, self.t(k)])));
+                }
+                "end" if !cases.is_empty() && !self.glued(k) => {
+                    let (_, multi) = cases.pop().unwrap();
+                    let brk = if multi { self.hl(k) } else { self.ln(k) };
+                    docs.push(nest(cases.len(), b::concat(vec![brk, self.t(k)])));
+                }
+                _ => {
+                    docs.push(self.sp(k));
+                    docs.push(self.t(k));
+                    if w == "case" {
+                        cases.push((k, whens.get(&k).copied().unwrap_or(0) > 1));
+                    }
+                }
+            }
+        }
+        Some(b::group(docs))
+    }
+
+    // ---- DCL -----------------------------------------------------------
+
+    /// `grant select on <entity> [where …];` (DCL-GRANT-001): on one line if
+    /// it fits; otherwise `where` starts a line one level deeper, and a long
+    /// condition breaks before `and` / `or` two levels deeper.
+    pub fn grant(&self, first: usize, last: usize) -> Option<Doc> {
+        if self.word(first) != "grant" {
+            return None;
+        }
+        let mut docs = vec![self.t(first)];
+        let mut depth = 0i32;
+        let mut in_where = false;
+        for k in first + 1..=last {
+            match self.kind(k) {
+                LPAREN | LBRACKET => depth += 1,
+                RPAREN | RBRACKET => depth -= 1,
+                _ => {}
+            }
+            let w = self.word(k);
+            if depth == 0 && w == "where" && !self.glued(k) {
+                in_where = true;
+                docs.push(b::indent(vec![self.ln(k), self.t(k)]));
+            } else if depth == 0 && in_where && matches!(w.as_str(), "and" | "or") && !self.glued(k)
+            {
+                docs.push(b::indent(vec![b::indent(vec![self.ln(k), self.t(k)])]));
+            } else {
+                docs.push(self.sp(k));
+                docs.push(self.t(k));
+            }
+        }
+        Some(b::group(docs))
+    }
 }

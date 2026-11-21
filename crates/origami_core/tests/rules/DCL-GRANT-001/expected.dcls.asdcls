@@ -1,0 +1,7 @@
+define role ZI_Travel
+{
+  grant select on ZI_Travel
+    where ( AgencyID ) = aspect pfcg_auth( ZAGENCY, ZAGENCYID, ACTVT = '03' )
+      and CurrencyCode = 'EUR'
+      and Status <> 'X';
+}

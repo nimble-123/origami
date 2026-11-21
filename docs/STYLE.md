@@ -546,3 +546,37 @@ define root view entity ZI_Travel
 {
 ```
 
+### CDS-ELEM-001: Case expressions in select lists
+Milestone: M2
+
+Approved by the maintainer, Nils Lutz, on 2026-11-21. A `case` expression with two or
+more `when` always breaks: each `when` and `else` starts a line one level
+deeper than its `case`, and `end` starts a line at the level of its `case`.
+Nested cases go one level deeper each. A `case` with one `when` stays on one
+line when it fits. Elements without `case` keep the author's line breaks.
+
+```cds
+      case currency
+        when 'EUR' then 'X'
+        when 'USD' then 'Y'
+        else 'Z'
+      end as CurrencyGroup,
+```
+
+### DCL-GRANT-001: Access conditions
+Milestone: M2
+
+Approved by the maintainer, Nils Lutz, on 2026-11-21. `grant select on <entity> [where …];`
+is printed on one line when it fits, instead of one word per line as in the
+ADT template. Otherwise `where` starts a line one level deeper, and a long
+condition breaks before `and` / `or` two levels deeper.
+
+```cds
+define role ZI_Travel
+{
+  grant select on ZI_Travel
+    where ( AgencyID ) = aspect pfcg_auth( ZAGENCY, ZAGENCYID, ACTVT = '03' )
+      and CurrencyCode = 'EUR';
+}
+```
+

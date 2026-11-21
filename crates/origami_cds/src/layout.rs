@@ -267,7 +267,11 @@ pub fn layout(
             };
             let parsed = match u.kind {
                 Kind::Annotation => g.annotation(u.first, u.last),
-                Kind::Element => g.header(u.first, u.last, lang),
+                Kind::Element => g.header(u.first, u.last, lang).or_else(|| match lang {
+                    Language::Ddls if u.depth > 0 => g.element(u.first, u.last),
+                    Language::Dcl => g.grant(u.first, u.last),
+                    _ => None,
+                }),
                 _ => None,
             };
             parsed.unwrap_or_else(|| b::unknown(first, last, blank))
