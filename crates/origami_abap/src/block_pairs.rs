@@ -109,7 +109,10 @@ pub fn select_is_loop(depth0: &[String]) -> bool {
         return false;
     }
     let Some(into) = q.iter().position(|w| w == "INTO" || w == "APPENDING") else {
-        return false;
+        // Obsolete short form with the `TABLES` work area
+        // (`SELECT * FROM dbtab WHERE … . … ENDSELECT.`): a loop unless it
+        // only aggregates.
+        return sel == 0 && !is_aggregate_only(q);
     };
     let target = q[into + 1..]
         .iter()

@@ -32,6 +32,12 @@ pub fn by_file_name(name: &str) -> FileKind {
     let lower = name.to_ascii_lowercase();
     let ext = |s: &str| lower.ends_with(s);
     let lang = if ext(".abap") {
+        // abapGit stores dynpro flow logic (`PROCESS BEFORE OUTPUT.`,
+        // `MODULE x.` as a call) as `<prog>.screen_<nr>.abap`; that is a
+        // different language.
+        if lower.contains(".screen_") {
+            return FileKind::Unsupported;
+        }
         Language::Abap
     } else if ext(".asddls") {
         Language::Ddls

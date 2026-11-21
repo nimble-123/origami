@@ -42,6 +42,55 @@ fn keyword_position(
     !(next.kind == WORD && matches!(op, "=" | "?=" | "+=" | "-=" | "*=" | "/=" | "&&="))
 }
 
+/// Closer of the implicit block an event keyword opens (an event block has
+/// no closing statement; it ends at the next event or processing block).
+const EVENT: &str = "";
+
+/// Event keywords of reports and module pools (ABAP-EVENT-001).
+fn is_event(words: &[String]) -> bool {
+    let w = |k: usize| words.get(k).map(String::as_str).unwrap_or("");
+    match w(0) {
+        "LOAD-OF-PROGRAM" | "INITIALIZATION" | "START-OF-SELECTION" | "END-OF-SELECTION"
+        | "TOP-OF-PAGE" | "END-OF-PAGE" => true,
+        "AT" => {
+            matches!(w(1), "SELECTION-SCREEN" | "LINE-SELECTION" | "USER-COMMAND")
+                || (w(1).starts_with("PF") && w(1)[2..].parse::<u8>().is_ok())
+        }
+        _ => false,
+    }
+}
+
+/// Closer of a structure that opens in one declaration and closes in a later
+/// one (`DATA: BEGIN OF s.` … `DATA: END OF s.`); its body is indented.
+const END_OF: &str = "END OF";
+
+/// Net number of structures a declaration opens (positive) or closes.
+fn struct_delta(words: &[String]) -> i32 {
+    if !matches!(
+        words.first().map(String::as_str),
+        Some("DATA" | "TYPES" | "CONSTANTS" | "STATICS" | "CLASS-DATA")
+    ) {
+        return 0;
+    }
+    words
+        .windows(2)
+        .map(|p| match (p[0].as_str(), p[1].as_str()) {
+            ("BEGIN", "OF") => 1,
+            ("END", "OF") => -1,
+            _ => 0,
+        })
+        .sum()
+}
+
+/// Processing blocks that end an event block.
+const ENDS_EVENT: &[&str] = &[
+    "ENDFORM",
+    "ENDMODULE",
+    "ENDFUNCTION",
+    "ENDCLASS",
+    "ENDINTERFACE",
+];
+
 /// Blocks whose intermediates are indented one level and bodies two.
 fn extra_level(words: &[String]) -> u32 {
     match words.first().map(String::as_str) {
@@ -95,14 +144,38 @@ pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnos
                     }
                 }
                 let opener_at = tokens[start].start;
-                let level: u32 = blocks.iter().map(|b| b.2).sum();
                 // ABAP has no reserved words: `do( ).`, `if = 1.` or
                 // `case->m( ).` are calls or assignments, never blocks.
-                let role = if keyword_position(text, tokens, start, k) {
+                let keyword = keyword_position(text, tokens, start, k);
+                let role = if keyword {
                     classify(&words, &depth0)
                 } else {
                     None
                 };
+                // An event block ends at the next event or processing block
+                // on its level, and before a closer meant for an outer block.
+                let event = keyword && is_event(&words);
+                let ends_event = event
+                    || matches!(role, Some(Role::Opener(c)) if ENDS_EVENT.contains(&c))
+                    || role == Some(Role::Closer);
+                if ends_event && blocks.last().is_some_and(|b| b.0 == EVENT) {
+                    blocks.pop();
+                }
+                let delta = if keyword { struct_delta(&words) } else { 0 };
+                if delta < 0 {
+                    for _ in 0..-delta {
+                        if blocks.last().is_some_and(|b| b.0 == END_OF) {
+                            blocks.pop();
+                        }
+                    }
+                }
+                let level: u32 = blocks.iter().map(|b| b.2).sum();
+                if event && blocks.is_empty() {
+                    blocks.push((EVENT, opener_at, 1));
+                }
+                for _ in 0..delta.max(0) {
+                    blocks.push((END_OF, opener_at, 1));
+                }
                 let depth_here = match role {
                     Some(Role::Opener(closer)) => {
                         blocks.push((closer, opener_at, 1 + extra_level(&words)));
@@ -156,6 +229,9 @@ pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnos
             "Statement is not terminated by a period".into(),
             at,
         ));
+    }
+    while blocks.last().is_some_and(|b| b.0 == EVENT || b.0 == END_OF) {
+        blocks.pop();
     }
     if let Some((closer, at, _)) = blocks.last() {
         return Err(err(

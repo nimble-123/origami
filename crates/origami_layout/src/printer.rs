@@ -509,11 +509,16 @@ impl<'c, 'a> Printer<'c, 'a> {
         // A unit that starts with `*` never starts in column 1 (see
         // write_token); shift its other lines by the same amount.
         let star = ctx.token_text(first).starts_with('*');
-        let target = if star && self.column() == 0 {
-            1
-        } else {
-            self.column()
+        // Measured like `orig`: a tab already on this output line counts as
+        // one indent step.
+        let here = match self.pending_indent {
+            Some(c) => c,
+            None => {
+                let ls = self.out.rfind('\n').map(|p| p + 1).unwrap_or(0);
+                visual_width(&self.out[ls..], ctx.opts.indent as usize)
+            }
         };
+        let target = if star && here == 0 { 1 } else { here };
         let shift = target as isize - orig as isize;
         let min_indent = ctx.opts.indent as usize;
 

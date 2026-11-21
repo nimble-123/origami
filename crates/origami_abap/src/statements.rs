@@ -55,6 +55,16 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             p.pos = start;
             return None;
         }
+        if w0 == "FORM" && p.kind(start + 1) == WORD {
+            let saved = p.c.keywords.len();
+            let lead = p.kw(start);
+            if let Some(item) = method_item(p, start + 1, p.end, FORM_SECTIONS) {
+                p.pos = p.end;
+                return Some(b::group(vec![lead, p.sp(start + 1), item, p.period()]));
+            }
+            p.c.keywords.truncate(saved);
+            p.pos = start;
+        }
         if w0 == "METHODS" || w0 == "CLASS-METHODS" {
             let r = methods(p);
             if r.is_none() {
@@ -63,6 +73,15 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             return r;
         }
         for spec in SPECS {
+            // `RAISE x.` (classic) is not `RAISE EXCEPTION …` and friends.
+            if spec.lead == ["RAISE"]
+                && matches!(
+                    p.upper(start + 1).as_str(),
+                    "EXCEPTION" | "EVENT" | "SHORTDUMP" | "ENTITY" | "RESUMABLE"
+                )
+            {
+                continue;
+            }
             if matches_words(p, start, spec.lead) {
                 let saved = p.c.keywords.len();
                 if let Some(d) = keyword_statement(p, spec) {
@@ -638,8 +657,7 @@ static SPECS: &[Spec] = &[
         ..spec(&["GET", "TIME"])
     },
     Spec {
-        words: &[],
-        bare: false,
+        words: &["AND WAIT"],
         ..spec(&["COMMIT", "WORK"])
     },
     Spec {
@@ -739,6 +757,564 @@ static SPECS: &[Spec] = &[
         all_clauses: true,
         ..spec(&["SELECT"])
     },
+    // ---- classic ABAP: programs, events, selection screens, lists --------
+    Spec {
+        words: PROGRAM_WORDS,
+        bare: false,
+        ..spec(&["REPORT"])
+    },
+    Spec {
+        words: PROGRAM_WORDS,
+        bare: false,
+        ..spec(&["PROGRAM"])
+    },
+    Spec {
+        words: PROGRAM_WORDS,
+        bare: false,
+        ..spec(&["FUNCTION-POOL"])
+    },
+    Spec {
+        bare: false,
+        ..spec(&["TABLES"])
+    },
+    Spec {
+        bare: false,
+        ..spec(&["TYPE-POOLS"])
+    },
+    spec(&["LOAD-OF-PROGRAM"]),
+    spec(&["INITIALIZATION"]),
+    spec(&["START-OF-SELECTION"]),
+    spec(&["END-OF-SELECTION"]),
+    spec(&["END-OF-PAGE"]),
+    Spec {
+        words: &["DURING LINE-SELECTION"],
+        ..spec(&["TOP-OF-PAGE"])
+    },
+    Spec {
+        words: &[
+            "OUTPUT",
+            "ON",
+            "END OF",
+            "BLOCK",
+            "RADIOBUTTON GROUP",
+            "VALUE-REQUEST",
+            "HELP-REQUEST",
+            "FOR",
+            "EXIT-COMMAND",
+        ],
+        ..spec(&["AT", "SELECTION-SCREEN"])
+    },
+    spec(&["AT", "LINE-SELECTION"]),
+    spec(&["AT", "USER-COMMAND"]),
+    spec(&["AT", "FIRST"]),
+    spec(&["AT", "LAST"]),
+    Spec {
+        bare: false,
+        ..spec(&["AT", "NEW"])
+    },
+    Spec {
+        bare: false,
+        ..spec(&["AT", "END", "OF"])
+    },
+    spec(&["SUM"]),
+    Spec {
+        words: PARAMETER_WORDS,
+        bare: false,
+        ..spec(&["PARAMETERS"])
+    },
+    Spec {
+        words: PARAMETER_WORDS,
+        bare: false,
+        ..spec(&["PARAMETER"])
+    },
+    Spec {
+        words: PARAMETER_WORDS,
+        bare: false,
+        ..spec(&["SELECT-OPTIONS"])
+    },
+    Spec {
+        words: &[
+            "BEGIN OF",
+            "END OF",
+            "BLOCK",
+            "LINE",
+            "SCREEN",
+            "TABBED BLOCK",
+            "WITH FRAME",
+            "TITLE",
+            "NO INTERVALS",
+            "AS SUBSCREEN",
+            "AS WINDOW",
+            "COMMENT",
+            "FOR FIELD",
+            "POSITION",
+            "SKIP",
+            "ULINE",
+            "PUSHBUTTON",
+            "USER-COMMAND",
+            "MODIF ID",
+            "VISIBLE LENGTH",
+            "TAB",
+            "DEFAULT SCREEN",
+            "DEFAULT PROGRAM",
+            "FUNCTION KEY",
+            "INCLUDE",
+            "PARAMETERS",
+            "SELECT-OPTIONS",
+            "BLOCKS",
+            "NESTING LEVEL",
+            "LINES",
+        ],
+        bare: false,
+        ..spec(&["SELECTION-SCREEN"])
+    },
+    Spec {
+        clauses: &["TABLES", "USING", "CHANGING", "RAISING"],
+        words: FORM_WORDS,
+        bare: false,
+        ..spec(&["FORM"])
+    },
+    spec(&["ENDFORM"]),
+    Spec {
+        clauses: &["TABLES", "USING", "CHANGING"],
+        words: &[
+            "IN PROGRAM",
+            "IF FOUND",
+            "ON COMMIT",
+            "ON ROLLBACK",
+            "LEVEL",
+        ],
+        bare: false,
+        ..spec(&["PERFORM"])
+    },
+    Spec {
+        bare: false,
+        ..spec(&["FUNCTION"])
+    },
+    spec(&["ENDFUNCTION"]),
+    Spec {
+        words: &["OUTPUT", "INPUT"],
+        bare: false,
+        ..spec(&["MODULE"])
+    },
+    spec(&["ENDMODULE"]),
+    Spec {
+        words: WRITE_WORDS,
+        bare: false,
+        ..spec(&["WRITE"])
+    },
+    Spec {
+        words: &["AT"],
+        ..spec(&["ULINE"])
+    },
+    spec(&["SKIP"]),
+    Spec {
+        words: &["TO LINE"],
+        ..spec(&["SKIP"])
+    },
+    Spec {
+        words: &["NO-SCROLLING", "SCROLLING"],
+        ..spec(&["NEW-LINE"])
+    },
+    Spec {
+        words: &[
+            "NO-TITLE",
+            "WITH-TITLE",
+            "NO-HEADING",
+            "WITH-HEADING",
+            "LINE-SIZE",
+            "LINE-COUNT",
+        ],
+        ..spec(&["NEW-PAGE"])
+    },
+    Spec {
+        words: &["LINES"],
+        bare: false,
+        ..spec(&["RESERVE"])
+    },
+    spec(&["BACK"]),
+    Spec {
+        bare: false,
+        ..spec(&["POSITION"])
+    },
+    Spec {
+        words: &[
+            "COLOR",
+            "INTENSIFIED",
+            "INVERSE",
+            "HOTSPOT",
+            "INPUT",
+            "FRAMES",
+            "ON",
+            "OFF",
+            "RESET",
+        ],
+        ..spec(&["FORMAT"])
+    },
+    Spec {
+        bare: false,
+        ..spec(&["HIDE"])
+    },
+    Spec {
+        clauses: &["TO"],
+        bare: false,
+        ..spec(&["ADD"])
+    },
+    Spec {
+        clauses: &["FROM"],
+        bare: false,
+        ..spec(&["SUBTRACT"])
+    },
+    Spec {
+        clauses: &["BY"],
+        bare: false,
+        ..spec(&["MULTIPLY"])
+    },
+    Spec {
+        clauses: &["BY"],
+        bare: false,
+        ..spec(&["DIVIDE"])
+    },
+    Spec {
+        clauses: &["TO"],
+        words: &["EXACT"],
+        bare: false,
+        ..spec(&["MOVE"])
+    },
+    Spec {
+        words: &["LINES", "KIND", "OCCURS"],
+        bare: false,
+        ..spec(&["DESCRIBE", "TABLE"])
+    },
+    Spec {
+        words: &[
+            "TYPE",
+            "COMPONENTS",
+            "LENGTH",
+            "IN CHARACTER MODE",
+            "IN BYTE MODE",
+            "DECIMALS",
+            "OUTPUT-LENGTH",
+            "HELP-ID",
+            "EDIT MASK",
+        ],
+        bare: false,
+        ..spec(&["DESCRIBE", "FIELD"])
+    },
+    Spec {
+        words: &["EXCLUDING", "OF PROGRAM", "IMMEDIATELY"],
+        bare: false,
+        ..spec(&["SET", "PF-STATUS"])
+    },
+    Spec {
+        words: &["OF PROGRAM", "WITH"],
+        bare: false,
+        ..spec(&["SET", "TITLEBAR"])
+    },
+    Spec {
+        words: &["FIELD"],
+        bare: false,
+        ..spec(&["SET", "PARAMETER", "ID"])
+    },
+    Spec {
+        words: &["FIELD"],
+        bare: false,
+        ..spec(&["GET", "PARAMETER", "ID"])
+    },
+    Spec {
+        bare: false,
+        ..spec(&["SET", "SCREEN"])
+    },
+    Spec {
+        clauses: &["INTO"],
+        bare: false,
+        ..spec(&["GET", "REFERENCE", "OF"])
+    },
+    spec(&["LEAVE", "SCREEN"]),
+    spec(&["LEAVE", "PROGRAM"]),
+    spec(&["LEAVE", "LIST-PROCESSING"]),
+    Spec {
+        words: &["AND RETURN TO SCREEN"],
+        ..spec(&["LEAVE", "TO", "LIST-PROCESSING"])
+    },
+    Spec {
+        bare: false,
+        ..spec(&["LEAVE", "TO", "SCREEN"])
+    },
+    Spec {
+        words: &["AND SKIP FIRST SCREEN"],
+        bare: false,
+        ..spec(&["LEAVE", "TO", "TRANSACTION"])
+    },
+    Spec {
+        clauses: &["STARTING AT", "ENDING AT"],
+        bare: false,
+        ..spec(&["CALL", "SCREEN"])
+    },
+    Spec {
+        clauses: &["USING", "MESSAGES INTO", "OPTIONS FROM"],
+        words: &[
+            "WITH AUTHORITY-CHECK",
+            "WITHOUT AUTHORITY-CHECK",
+            "AND SKIP FIRST SCREEN",
+            "MODE",
+            "UPDATE",
+        ],
+        bare: false,
+        ..spec(&["CALL", "TRANSACTION"])
+    },
+    Spec {
+        clauses: &[
+            "WITH",
+            "USING SELECTION-SET",
+            "VIA SELECTION-SCREEN",
+            "AND RETURN",
+            "EXPORTING LIST TO MEMORY",
+            "TO SAP-SPOOL",
+        ],
+        words: &[
+            "SIGN",
+            "IN",
+            "USER",
+            "VIA JOB",
+            "NUMBER",
+            "SPOOL PARAMETERS",
+            "WITHOUT SPOOL DYNPRO",
+            "LINE-SIZE",
+            "LINE-COUNT",
+            "SELECTION-TABLE",
+        ],
+        bare: false,
+        ..spec(&["SUBMIT"])
+    },
+    Spec {
+        clauses: &["TO", "FROM"],
+        words: &[
+            "MEMORY ID",
+            "DATA BUFFER",
+            "INTERNAL TABLE",
+            "DATABASE",
+            "SHARED MEMORY",
+            "SHARED BUFFER",
+            "ID",
+        ],
+        bare: false,
+        ..spec(&["EXPORT"])
+    },
+    Spec {
+        clauses: &["TO", "FROM"],
+        words: &[
+            "MEMORY ID",
+            "DATA BUFFER",
+            "INTERNAL TABLE",
+            "DATABASE",
+            "SHARED MEMORY",
+            "SHARED BUFFER",
+            "ID",
+        ],
+        bare: false,
+        ..spec(&["IMPORT"])
+    },
+    Spec {
+        words: &["ID"],
+        ..spec(&["FREE", "MEMORY"])
+    },
+    Spec {
+        words: &["TYPE", "TABLEVIEW", "TABSTRIP", "USING SCREEN"],
+        bare: false,
+        ..spec(&["CONTROLS"])
+    },
+    Spec {
+        words: &["FROM TABLE"],
+        bare: false,
+        ..spec(&["REFRESH"])
+    },
+    Spec {
+        clauses: &["STARTING AT", "ENDING AT", "USING SELECTION-SET"],
+        bare: false,
+        ..spec(&["CALL", "SELECTION-SCREEN"])
+    },
+    Spec {
+        words: DATASET_WORDS,
+        bare: false,
+        ..spec(&["OPEN", "DATASET"])
+    },
+    Spec {
+        bare: false,
+        ..spec(&["CLOSE", "DATASET"])
+    },
+    Spec {
+        bare: false,
+        ..spec(&["DELETE", "DATASET"])
+    },
+    Spec {
+        clauses: &["INTO"],
+        words: &["MAXIMUM LENGTH", "ACTUAL LENGTH", "LENGTH"],
+        bare: false,
+        ..spec(&["READ", "DATASET"])
+    },
+    Spec {
+        clauses: &["TO"],
+        words: &["LENGTH", "NO END OF LINE"],
+        bare: false,
+        ..spec(&["TRANSFER"])
+    },
+    Spec {
+        clauses: &["INTO", "APPENDING"],
+        words: &["TABLE", "CORRESPONDING FIELDS OF", "PACKAGE SIZE"],
+        bare: false,
+        ..spec(&["FETCH", "NEXT", "CURSOR"])
+    },
+    Spec {
+        bare: false,
+        ..spec(&["CLOSE", "CURSOR"])
+    },
+    Spec {
+        clauses: &["INTO"],
+        words: &["STATE"],
+        bare: false,
+        ..spec(&["READ", "REPORT"])
+    },
+    Spec {
+        clauses: &["INTO"],
+        words: &["LANGUAGE", "STATE"],
+        bare: false,
+        ..spec(&["READ", "TEXTPOOL"])
+    },
+    Spec {
+        clauses: &["INTO"],
+        words: &["OF"],
+        bare: false,
+        ..spec(&["GET", "BIT"])
+    },
+    Spec {
+        words: &["OF", "TO"],
+        bare: false,
+        ..spec(&["SET", "BIT"])
+    },
+    spec(&["STOP"]),
+    spec(&["REJECT"]),
+    // Classic exception in a function module (`RAISE not_found.`); the
+    // dispatcher skips it before EXCEPTION, EVENT, SHORTDUMP, ENTITY and
+    // RESUMABLE.
+    Spec {
+        bare: false,
+        ..spec(&["RAISE"])
+    },
+];
+
+const DATASET_WORDS: &[&str] = &[
+    "FOR INPUT",
+    "FOR OUTPUT",
+    "FOR APPENDING",
+    "FOR UPDATE",
+    "IN BINARY MODE",
+    "IN TEXT MODE",
+    "IN LEGACY BINARY MODE",
+    "IN LEGACY TEXT MODE",
+    "ENCODING DEFAULT",
+    "ENCODING UTF-8",
+    "ENCODING NON-UNICODE",
+    "SKIPPING BYTE-ORDER MARK",
+    "WITH BYTE-ORDER MARK",
+    "WITH SMART LINEFEED",
+    "WITH NATIVE LINEFEED",
+    "WITH UNIX LINEFEED",
+    "WITH WINDOWS LINEFEED",
+    "IGNORING CONVERSION ERRORS",
+    "MESSAGE",
+    "AT POSITION",
+    "FILTER",
+    "TYPE",
+];
+
+const PROGRAM_WORDS: &[&str] = &[
+    "MESSAGE-ID",
+    "LINE-SIZE",
+    "LINE-COUNT",
+    "NO STANDARD PAGE HEADING",
+    "REDUCED FUNCTIONALITY",
+    "DEFINING DATABASE",
+];
+
+const PARAMETER_WORDS: &[&str] = &[
+    "TYPE",
+    "LIKE",
+    "FOR",
+    "DEFAULT",
+    "TO",
+    "OPTION",
+    "SIGN",
+    "OBLIGATORY",
+    "LOWER CASE",
+    "AS CHECKBOX",
+    "AS LISTBOX",
+    "RADIOBUTTON GROUP",
+    "MEMORY ID",
+    "MATCHCODE OBJECT",
+    "VALUE CHECK",
+    "NO-DISPLAY",
+    "NO-EXTENSION",
+    "NO INTERVALS",
+    "VISIBLE LENGTH",
+    "MODIF ID",
+    "USER-COMMAND",
+    "DECIMALS",
+    "LENGTH",
+    "HELP-REQUEST",
+    "VALUE-REQUEST",
+    "REF TO",
+];
+
+const FORM_WORDS: &[&str] = &[
+    "TYPE",
+    "LIKE",
+    "STRUCTURE",
+    "REF TO",
+    "STANDARD TABLE",
+    "SORTED TABLE",
+    "HASHED TABLE",
+    "ANY TABLE",
+    "INDEX TABLE",
+    "TABLE",
+    "OF",
+];
+
+const WRITE_WORDS: &[&str] = &[
+    // Line feed (`WRITE / text.`).
+    "/",
+    "AT",
+    "NO-GAP",
+    "COLOR",
+    "INTENSIFIED",
+    "INVERSE",
+    "HOTSPOT",
+    "INPUT",
+    "FRAMES",
+    "ON",
+    "OFF",
+    "CENTERED",
+    "LEFT-JUSTIFIED",
+    "RIGHT-JUSTIFIED",
+    "UNDER",
+    "USING EDIT MASK",
+    "USING NO EDIT MASK",
+    "CURRENCY",
+    "DECIMALS",
+    "NO-SIGN",
+    "NO-ZERO",
+    "NO-GROUPING",
+    "ROUND",
+    "UNIT",
+    "EXPONENT",
+    "TIME ZONE",
+    "AS CHECKBOX",
+    "AS ICON",
+    "AS SYMBOL",
+    "AS LINE",
+    "QUICKINFO",
+    "TO",
+    "STYLE",
 ];
 
 fn matches_words(p: &P, at: usize, words: &[&str]) -> bool {
@@ -784,6 +1360,29 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
     if p.kind(p.pos) == COLON && !spec.commas {
         return spec_chain(p, spec, b::concat(head));
     }
+    // Keywords before the colon belong to every item (`WRITE /: a, b.`).
+    if !spec.commas {
+        let saved = p.c.keywords.len();
+        let mut prefix = Vec::new();
+        let mut q = p.pos;
+        loop {
+            let n = phrase_at(p, q, spec.words);
+            if n == 0 {
+                break;
+            }
+            for k in 0..n {
+                prefix.push(p.sp(q + k));
+                prefix.push(p.kw(q + k));
+            }
+            q += n;
+        }
+        if q > p.pos && q < p.end && p.kind(q) == COLON {
+            p.pos = q;
+            head.extend(prefix);
+            return spec_chain(p, spec, b::concat(head));
+        }
+        p.c.keywords.truncate(saved);
+    }
     let body = spec_body(p, spec, true)?;
     Some(b::group(vec![b::concat(head), body, p.period()]))
 }
@@ -822,6 +1421,8 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
         // statement follows it (`ASSIGN structure TO <fs>`).
         if n_word > 0
             && Some(i) == first_operand
+            && p.text(i)
+                .starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
             && (i + n_word >= p.end || phrase_at(p, i + n_word, spec.clauses) > 0)
         {
             n_word = 0;
@@ -927,7 +1528,7 @@ fn spec_chain(p: &mut P, spec: &Spec, head: Doc) -> Option<Doc> {
     if a < p.end {
         items.push((a, p.end));
     }
-    if items.is_empty() || items.iter().any(|&(x, e)| x >= e || p.glued(x)) {
+    if items.is_empty() || items.iter().any(|&(x, e)| x >= e) {
         return None;
     }
     let end = p.end;
@@ -939,7 +1540,8 @@ fn spec_chain(p: &mut P, spec: &Spec, head: Doc) -> Option<Doc> {
         p.end = end;
         let item = item?;
         let mut d = Vec::new();
-        if n > 0 {
+        // An item glued to its comma stays glued (no line break possible).
+        if n > 0 && !p.glued(x) {
             d.push(p.ln(x));
         }
         d.push(b::group(vec![item]));
@@ -1197,8 +1799,10 @@ fn declaration(p: &mut P) -> Option<Doc> {
         };
         let begin = p.is(a, "BEGIN") && p.is(a + 1, "OF");
         let end = p.is(a, "END") && p.is(a + 1, "OF");
+        // A structure may open and close in different statements
+        // (`DATA: BEGIN OF s.` … `DATA: END OF s.`).
         if end {
-            level = level.checked_sub(1)?;
+            level = level.saturating_sub(1);
         }
         let mut tail_end = vec![];
         if let Some(c) = comma {
@@ -1233,9 +1837,6 @@ fn declaration(p: &mut P) -> Option<Doc> {
         if begin {
             level += 1;
         }
-    }
-    if level != 0 {
-        return None;
     }
     // Group consecutive rows of the same level into alignment groups.
     let mut docs: Vec<Doc> = Vec::new();
@@ -1298,11 +1899,14 @@ const SECTIONS: &[&str] = &[
     "EXCEPTIONS",
 ];
 
-fn is_section(p: &P, i: usize) -> bool {
+/// Sections of a `FORM` signature (ABAP-FORM-001), laid out like `METHODS`.
+const FORM_SECTIONS: &[&str] = &["TABLES", "USING", "CHANGING", "RAISING"];
+
+fn is_section(p: &P, i: usize, sections: &[&str]) -> bool {
     // A parameter may be named like a section keyword (`IMPORTING importing TYPE i`).
     p.kind(i) == WORD
         && !p.glued(i)
-        && SECTIONS.contains(&p.upper(i).as_str())
+        && sections.contains(&p.upper(i).as_str())
         && !operand_follows_glued(p, i)
         && !(p.is(i + 1, "TYPE") || p.is(i + 1, "LIKE"))
 }
@@ -1320,14 +1924,14 @@ fn param_start(p: &P, i: usize) -> bool {
             None => return false,
         }
     }
-    p.is(j, "TYPE") || p.is(j, "LIKE")
+    p.is(j, "TYPE") || p.is(j, "LIKE") || p.is(j, "STRUCTURE")
 }
 
 fn methods(p: &mut P) -> Option<Doc> {
     let start = p.pos;
     let lead = p.kw(start);
     if p.kind(start + 1) != COLON {
-        let item = method_item(p, start + 1, p.end)?;
+        let item = method_item(p, start + 1, p.end, SECTIONS)?;
         p.pos = p.end;
         return Some(b::group(vec![lead, p.sp(start + 1), item, p.period()]));
     }
@@ -1356,7 +1960,7 @@ fn methods(p: &mut P) -> Option<Doc> {
     }
     let mut docs = Vec::new();
     for (n, &(x, e)) in items.iter().enumerate() {
-        let item = method_item(p, x, e)?;
+        let item = method_item(p, x, e, SECTIONS)?;
         let mut d = Vec::new();
         if n > 0 {
             d.push(p.ln(x));
@@ -1382,24 +1986,24 @@ fn methods(p: &mut P) -> Option<Doc> {
 
 /// One method signature from its name (`from`) to `to` (exclusive), without
 /// the leading `METHODS` keyword.
-fn method_item(p: &mut P, from: usize, to: usize) -> Option<Doc> {
+fn method_item(p: &mut P, from: usize, to: usize, sections: &[&str]) -> Option<Doc> {
     let name = from;
     if p.kind(name) != WORD {
         return None;
     }
     let saved_end = p.end;
     p.end = to;
-    let result = method_item_inner(p, name);
+    let result = method_item_inner(p, name, sections);
     p.end = saved_end;
     result
 }
 
-fn method_item_inner(p: &mut P, name: usize) -> Option<Doc> {
+fn method_item_inner(p: &mut P, name: usize, sections_kw: &[&str]) -> Option<Doc> {
     let mut first_line = vec![p.t(name)];
     let mut i = name + 1;
     // Header words up to the first section keyword (FOR TESTING, ABSTRACT,
     // RAP handler phrases …), printed as written.
-    while i < p.end && !is_section(p, i) {
+    while i < p.end && !is_section(p, i, sections_kw) {
         first_line.push(p.sp(i));
         let w = p.upper(i);
         let simple = matches!(
@@ -1415,12 +2019,14 @@ fn method_item_inner(p: &mut P, name: usize) -> Option<Doc> {
     }
     let mut sections = Vec::new();
     while i < p.end {
-        if !is_section(p, i) {
+        if !is_section(p, i, sections_kw) {
             return None;
         }
         let kw = p.kw(i);
         let mut j = i + 1;
-        let section_end = (j..p.end).find(|&k| is_section(p, k)).unwrap_or(p.end);
+        let section_end = (j..p.end)
+            .find(|&k| is_section(p, k, sections_kw))
+            .unwrap_or(p.end);
         // Split the section's content into parameters.
         let mut params: Vec<(usize, usize)> = Vec::new();
         let raising = p.is(i, "RAISING");
