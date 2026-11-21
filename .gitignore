@@ -1,0 +1,10 @@
+target/
+corpus/repos/
+editors/vscode/node_modules/
+editors/vscode/out/
+editors/vscode/bin/
+tools/*/node_modules/
+fuzz/artifacts/
+fuzz/corpus/
+fuzz/target/
+.DS_Store

@@ -1,0 +1,31 @@
+[package]
+name = "origami-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+# Separate workspace: cargo-fuzz needs nightly, and libfuzzer-sys includes the
+# NCSA license, which is outside the cargo-deny scope of the main workspace.
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4.13"
+origami_core = { path = "../crates/origami_core" }
+
+[[bin]]
+name = "format_abap"
+path = "fuzz_targets/format_abap.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "format_cds"
+path = "fuzz_targets/format_cds.rs"
+test = false
+doc = false
+bench = false

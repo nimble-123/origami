@@ -1,0 +1,11 @@
+{
+  "name": "origami-abaplint-oracle",
+  "private": true,
+  "description": "Independent ABAP lexer oracle for origami CI (not shipped)",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "@abaplint/core": "2.120.112"
+  }
+}

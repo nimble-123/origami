@@ -1,0 +1,52 @@
+name: Fuzz
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [format_abap, format_cds]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - name: Seed corpus
+        run: |
+          cargo xtask corpus fetch
+          mkdir -p fuzz/corpus/${{ matrix.target }}
+          if [ "${{ matrix.target }}" = format_abap ]; then
+            find corpus/repos -name '*.abap' -size -64k | head -500 | xargs -I{} cp {} fuzz/corpus/format_abap/ || true
+          else
+            find corpus/repos \( -name '*.asddls' -o -name '*.asbdef' -o -name '*.srvdsrv' \) | head -300 | xargs -I{} cp {} fuzz/corpus/format_cds/ || true
+          fi
+      - name: Fuzz for one hour
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=3600
+      - name: Upload crash
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: fuzz/artifacts/
+      - name: Open issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "Fuzz crash in ${{ matrix.target }}" \
+            --body "Nightly fuzzing found a crash. Artifact: run ${{ github.run_id }}."

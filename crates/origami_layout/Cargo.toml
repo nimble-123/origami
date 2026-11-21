@@ -1,0 +1,13 @@
+[package]
+name = "origami_layout"
+description = "Doc IR and printer for the origami ABAP and CDS formatter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+origami_syntax.workspace = true
+
+[lints]
+workspace = true

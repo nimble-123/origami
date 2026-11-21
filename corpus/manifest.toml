@@ -1,0 +1,53 @@
+# Test corpus. `cargo xtask corpus fetch` clones each repository at the pinned
+# commit into corpus/repos/<name>/ (never committed). The `modern` flag selects
+# the files counted for the M1 exit criterion. `commit` is the default-branch
+# HEAD on the M0 start date (2026-11-21). For abap-platform-refscen-flight the
+# sources live on release branches, so the `ABAP-platform-cloud` branch is used.
+
+[[repo]]
+name = "abapGit"
+url = "https://github.com/abapGit/abapGit"
+commit = "ab9919e4e1157807ca6b456832aa79cbf0301857"
+spdx = "MIT"
+include = ["src/**"]
+modern = false
+
+[[repo]]
+name = "abap-platform-refscen-flight"
+url = "https://github.com/SAP-samples/abap-platform-refscen-flight"
+commit = "93f769170fa0b41591c3a4d39284f353cd90799e" # branch ABAP-platform-cloud
+spdx = "Apache-2.0"
+include = ["src/**"]
+modern = true
+
+[[repo]]
+name = "abap-cheat-sheets"
+url = "https://github.com/SAP-samples/abap-cheat-sheets"
+commit = "82815d28fda10f00fb6168747e8a08097e90e729"
+spdx = "Apache-2.0"
+include = ["src/**"]
+modern = true
+
+[[repo]]
+name = "open-abap"
+url = "https://github.com/open-abap/open-abap"
+commit = "1e83502ca98ad2c4f58ec3851edf75e4d80a50f7"
+spdx = "MIT"
+include = ["src/**"]
+modern = false
+
+[[repo]]
+name = "ajson"
+url = "https://github.com/sbcgua/ajson"
+commit = "bf96b577bafed71095db3f9533e2e7bba28bef05"
+spdx = "MIT"
+include = ["src/**"]
+modern = false
+
+[[repo]]
+name = "abap2xlsx"
+url = "https://github.com/abap2xlsx/abap2xlsx"
+commit = "3bdf779f490717bfe0553c95f686e6371ffc326e"
+spdx = "Apache-2.0"
+include = ["src/**"]
+modern = false
