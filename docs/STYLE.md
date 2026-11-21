@@ -366,12 +366,40 @@ before: lv_a = 1.          " first
 after:  lv_a = 1. " first
 ```
 
+### ABAP-EML-001: Entity manipulation language
+Milestone: M1
+
+Approved by the maintainer, Nils Lutz, on 2026-11-21. `READ ENTITIES`, `READ ENTITY`,
+`MODIFY ENTITIES` and `MODIFY ENTITY` statements are printed on one line when
+they fit. Otherwise:
+
+* each `ENTITY` and each response (`FAILED`, `REPORTED`, `MAPPED`) starts a
+  line at the continuation indent;
+* each operation (`CREATE`, `UPDATE`, `DELETE`, `EXECUTE`, `FIELDS`,
+  `ALL FIELDS`, `BY \_assoc`, `FROM`) and its `RESULT` and `LINK` start a line
+  one level deeper;
+* `WITH …` and `FROM …` stay behind their operation and move to the next line
+  only when they do not fit.
+
+`COMMIT ENTITIES`, `GET PERMISSIONS` and `SET LOCKS` break before their
+clauses when they do not fit.
+
+```abap
+READ ENTITIES OF /DMO/I_Travel_M IN LOCAL MODE
+    ENTITY travel
+      FIELDS ( customer_id ) WITH CORRESPONDING #( keys )
+      RESULT DATA(travels)
+    FAILED DATA(failed).
+```
+
 ## CDS family (M2/M3 batch 1, structural)
 
-**Proposed, pending maintainer approval.** These rules apply to DDLS, DDLX,
-DCL, BDEF and SRVD. The layout is structural: it knows units, blocks and
-`key` elements, but not yet the full grammar of headers and expressions.
-One rule is marked **[decision]**.
+Approved by the maintainer, Nils Lutz, on 2026-11-21, including single
+spaces between CDS tokens (CDS-SPACE-001), indented continuation lines in BDEF
+headers (CDS-CONT-001) and one-line RAP handler `METHODS` when they fit
+(ABAP-METHODS-001). These rules apply to DDLS, DDLX, DCL, BDEF and SRVD. The
+layout is structural: it knows units, blocks and `key` elements, but not yet
+the full grammar of headers and expressions.
 
 ### CDS-UNIT-001: One unit per line
 Milestone: M2
@@ -433,9 +461,8 @@ start left of one indent level.
 ### CDS-SPACE-001: Single spaces between tokens
 Milestone: M2
 
-**[decision]** Runs of spaces between tokens on one line shrink to one space.
-Hand-aligned columns, for example annotation values or `as` aliases, are not
-kept. Alternative: keep the author's spacing inside CDS units.
+Runs of spaces between tokens on one line shrink to one space. Hand-aligned
+columns, for example annotation values or `as` aliases, are not kept.
 
 ```cds
 before: id:              'Connection',
