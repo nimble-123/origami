@@ -1,0 +1,5 @@
+annotate entity ZC_X with
+{
+  @UI.facet: [ { id: 'General', purpose: #STANDARD, type: #COLLECTION, position: 10 }, { id: 'Details', targetQualifier: 'Details_FG', parentId: 'General', purpose: #STANDARD, type: #FIELDGROUP_REFERENCE, label: 'Details', position: 20 } ]
+  a;
+}

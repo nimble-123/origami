@@ -6,6 +6,7 @@
 //! are kept and re-indented. The CDS printer never changes letter case.
 //! Grammar-based layout of headers and expressions is future work.
 
+mod grammar;
 pub mod kinds;
 mod layout;
 mod lexer;
@@ -43,7 +44,7 @@ pub fn format(
             tokens: TokenIndex(u.first as u32)..TokenIndex(u.last as u32 + 1),
         })
         .collect();
-    let doc = layout::layout(src.text(), &stream, &cds_units, quarantine, opaque);
+    let doc = layout::layout(src.text(), &stream, lang, &cds_units, quarantine, opaque);
     let print_opts = PrintOptions {
         width: opts.line_width,
         indent: opts.indent_width,

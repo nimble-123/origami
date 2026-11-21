@@ -20,6 +20,9 @@ edition, every output change is listed with its STYLE rule ID.
   selectors after constructor expressions, `CREATE DATA`, `FIND`,
   `REPLACE`, `AUTHORITY-CHECK`, `CALL TRANSFORMATION`, `UPDATE`,
   `RAISE SHORTDUMP`.
+- CDS: annotation values laid out like JSON when they do not fit
+  (CDS-ANNO-001); DDLS and BDEF headers one clause per line
+  (CDS-HEAD-001).
 - Write mode no longer forces each file to disk (fsync): formatting the RAP
   reference project (346 files) takes 0.06 s instead of 0.9 s.
 - Printer unit tests; `docs/adoption.md` (team adoption guide).

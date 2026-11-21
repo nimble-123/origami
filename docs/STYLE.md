@@ -500,3 +500,49 @@ Milestone: M2
 
 Blank lines between units are kept, at most one in a row. Blank lines directly
 after `{` and directly before `}` are removed.
+
+### CDS-ANNO-001: Annotation values
+Milestone: M2
+
+Approved by the maintainer, Nils Lutz, on 2026-11-21. An annotation value is printed on
+one line when it fits. Otherwise each object `{ … }` or array `[ … ]` that does
+not fit puts every item on its own line, one level deeper, and its closing
+bracket on its own line, as in JSON. Items that fit stay on one line. Where a
+bracket is glued to its content in the input (`[{`, `}]`), no line break is
+added between them.
+
+```cds
+@UI.facet: [
+  { id: 'General', purpose: #STANDARD, type: #COLLECTION, position: 10 },
+  {
+    id: 'Details',
+    targetQualifier: 'Details_FG',
+    parentId: 'General',
+    purpose: #STANDARD,
+    type: #FIELDGROUP_REFERENCE,
+    label: 'Details',
+    position: 20
+  }
+]
+```
+
+### CDS-HEAD-001: Definition headers
+Milestone: M2
+
+Approved by the maintainer, Nils Lutz, on 2026-11-21. In a DDLS header, `as select from`,
+`as projection on`, `provider contract`, `with parameters`, each `association`,
+each `composition` and each join start a line one level deeper than `define`;
+view parameters go one level deeper still. A long `on` condition breaks before
+`and` / `or`. In a BDEF `define behavior for` header, each clause
+(`implementation in class`, `persistent table`, `draft table`, `lock`,
+`authorization`, `etag`, `total etag`, `early numbering`, `late numbering`,
+`with …`) starts a line one level deeper.
+
+```cds
+define root view entity ZI_Travel
+  as select from ztravel as Travel
+  composition [0..*] of ZI_Booking as _Booking
+  association [0..1] to ZI_Agency as _Agency on $projection.AgencyID = _Agency.AgencyID
+{
+```
+
