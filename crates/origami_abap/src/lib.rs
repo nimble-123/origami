@@ -1,18 +1,20 @@
 //! ABAP support for origami: lexer, structural pass and layout.
 //!
-//! M0 state: every statement is treated as unknown and the printer runs in
-//! identity mode. Statement parsers arrive in M1.
+//! M1 state: statement-level layout (block indentation, one statement per
+//! line, blank lines). Statements without a parser are printed as unknown
+//! statements: re-indented, with their own line breaks, runs of spaces shrunk
+//! to one, and W003. Statement parsers are added in order of corpus
+//! frequency.
 
 pub mod block_pairs;
 pub mod kinds;
+mod layout;
 mod lexer;
 pub mod structure;
 pub mod verbatim;
 
-use origami_layout::{PrintOptions, builder, print};
-use origami_syntax::{
-    LangOptions, LangResult, SourceText, Stats, TokenIndex, TokenStream, Unit, UnitId,
-};
+use origami_layout::{PrintOptions, print};
+use origami_syntax::{LangOptions, LangResult, SourceText, Stats, TokenIndex, Unit, UnitId};
 use std::collections::BTreeSet;
 
 pub use lexer::lex;
@@ -43,51 +45,29 @@ pub fn format(
         })
         .collect();
 
-    // M0: no statement parsers yet, so every statement is an unknown statement.
-    // W003 ("formatted generically") is not emitted in identity mode, because
-    // nothing is formatted.
-    let doc = layout(&stream, &units, quarantine, opaque);
+    let laid = layout::layout(src.text(), &stream, &statements, quarantine, opaque);
     let print_opts = PrintOptions {
         width: opts.line_width,
         indent: opts.indent_width,
         keyword_case: Some(opts.abap_keyword_case),
         identity,
     };
-    let output = print(&doc, src, &stream, &print_opts);
-    let n = units.len() as u32;
+    let output = print(&laid.doc, src, &stream, &print_opts);
+    // In identity mode nothing is formatted, so no W003 is reported.
+    let diagnostics = if identity {
+        Vec::new()
+    } else {
+        laid.diagnostics
+    };
     LangResult {
         output,
         input_tokens: stream,
         units,
-        diagnostics: Vec::new(),
+        diagnostics,
         stats: Stats {
-            statements: n,
-            unknown: n,
+            statements: statements.len() as u32,
+            unknown: laid.unknown,
             ..Stats::default()
         },
     }
-}
-
-fn layout(
-    stream: &TokenStream,
-    units: &[Unit],
-    quarantine: &BTreeSet<UnitId>,
-    opaque: &BTreeSet<UnitId>,
-) -> origami_layout::Doc {
-    let docs = units
-        .iter()
-        .map(|u| {
-            let first = &stream.tokens[u.tokens.start.0 as usize];
-            let last = &stream.tokens[u.tokens.end.0 as usize - 1];
-            let range = first.start..last.end;
-            if opaque.contains(&u.id) {
-                builder::opaque(range)
-            } else if quarantine.contains(&u.id) {
-                builder::verbatim(range)
-            } else {
-                builder::unknown(range)
-            }
-        })
-        .collect();
-    builder::concat(docs)
 }

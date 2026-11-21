@@ -201,10 +201,16 @@ fn structure_accepts_valid_blocks() {
                TRY.\n    CATCH cx_root.\n    ENDTRY.\n  ENDMETHOD.\nENDCLASS.\nAT SELECTION-SCREEN.\n";
     let st = check(src).expect("valid");
     let depths: Vec<u32> = st.iter().map(|s| s.depth).collect();
+    // CLASS DEFINITION: section at 1; METHOD body at 2; TRY body at 4, CATCH at 3.
     assert_eq!(
         depths,
-        [0, 0, 1, 0, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0, 0]
+        [0, 0, 1, 0, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 1, 0, 0]
     );
+}
+
+#[test]
+fn keywords_used_as_names_are_not_blocks() {
+    assert!(check("do( ).\nif = 1.\ncase->m( ).\nloop[ 1 ]-x = 2.\nwhile += 1.\n").is_ok());
 }
 
 #[test]

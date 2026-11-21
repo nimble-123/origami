@@ -1,2 +1,2 @@
 * This comment stays here
-  DATA x TYPE i.
+DATA x TYPE i.

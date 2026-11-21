@@ -192,7 +192,7 @@ pub fn run(bless: bool) -> Result<(), String> {
                 .language
                 .map(|l| l.as_str().to_string())
                 .unwrap_or_default();
-            let fallback = if origami_core::IDENTITY_MODE {
+            let fallback = if res.language.is_none_or(origami_core::identity_mode) {
                 res.stats.statements
             } else {
                 res.diagnostics
