@@ -14,7 +14,9 @@ edition, every output change is listed with its STYLE rule ID.
   calls, constructor expressions, logical expressions, declarations and
   chains (A3), method signatures, ABAP SQL `SELECT` and about 50 keyword
   statements; keyword upper case (STYLE ABAP-*, batch 1).
-- CDS family: structural layout (STYLE CDS-*, proposed).
+- ABAP EML (`READ`/`MODIFY ENTITIES`, `COMMIT ENTITIES`, `GET PERMISSIONS`,
+  `SET LOCKS`): STYLE ABAP-EML-001.
+- CDS family: structural layout (STYLE CDS-*).
 - M0 walking skeleton:
   - lossless lexers for ABAP and the CDS family;
   - structural checks (E001–E005), with the block-pair table and the

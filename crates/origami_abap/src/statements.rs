@@ -27,6 +27,17 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             p.pos = start;
             return None;
         }
+        if (w0 == "READ" || w0 == "MODIFY")
+            && (p.is(start + 1, "ENTITIES") || p.is(start + 1, "ENTITY"))
+        {
+            let saved = p.c.keywords.len();
+            if let Some(d) = eml(p) {
+                return Some(d);
+            }
+            p.c.keywords.truncate(saved);
+            p.pos = start;
+            return None;
+        }
         if w0 == "METHODS" || w0 == "CLASS-METHODS" {
             let r = methods(p);
             if r.is_none() {
@@ -432,6 +443,39 @@ static SPECS: &[Spec] = &[
         words: &[],
         bare: false,
         ..spec(&["INCLUDE"])
+    },
+    Spec {
+        clauses: &["RESPONSE OF", "FAILED", "REPORTED", "MAPPED"],
+        words: &["IN", "SIMULATION", "MODE"],
+        ..spec(&["COMMIT", "ENTITIES"])
+    },
+    spec(&["ROLLBACK", "ENTITIES"]),
+    Spec {
+        clauses: &["ENTITY", "FROM", "REQUEST", "RESULT", "FAILED", "REPORTED"],
+        words: &[
+            "ONLY",
+            "GLOBAL",
+            "INSTANCE",
+            "AUTHORIZATION",
+            "FEATURES",
+            "OF",
+            "IN",
+            "LOCAL",
+            "MODE",
+        ],
+        bare: false,
+        ..spec(&["GET", "PERMISSIONS"])
+    },
+    Spec {
+        clauses: &["ENTITY", "FROM", "FAILED", "REPORTED"],
+        words: &["OF", "IN", "LOCAL", "MODE"],
+        bare: false,
+        ..spec(&["SET", "LOCKS"])
+    },
+    Spec {
+        clauses: &["FROM"],
+        bare: false,
+        ..spec(&["RAISE", "ENTITY", "EVENT"])
     },
     Spec {
         clauses: &[
@@ -1063,4 +1107,164 @@ fn methods(p: &mut P) -> Option<Doc> {
     docs.push(b::cont(sections));
     docs.push(p.period());
     Some(b::group(docs))
+}
+
+// ---- EML ------------------------------------------------------------------
+
+/// A line of a broken EML statement: its level below the statement
+/// (1 = `ENTITY` and responses, 2 = operations), first token, content, and
+/// data segments (`WITH …`, `FROM …`) that break only when they do not fit.
+struct EmlLine {
+    level: u32,
+    first: usize,
+    content: Vec<Doc>,
+    data: Vec<(Doc, Doc)>,
+}
+
+fn take_kw(p: &mut P, head: &mut Vec<Doc>) {
+    let i = p.pos;
+    head.push(p.sp(i));
+    head.push(p.kw(i));
+    p.pos += 1;
+}
+
+/// `READ ENTITIES OF … | READ ENTITY … | MODIFY ENTITIES OF … | MODIFY ENTITY …`
+/// (ABAP-EML-001). After every keyword that takes an operand, the next token
+/// is an operand, so `REPORTED reported` works.
+fn eml(p: &mut P) -> Option<Doc> {
+    let start = p.pos;
+    let mut head = vec![p.kw(start), p.sp(start + 1), p.kw(start + 1)];
+    let plural = p.is(start + 1, "ENTITIES");
+    p.pos = start + 2;
+    if plural {
+        if !p.is(p.pos, "OF") {
+            return None;
+        }
+        take_kw(p, &mut head);
+        head.push(p.sp(p.pos));
+        head.push(p.operand()?);
+    }
+    loop {
+        if p.is(p.pos, "IN") && p.is(p.pos + 1, "LOCAL") && p.is(p.pos + 2, "MODE") {
+            for _ in 0..3 {
+                take_kw(p, &mut head);
+            }
+        } else if p.is(p.pos, "PRIVILEGED") {
+            take_kw(p, &mut head);
+        } else {
+            break;
+        }
+    }
+    if !plural {
+        head.push(p.sp(p.pos));
+        head.push(p.operand()?);
+    }
+    let op_level = if plural { 2 } else { 1 };
+    let mut lines: Vec<EmlLine> = Vec::new();
+    let mut op_open = false;
+    let mut op_has_data = false;
+    while !p.at_end() {
+        let i = p.pos;
+        if p.glued(i) || p.kind(i) != WORD {
+            return None;
+        }
+        let w = p.upper(i);
+        match w.as_str() {
+            "ENTITY" if plural => {
+                let kw = p.kw(i);
+                p.pos += 1;
+                let sp = p.sp(p.pos);
+                let name = p.operand()?;
+                lines.push(EmlLine {
+                    level: 1,
+                    first: i,
+                    content: vec![kw, sp, name],
+                    data: vec![],
+                });
+                op_open = false;
+            }
+            "FAILED" | "REPORTED" | "MAPPED" | "RESULT" | "LINK" => {
+                let level = if matches!(w.as_str(), "RESULT" | "LINK") {
+                    op_level
+                } else {
+                    1
+                };
+                let kw = p.kw(i);
+                p.pos += 1;
+                let sp = p.sp(p.pos);
+                let value = p.operand()?;
+                lines.push(EmlLine {
+                    level,
+                    first: i,
+                    content: vec![kw, sp, value],
+                    data: vec![],
+                });
+                op_open = false;
+            }
+            "WITH" | "FROM" if op_open && !op_has_data => {
+                let kw = p.kw(i);
+                p.pos += 1;
+                let sp = p.sp(p.pos);
+                let value = p.expr()?;
+                let sep = p.ln(i);
+                lines
+                    .last_mut()?
+                    .data
+                    .push((sep, b::concat(vec![kw, sp, value])));
+                op_has_data = true;
+            }
+            "CREATE" | "UPDATE" | "DELETE" | "EXECUTE" | "BY" | "FIELDS" | "ALL" | "FROM"
+            | "SET" | "AUTO" => {
+                let (n_words, operand) = match w.as_str() {
+                    "ALL" if p.is(i + 1, "FIELDS") => (2, false),
+                    "SET" if p.is(i + 1, "FIELDS") => (2, false),
+                    "AUTO" if p.is(i + 1, "FILL") && p.is(i + 2, "CID") => (3, false),
+                    "FIELDS" | "EXECUTE" | "BY" | "FROM" => (1, true),
+                    "CREATE" | "UPDATE" | "DELETE" => (1, false),
+                    _ => return None,
+                };
+                if !op_open || op_has_data {
+                    lines.push(EmlLine {
+                        level: op_level,
+                        first: i,
+                        content: vec![],
+                        data: vec![],
+                    });
+                    op_open = true;
+                    op_has_data = false;
+                }
+                let line = lines.len() - 1;
+                let mut docs = Vec::new();
+                for k in 0..n_words {
+                    if !lines[line].content.is_empty() || k > 0 {
+                        docs.push(p.sp(i + k));
+                    }
+                    docs.push(p.kw(i + k));
+                }
+                p.pos = i + n_words;
+                if operand {
+                    docs.push(p.sp(p.pos));
+                    docs.push(p.expr()?);
+                    if w == "FROM" {
+                        op_has_data = true;
+                    }
+                }
+                lines[line].content.extend(docs);
+            }
+            _ => return None,
+        }
+    }
+    if lines.is_empty() {
+        return None;
+    }
+    let mut body = Vec::new();
+    for l in lines {
+        let mut d = vec![p.ln(l.first)];
+        d.extend(l.content);
+        if !l.data.is_empty() {
+            d.push(b::fill(l.data));
+        }
+        body.push((1..l.level).fold(b::concat(d), |x, _| b::indent(vec![x])));
+    }
+    Some(b::group(vec![b::concat(head), b::cont(body), p.period()]))
 }
