@@ -1,6 +1,6 @@
 {
   "name": "abap-origami",
-  "displayName": "origami \u2013 ABAP & CDS formatter",
+  "displayName": "origami – ABAP & CDS formatter",
   "description": "Layout-only formatter for ABAP, CDS views, metadata extensions, access controls, behavior definitions and service definitions. Works on abapGit files and ADT for VS Code documents.",
   "version": "0.1.0",
   "publisher": "origami-dev",
@@ -63,16 +63,22 @@
     "build": "node esbuild.mjs",
     "typecheck": "tsc --noEmit",
     "test": "tsc -p tsconfig.test.json && node --test out-test/test/*.test.js",
-    "package": "vsce package"
+    "package": "vsce package",
+    "lint": "eslint .",
+    "test:e2e": "npm run build && tsc -p tsconfig.e2e.json && node out-test/test/e2e/run.js"
   },
   "dependencies": {
     "diff": "9.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@types/node": "22.20.5",
     "@types/vscode": "1.90.0",
+    "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "4.1.1",
     "esbuild": "0.28.2",
-    "typescript": "5.9.3"
+    "eslint": "10.15.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.73.0"
   }
 }

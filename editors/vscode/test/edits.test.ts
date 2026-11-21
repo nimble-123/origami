@@ -58,7 +58,7 @@ test("diagnostics JSON is parsed and positions become 0-based", () => {
     }),
   );
   assert.ok(run);
-  const r = toEditorRange(run!.files[0].diagnostics[0]);
+  const r = toEditorRange(run.files[0].diagnostics[0]);
   assert.deepEqual(r, { startLine: 2, startCharacter: 4, endLine: 2, endCharacter: 6 });
   assert.equal(parseRun("not json"), undefined);
 });
