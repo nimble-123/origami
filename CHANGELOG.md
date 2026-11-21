@@ -29,6 +29,14 @@ edition, every output change is listed with its STYLE rule ID.
   call arguments with an unhandled keyword group fall back instead of
   dropping tokens; `message = …` and other assignments to variables named
   like statements are assignments; `TYPE any` / `TYPE line` stay type names.
+- Robustness (longer fuzzing): a new line over 255 characters that remains
+  after quarantine leaves the whole file as written (INVARIANTS 2); an
+  opaque unit starting with `*` never lands in column 1; an unclosed pragma
+  parameter (`##X[ `) is not part of the pragma; CDS: a one-line block is
+  part of its unit only right after the previous token, and it ends the
+  unit (fixes wrong indentation after `define authorization context … { … }`
+  and keeps one blank line between BDEF statements). One finding on
+  binary garbage with nested braces is open (`fuzz/found/open-*`).
 - Classic ABAP (M4 decision: full grammar): event blocks indented
   (ABAP-EVENT-001), structures across `DATA`/`TYPES` statements
   (ABAP-DECL-002), `FORM` signatures like `METHODS` (ABAP-FORM-001);
@@ -43,8 +51,8 @@ edition, every output change is listed with its STYLE rule ID.
   regression tests in `fuzz/found/`: line-break style could flip between
   runs with `\r\r\n`; a vertical tab ending a comment was dropped; a
   `/* */` comment between tokens on one line was dropped in unknown units
-  (caught by the self-check). Two idempotency findings on binary garbage
-  input are open (`fuzz/found/open-*`).
+  (caught by the self-check). Two further idempotency findings on binary
+  garbage input were fixed later (see Robustness).
 - `ASSIGN structure TO <fs>`: a first operand named like a keyword stays a
   name (found by comparing with ABAP Cleaner output).
 - ABAP: chains of keyword statements (ABAP-CHAIN-001); `SHIFT`,

@@ -152,15 +152,24 @@ pub fn units(text: &str, stream: &TokenStream, lang: Language) -> Vec<CdsUnit> {
                             break;
                         }
                         if k == LBRACE {
-                            // A short block that the author wrote on one line
-                            // stays part of this unit.
+                            // A short block that the author wrote on one line,
+                            // right after the previous token, stays part of
+                            // this unit. (Both conditions survive formatting,
+                            // so a second run makes the same choice.)
                             match matching_brace(toks, j) {
                                 Some(close)
-                                    if line_of(text, toks[j].start)
-                                        == line_of(text, toks[close].start) =>
+                                    if line_of(text, toks[j - 1].start)
+                                        == line_of(text, toks[j].start)
+                                        && line_of(text, toks[j].start)
+                                            == line_of(text, toks[close].start) =>
                                 {
+                                    // The block ends the unit
+                                    // (`use association _x { with draft; }`).
                                     j = close + 1;
-                                    continue;
+                                    if j < n && matches!(toks[j].kind, COMMA | SEMICOLON) {
+                                        j += 1;
+                                    }
+                                    break;
                                 }
                                 _ => break,
                             }

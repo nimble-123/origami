@@ -498,6 +498,11 @@ impl<'c, 'a> Printer<'c, 'a> {
         let src = ctx.src;
         if kind == RawKind::Opaque {
             let (a, b) = ctx.raw_range(first, last);
+            // Opaque text keeps its bytes, but a leading `*` never lands in
+            // column 1 (INVARIANTS 4), where it would start a comment.
+            if src[a..b].starts_with('*') && self.column() == 0 && self.line_empty {
+                self.pending_indent = Some(1);
+            }
             self.write(&src[a..b], indent);
             self.trailing_comments(last, indent);
             return;

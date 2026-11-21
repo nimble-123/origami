@@ -195,13 +195,20 @@ impl<'a> Lexer<'a> {
                     while self.at(j).is_ascii_alphanumeric() || self.at(j) == b'_' {
                         j += 1;
                     }
-                    if self.at(j) == b'[' {
-                        while j < self.b.len() && self.b[j] != b']' && self.b[j] != b'\n' {
-                            j += 1;
+                    // Parameters `[p]…`; an unclosed `[` (blank or line end
+                    // first) is not part of the pragma, so the token never
+                    // ends in a blank the printer would trim.
+                    while self.at(j) == b'[' {
+                        let mut k = j + 1;
+                        while k < self.b.len()
+                            && !matches!(self.b[k], b']' | b' ' | b'\t' | b'\r' | b'\n')
+                        {
+                            k += 1;
                         }
-                        if self.at(j) == b']' {
-                            j += 1;
+                        if self.at(k) != b']' {
+                            break;
                         }
+                        j = k + 1;
                     }
                     self.push(PRAGMA, j);
                 }
