@@ -38,6 +38,15 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             p.pos = start;
             return None;
         }
+        if w0 == "CALL" && (p.is(start + 1, "FUNCTION") || p.is(start + 1, "METHOD")) {
+            let saved = p.c.keywords.len();
+            if let Some(d) = call_with_groups(p) {
+                return Some(d);
+            }
+            p.c.keywords.truncate(saved);
+            p.pos = start;
+            return None;
+        }
         if w0 == "METHODS" || w0 == "CLASS-METHODS" {
             let r = methods(p);
             if r.is_none() {
@@ -263,6 +272,129 @@ static SPECS: &[Spec] = &[
         words: &[],
         bare: false,
         ..spec(&["FREE"])
+    },
+    Spec {
+        clauses: &["TYPE", "EXPORTING", "MESSAGE"],
+        words: &["WITH", "NEW"],
+        bare: false,
+        ..spec(&["RAISE", "SHORTDUMP"])
+    },
+    Spec {
+        words: &[
+            "TYPE",
+            "LIKE",
+            "REF",
+            "TO",
+            "TABLE",
+            "OF",
+            "LINE",
+            "STANDARD",
+            "SORTED",
+            "HASHED",
+            "HANDLE",
+            "LENGTH",
+            "DECIMALS",
+            "VALUE",
+            "WITH",
+            "DEFAULT",
+            "KEY",
+            "EMPTY",
+            "UNIQUE",
+            "NON-UNIQUE",
+            "RANGE",
+            "AREA",
+        ],
+        bare: false,
+        ..spec(&["CREATE", "DATA"])
+    },
+    Spec {
+        clauses: &["ID"],
+        words: &["FIELD", "DUMMY", "FOR", "USER"],
+        bare: false,
+        ..spec(&["AUTHORITY-CHECK", "OBJECT"])
+    },
+    Spec {
+        clauses: &[
+            "RESULTS",
+            "SUBMATCHES",
+            "MATCH COUNT",
+            "MATCH OFFSET",
+            "MATCH LENGTH",
+            "MATCH LINE",
+        ],
+        words: &[
+            "FIRST",
+            "ALL",
+            "OCCURRENCE",
+            "OCCURRENCES",
+            "OF",
+            "SUBSTRING",
+            "REGEX",
+            "PCRE",
+            "IN",
+            "SECTION",
+            "OFFSET",
+            "LENGTH",
+            "TABLE",
+            "IGNORING",
+            "RESPECTING",
+            "CASE",
+            "BYTE",
+            "CHARACTER",
+            "MODE",
+            "FROM",
+            "TO",
+        ],
+        bare: false,
+        ..spec(&["FIND"])
+    },
+    Spec {
+        clauses: &[
+            "WITH",
+            "REPLACEMENT COUNT",
+            "REPLACEMENT OFFSET",
+            "REPLACEMENT LENGTH",
+            "RESULTS",
+        ],
+        words: &[
+            "FIRST",
+            "ALL",
+            "OCCURRENCE",
+            "OCCURRENCES",
+            "OF",
+            "SUBSTRING",
+            "REGEX",
+            "PCRE",
+            "IN",
+            "SECTION",
+            "OFFSET",
+            "LENGTH",
+            "TABLE",
+            "IGNORING",
+            "RESPECTING",
+            "CASE",
+            "BYTE",
+            "CHARACTER",
+            "MODE",
+            "FROM",
+            "TO",
+        ],
+        bare: false,
+        ..spec(&["REPLACE"])
+    },
+    Spec {
+        clauses: &["SOURCE", "RESULT", "OPTIONS", "PARAMETERS", "OBJECTS"],
+        words: &["XML"],
+        bare: false,
+        ..spec(&["CALL", "TRANSFORMATION"])
+    },
+    Spec {
+        clauses: &["SET", "WHERE", "FROM"],
+        words: &["TABLE"],
+        logical_clauses: LOGIC_WHERE,
+        bare: false,
+        commas: true,
+        ..spec(&["UPDATE"])
     },
     Spec {
         clauses: &["TYPE", "EXPORTING", "MESSAGE"],
@@ -577,10 +709,23 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
     let mut parts: Vec<Doc> = Vec::new();
     let mut current: Vec<Doc> = Vec::new();
     let mut mode = spec.after_lead;
+    let mut prev_kw: Option<String> = None;
     while !p.at_end() {
         let i = p.pos;
-        let n_clause = phrase_at(p, i, spec.clauses);
-        let n_word = phrase_at(p, i, spec.words);
+        // A word equal to the keyword just before it is a name
+        // (`MATCH COUNT count`, `REPORTED reported`).
+        let repeated = prev_kw.as_deref() == Some(p.upper(i).as_str());
+        let n_clause = if repeated {
+            0
+        } else {
+            phrase_at(p, i, spec.clauses)
+        };
+        let n_word = if repeated {
+            0
+        } else {
+            phrase_at(p, i, spec.words)
+        };
+        prev_kw = None;
         if n_clause > 0 && n_clause >= n_word {
             parts.push(b::concat(std::mem::take(&mut current)));
             current.push(p.ln(i));
@@ -600,6 +745,7 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
                 Operands::Expr
             };
             p.pos = i + n_clause;
+            prev_kw = Some(p.upper(i + n_clause - 1));
             continue;
         }
         if n_word > 0 {
@@ -608,6 +754,7 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
                 current.push(p.kw(i + k));
             }
             p.pos = i + n_word;
+            prev_kw = Some(p.upper(i + n_word - 1));
             continue;
         }
         if spec.commas && p.kind(i) == COMMA {
@@ -1016,15 +1163,77 @@ fn param_start(p: &P, i: usize) -> bool {
 
 fn methods(p: &mut P) -> Option<Doc> {
     let start = p.pos;
-    if p.kind(start + 1) == COLON {
+    let lead = p.kw(start);
+    if p.kind(start + 1) != COLON {
+        let item = method_item(p, start + 1, p.end)?;
+        p.pos = p.end;
+        return Some(b::group(vec![lead, p.sp(start + 1), item, p.period()]));
+    }
+    // Chain `METHODS: a …, b … .`: one item per line, aligned after the colon.
+    let colon = start + 1;
+    let mut items = Vec::new();
+    let mut a = colon + 1;
+    let mut depth = 0i32;
+    for i in colon + 1..p.end {
+        match p.kind(i) {
+            LPAREN | LBRACKET => depth += 1,
+            RPAREN | RBRACKET => depth -= 1,
+            COMMA if depth == 0 => {
+                items.push((a, i));
+                a = i + 1;
+            }
+            COLON => return None,
+            _ => {}
+        }
+    }
+    if a < p.end {
+        items.push((a, p.end));
+    }
+    if items.is_empty() || items.iter().any(|&(x, e)| x >= e || p.glued(x)) {
         return None;
     }
-    let lead = p.kw(start);
-    let name = start + 1;
+    let mut docs = Vec::new();
+    for (n, &(x, e)) in items.iter().enumerate() {
+        let item = method_item(p, x, e)?;
+        let mut d = Vec::new();
+        if n > 0 {
+            d.push(p.ln(x));
+        }
+        // Each item decides on its own whether its sections break.
+        d.push(b::group(vec![item]));
+        if e < p.end && p.kind(e) == COMMA {
+            d.push(p.sp(e));
+            d.push(p.t(e));
+        }
+        docs.push(b::concat(d));
+    }
+    p.pos = p.end;
+    Some(b::group(vec![
+        lead,
+        p.sp(colon),
+        p.t(colon),
+        p.sp(colon + 1),
+        b::hang(docs),
+        p.period(),
+    ]))
+}
+
+/// One method signature from its name (`from`) to `to` (exclusive), without
+/// the leading `METHODS` keyword.
+fn method_item(p: &mut P, from: usize, to: usize) -> Option<Doc> {
+    let name = from;
     if p.kind(name) != WORD {
         return None;
     }
-    let mut first_line = vec![lead, p.sp(name), p.t(name)];
+    let saved_end = p.end;
+    p.end = to;
+    let result = method_item_inner(p, name);
+    p.end = saved_end;
+    result
+}
+
+fn method_item_inner(p: &mut P, name: usize) -> Option<Doc> {
+    let mut first_line = vec![p.t(name)];
     let mut i = name + 1;
     // Header words up to the first section keyword (FOR TESTING, ABSTRACT,
     // RAP handler phrases …), printed as written.
@@ -1102,11 +1311,7 @@ fn methods(p: &mut P) -> Option<Doc> {
         sections.push(b::concat(vec![p.ln(i), kw, b::indent(param_docs)]));
         i = section_end;
     }
-    p.pos = p.end;
-    let mut docs = vec![b::concat(first_line)];
-    docs.push(b::cont(sections));
-    docs.push(p.period());
-    Some(b::group(docs))
+    Some(b::concat(vec![b::concat(first_line), b::cont(sections)]))
 }
 
 // ---- EML ------------------------------------------------------------------
@@ -1267,4 +1472,113 @@ fn eml(p: &mut P) -> Option<Doc> {
         body.push((1..l.level).fold(b::concat(d), |x, _| b::indent(vec![x])));
     }
     Some(b::group(vec![b::concat(head), b::cont(body), p.period()]))
+}
+
+// ---- CALL FUNCTION / CALL METHOD ------------------------------------------
+
+const CALL_GROUPS: &[&str] = &[
+    "EXPORTING",
+    "IMPORTING",
+    "CHANGING",
+    "TABLES",
+    "EXCEPTIONS",
+    "RECEIVING",
+    "PARAMETER-TABLE",
+    "EXCEPTION-TABLE",
+];
+const CALL_HEADER_WORDS: &[&str] = &[
+    "DESTINATION",
+    "STARTING",
+    "NEW",
+    "TASK",
+    "IN",
+    "UPDATE",
+    "BACKGROUND",
+    "UNIT",
+    "PERFORMING",
+    "CALLING",
+    "ON",
+    "END",
+    "OF",
+    "AS",
+    "SEPARATE",
+    "KEEPING",
+    "LOGICAL",
+    "WORK",
+];
+
+fn is_group(p: &P, i: usize) -> bool {
+    p.kind(i) == WORD
+        && !p.glued(i)
+        && CALL_GROUPS.contains(&p.upper(i).as_str())
+        // A parameter may be named like a group keyword (`tables = x`).
+        && (!p.is(i + 1, "=") || p.glued(i + 1))
+}
+
+/// `CALL FUNCTION 'X' …` and `CALL METHOD x->m …` with parameter groups
+/// (ABAP-CALL-003): each group keyword starts a line at the continuation
+/// indent, its parameters hang behind it with aligned `=` (A1).
+fn call_with_groups(p: &mut P) -> Option<Doc> {
+    let start = p.pos;
+    let mut head = vec![p.kw(start), p.sp(start + 1), p.kw(start + 1)];
+    p.pos = start + 2;
+    head.push(p.sp(p.pos));
+    head.push(p.expr()?);
+    // Header words (DESTINATION, STARTING NEW TASK, IN UPDATE TASK, …).
+    while !p.at_end() && !is_group(p, p.pos) {
+        let i = p.pos;
+        head.push(p.sp(i));
+        if p.kind(i) == WORD && !p.glued(i) && CALL_HEADER_WORDS.contains(&p.upper(i).as_str()) {
+            head.push(p.kw(i));
+            p.pos += 1;
+        } else {
+            head.push(p.expr()?);
+        }
+    }
+    let mut groups = Vec::new();
+    while !p.at_end() {
+        let k = p.pos;
+        if !is_group(p, k) {
+            return None;
+        }
+        let kw = p.kw(k);
+        p.pos += 1;
+        let content = if p.is(k, "PARAMETER-TABLE") || p.is(k, "EXCEPTION-TABLE") {
+            let sp = p.sp(p.pos);
+            b::concat(vec![sp, p.expr()?])
+        } else {
+            let mut rows = Vec::new();
+            while !p.at_end() && !is_group(p, p.pos) {
+                let name = p.pos;
+                if p.kind(name) != WORD
+                    || !p.is(name + 1, "=")
+                    || p.glued(name + 1)
+                    || p.glued(name)
+                {
+                    return None;
+                }
+                if !rows.is_empty() && p.c.commented[name] {
+                    rows.push(AlignItem::Break);
+                }
+                let eq = name + 1;
+                p.pos = eq + 1;
+                let value = p.expr()?;
+                let name_doc = if p.is(name, "OTHERS") {
+                    p.kw(name)
+                } else {
+                    p.t(name)
+                };
+                rows.push(b::row(
+                    vec![name_doc],
+                    vec![p.sp(eq), p.t(eq), p.sp(eq + 1), value],
+                ));
+            }
+            if rows.is_empty() {
+                return None;
+            }
+            b::concat(vec![p.sp(k + 1), b::hang(vec![b::align(rows)])])
+        };
+        groups.push(b::concat(vec![p.ln(k), kw, content]));
+    }
+    Some(b::group(vec![b::concat(head), b::cont(groups), p.period()]))
 }

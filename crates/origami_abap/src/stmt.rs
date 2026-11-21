@@ -54,17 +54,26 @@ pub struct P<'c, 'a> {
     pub blank: bool,
     /// The last operand ended with a call `( … )`.
     last_call: bool,
+    /// Index of the terminating period; `end` stops before trailing pragmas.
+    period_at: usize,
 }
 
 impl<'c, 'a> P<'c, 'a> {
     pub fn new(c: &'c mut Ctx<'a>, start: usize, end: usize, blank: bool) -> P<'c, 'a> {
+        // Pragmas right before the period (`##NO_TEXT.`) belong to the
+        // statement as a whole; parsers stop before them.
+        let mut stop = end;
+        while stop > start && c.stream.tokens[stop - 1].kind == PRAGMA {
+            stop -= 1;
+        }
         P {
             c,
             pos: start,
-            end,
+            end: stop,
             first: start,
             blank,
             last_call: false,
+            period_at: end,
         }
     }
 
@@ -278,27 +287,26 @@ impl<'c, 'a> P<'c, 'a> {
                     let body = self.parens(true)?;
                     docs.push(body);
                     self.last_call = true;
-                    return Some(b::concat(docs));
-                }
-                if (w == "-" || w == "+") && !self.glued(i + 1) {
+                } else if (w == "-" || w == "+") && !self.glued(i + 1) {
                     docs.push(self.t(i));
                     docs.push(self.sp(i + 1));
                     self.pos += 1;
                     let inner = self.operand()?;
                     docs.push(inner);
                     return Some(b::concat(docs));
-                }
-                if BINARY_OPS.contains(&w.as_str()) || ASSIGN_OPS.contains(&w.as_str()) {
-                    return None;
-                }
-                docs.push(self.t(i));
-                self.pos += 1;
-                // Inline declaration DATA( … ) / FINAL( … ).
-                if (w == "DATA" || w == "FINAL")
-                    && self.kind(self.pos) == LPAREN
-                    && self.glued(self.pos)
-                {
-                    self.c.keywords.push(i);
+                } else {
+                    if BINARY_OPS.contains(&w.as_str()) || ASSIGN_OPS.contains(&w.as_str()) {
+                        return None;
+                    }
+                    docs.push(self.t(i));
+                    self.pos += 1;
+                    // Inline declaration DATA( … ) / FINAL( … ).
+                    if (w == "DATA" || w == "FINAL")
+                        && self.kind(self.pos) == LPAREN
+                        && self.glued(self.pos)
+                    {
+                        self.c.keywords.push(i);
+                    }
                 }
             }
             _ => return None,
@@ -361,6 +369,7 @@ impl<'c, 'a> P<'c, 'a> {
             first: self.first,
             blank: false,
             last_call: false,
+            period_at: rp,
         };
         let parsed = if constructor {
             inner.ctor_body(lp, rp)
@@ -491,6 +500,7 @@ impl<'c, 'a> P<'c, 'a> {
                         first: self.first,
                         blank: false,
                         last_call: false,
+                        period_at: close,
                     };
                     if inner.is_named_row(open + 1) {
                         inner.rows().map(b::align)
@@ -570,6 +580,7 @@ impl<'c, 'a> P<'c, 'a> {
                     first: self.first,
                     blank: false,
                     last_call: false,
+                    period_at: rp,
                 };
                 q.logical().filter(|_| q.at_end())
             };
@@ -690,7 +701,12 @@ impl<'c, 'a> P<'c, 'a> {
 
     /// The terminating period.
     pub fn period(&self) -> Doc {
-        b::concat(vec![self.sp(self.end), self.t(self.end)])
+        let mut docs = Vec::new();
+        for i in self.end..=self.period_at {
+            docs.push(self.sp(i));
+            docs.push(self.t(i));
+        }
+        b::concat(docs)
     }
 
     /// Assignment `target op expr.` or standalone call `operand( … ).`.

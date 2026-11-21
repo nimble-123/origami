@@ -16,6 +16,10 @@ edition, every output change is listed with its STYLE rule ID.
   statements; keyword upper case (STYLE ABAP-*, batch 1).
 - ABAP EML (`READ`/`MODIFY ENTITIES`, `COMMIT ENTITIES`, `GET PERMISSIONS`,
   `SET LOCKS`): STYLE ABAP-EML-001.
+- ABAP: `CALL FUNCTION`/`CALL METHOD` parameter groups (ABAP-CALL-003), `METHODS:`/`CLASS-METHODS:` chains, trailing pragmas,
+  selectors after constructor expressions, `CREATE DATA`, `FIND`,
+  `REPLACE`, `AUTHORITY-CHECK`, `CALL TRANSFORMATION`, `UPDATE`,
+  `RAISE SHORTDUMP`.
 - VS Code extension (`editors/vscode`): formatter for `abap`/`acds` and
   abapGit files, binary resolution with `required_version`, minimal edits,
   Problems panel, untrusted-workspace handling.

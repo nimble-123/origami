@@ -366,6 +366,27 @@ before: lv_a = 1.          " first
 after:  lv_a = 1. " first
 ```
 
+### ABAP-CALL-003: CALL FUNCTION and CALL METHOD
+Milestone: M1
+
+Approved by the maintainer, Nils Lutz, on 2026-11-21. A `CALL FUNCTION` or
+`CALL METHOD` statement is printed on one line when it fits. Otherwise each
+parameter group (`EXPORTING`, `IMPORTING`, `CHANGING`, `TABLES`, `EXCEPTIONS`,
+`RECEIVING`, `PARAMETER-TABLE`, `EXCEPTION-TABLE`) starts a line at the
+continuation indent, and its parameters hang behind the keyword with aligned
+`=` (as ABAP-ALIGN-001). Header additions (`DESTINATION`, `STARTING NEW TASK`,
+`IN UPDATE TASK`, …) stay on the first line.
+
+```abap
+CALL FUNCTION 'Z_FLIGHT_TRAVEL_CREATE'
+    EXPORTING is_travel  = ls_travel
+              it_booking = lt_booking
+    IMPORTING es_travel   = ls_result
+              et_messages = lt_messages
+    EXCEPTIONS not_found = 1
+               OTHERS    = 2.
+```
+
 ### ABAP-EML-001: Entity manipulation language
 Milestone: M1
 
