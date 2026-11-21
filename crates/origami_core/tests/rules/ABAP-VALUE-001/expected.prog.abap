@@ -1,0 +1,4 @@
+mt_items = VALUE #( ( id = 1 name = `Alpha` )
+                    ( id = 2 name = `Beta` )
+                    ( id = 3 name = `Gamma` )
+                    ( id = 4 name = `Delta` ) ).

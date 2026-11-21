@@ -1,20 +1,23 @@
 //! Statement-level layout (STYLE ABAP-STMT-001, ABAP-BLOCK-001,
-//! ABAP-CLASS-001, ABAP-BLANK-001).
+//! ABAP-CLASS-001, ABAP-BLANK-001) and dispatch to statement parsers.
 //!
 //! Every statement starts on its own line at its block indent. Statements
 //! without a parser are printed as unknown statements (W003). Quarantined
 //! units are printed verbatim, opaque units byte for byte.
 
 use crate::block_pairs::Role;
+use crate::statements;
+use crate::stmt::{Ctx, P};
 use crate::structure::Statement;
 use origami_layout::{Doc, builder as b};
-use origami_syntax::{Code, Diagnostic, TokenIndex, TokenStream, UnitId};
+use origami_syntax::{Code, Diagnostic, TokenIndex, TokenStream, TriviaPosition, UnitId};
 use std::collections::BTreeSet;
 
 pub struct Laid {
     pub doc: Doc,
     pub diagnostics: Vec<Diagnostic>,
     pub unknown: u32,
+    pub keywords: Vec<usize>,
 }
 
 fn nest(level: u32, doc: Doc) -> Doc {
@@ -30,12 +33,24 @@ fn closes(role: Option<Role>) -> bool {
 }
 
 pub fn layout(
-    _text: &str,
+    text: &str,
     stream: &TokenStream,
     statements: &[Statement],
     quarantine: &BTreeSet<UnitId>,
     opaque: &BTreeSet<UnitId>,
 ) -> Laid {
+    let mut commented = vec![false; stream.tokens.len() + 1];
+    for t in &stream.trivia {
+        if t.is_comment() && t.position == TriviaPosition::Leading {
+            commented[t.anchor.0 as usize] = true;
+        }
+    }
+    let mut ctx = Ctx {
+        text,
+        stream,
+        commented: &commented,
+        keywords: Vec::new(),
+    };
     let mut docs = Vec::with_capacity(statements.len());
     let mut diagnostics = Vec::new();
     let mut unknown = 0;
@@ -52,14 +67,25 @@ pub fn layout(
         } else if quarantine.contains(&id) {
             b::verbatim(first, last, blank)
         } else {
-            unknown += 1;
-            let t = &stream.tokens[first.0 as usize];
-            diagnostics.push(Diagnostic::new(
-                Code::W003,
-                "Statement not recognized; formatted generically",
-                t.start..stream.tokens[last.0 as usize].end,
-            ));
-            b::unknown(first, last, blank)
+            let saved = ctx.keywords.len();
+            let parsed = {
+                let mut p = P::new(&mut ctx, st.tokens.start, st.tokens.end - 1, blank);
+                statements::parse(&mut p)
+            };
+            match parsed {
+                Some(d) => d,
+                None => {
+                    ctx.keywords.truncate(saved);
+                    unknown += 1;
+                    let t = &stream.tokens[first.0 as usize];
+                    diagnostics.push(Diagnostic::new(
+                        Code::W003,
+                        "Statement not recognized; formatted generically",
+                        t.start..stream.tokens[last.0 as usize].end,
+                    ));
+                    b::unknown(first, last, blank)
+                }
+            }
         };
         // A statement glued to the previous one (an opaque AMDP, EXEC SQL or
         // macro body) continues without a line break.
@@ -76,5 +102,6 @@ pub fn layout(
         doc: b::concat(docs),
         diagnostics,
         unknown,
+        keywords: ctx.keywords,
     }
 }

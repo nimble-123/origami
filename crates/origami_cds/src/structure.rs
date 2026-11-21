@@ -4,7 +4,7 @@
 //! the parser's fallback handles it.
 
 use crate::kinds::*;
-use origami_syntax::{Code, Diagnostic, TokenIndex, TokenStream, Unit};
+use origami_syntax::{Code, Diagnostic, TokenStream};
 
 pub fn check(stream: &TokenStream) -> Result<(), Diagnostic> {
     let mut stack: Vec<(u16, u32)> = Vec::new();
@@ -38,28 +38,4 @@ pub fn check(stream: &TokenStream) -> Result<(), Diagnostic> {
         ));
     }
     Ok(())
-}
-
-/// Splits the token stream into units. M0 approximation: a unit ends after a
-/// `;`, a `,`, a `{` or a `}`. M2 refines this to annotations, list elements,
-/// statements and headers.
-pub fn units(stream: &TokenStream) -> Vec<Unit> {
-    let mut units = Vec::new();
-    let mut start = 0usize;
-    for (k, t) in stream.tokens.iter().enumerate() {
-        if matches!(t.kind, SEMICOLON | COMMA | LBRACE | RBRACE) {
-            units.push(Unit {
-                id: units.len() as u32,
-                tokens: TokenIndex(start as u32)..TokenIndex(k as u32 + 1),
-            });
-            start = k + 1;
-        }
-    }
-    if start < stream.tokens.len() {
-        units.push(Unit {
-            id: units.len() as u32,
-            tokens: TokenIndex(start as u32)..TokenIndex(stream.tokens.len() as u32),
-        });
-    }
-    units
 }

@@ -76,8 +76,8 @@ Only tokens that a parser recognized as keywords may change case. Identifiers,
 literals, comments and every word of an unrecognized statement keep their case.
 
 ```abap
-before: Data lv_Value TYPE i.
-after:  Data lv_Value TYPE i.    " M0: no statement is recognized yet
+before: Data lv_Value type i.
+after:  DATA lv_Value TYPE i.
 ```
 
 ### GEN-COMMENT-001: Full-line star comments stay in column 1
@@ -365,3 +365,90 @@ space. Hand-aligned comment columns are not kept.
 before: lv_a = 1.          " first
 after:  lv_a = 1. " first
 ```
+
+## CDS family (M2/M3 batch 1, structural)
+
+**Proposed, pending maintainer approval.** These rules apply to DDLS, DDLX,
+DCL, BDEF and SRVD. The layout is structural: it knows units, blocks and
+`key` elements, but not yet the full grammar of headers and expressions.
+One rule is marked **[decision]**.
+
+### CDS-UNIT-001: One unit per line
+Milestone: M2
+
+Each annotation, each select-list element (DDLS, ended by `,`), each
+statement ended by `;` (DDLX, DCL, BDEF, SRVD), and each block brace `{` or `}`
+starts on its own line. A short block that the author wrote on one line stays
+on that line.
+
+```cds
+before: define service Z {
+        expose A as A; expose B as B; }
+after:  define service Z
+        {
+          expose A as A;
+          expose B as B;
+        }
+```
+
+### CDS-BLOCK-001: Block indentation
+Milestone: M2
+
+Units are indented one level per enclosing `{ }` block. `{` and `}` are at the
+level of the header they belong to.
+
+```cds
+define behavior for ZI_Travel alias Travel
+  persistent table ztravel
+  lock master
+{
+  create;
+  association _Booking { create; }
+}
+```
+
+### CDS-KEY-001: Non-key elements line up with key element names
+Milestone: M2
+
+In a block that contains `key` elements, the other elements and their
+annotations are indented two more levels, so that element names line up with
+the names after `key `.
+
+```cds
+{
+  key TravelUUID,
+      @Semantics.text: true
+      Description,
+      _Booking
+}
+```
+
+### CDS-CONT-001: Line breaks inside a unit
+Milestone: M2
+
+Inside a unit (a header, a long annotation value, a `where` condition), the
+author's line breaks are kept. Continuation lines move with the unit and never
+start left of one indent level.
+
+### CDS-SPACE-001: Single spaces between tokens
+Milestone: M2
+
+**[decision]** Runs of spaces between tokens on one line shrink to one space.
+Hand-aligned columns, for example annotation values or `as` aliases, are not
+kept. Alternative: keep the author's spacing inside CDS units.
+
+```cds
+before: id:              'Connection',
+after:  id: 'Connection',
+```
+
+### CDS-CASE-001: Letter case is never changed
+Milestone: M2
+
+CDS-family keywords and names keep their case as written.
+
+### CDS-BLANK-001: Blank lines
+Milestone: M2
+
+Blank lines between units are kept, at most one in a row. Blank lines directly
+after `{` and directly before `}` are removed.

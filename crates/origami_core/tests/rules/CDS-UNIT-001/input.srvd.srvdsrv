@@ -1,0 +1,2 @@
+define service Z {
+expose A as A; expose B as B; }

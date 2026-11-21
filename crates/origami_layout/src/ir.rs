@@ -7,6 +7,19 @@ use origami_syntax::TokenIndex;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Doc(pub(crate) Inner);
 
+impl Doc {
+    /// For a concatenation: its first element and the rest.
+    pub fn into_parts(self) -> Option<(Doc, Doc)> {
+        match self.0 {
+            Inner::Concat(mut v) if !v.is_empty() => {
+                let first = v.remove(0);
+                Some((first, Doc(Inner::Concat(v))))
+            }
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Inner {
     /// The original token, with its attached comments. `blank` allows one
@@ -30,6 +43,9 @@ pub(crate) enum Inner {
     Indent(Vec<Doc>),
     /// Breaks inside it continue at the current column (hanging indent).
     Hang(Vec<Doc>),
+    /// Clauses: each separator breaks only when the content after it does not
+    /// fit on the current line.
+    Fill(Vec<(Doc, Doc)>),
     /// `first` if every line of it fits into the width, else `second`.
     Choice(Box<Doc>, Box<Doc>),
     /// Aligned rows (design decision D7); printed one row per line.

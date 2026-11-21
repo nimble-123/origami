@@ -3,76 +3,76 @@
     "abap": {
       "files": 1608,
       "statements": 188305,
-      "fallback": 188305,
-      "fallback_rate": 1.0
+      "fallback": 6528,
+      "fallback_rate": 0.03466716231645469
     },
     "bdef": {
       "files": 36,
-      "statements": 1561,
-      "fallback": 1561,
-      "fallback_rate": 1.0
+      "statements": 1082,
+      "fallback": 0,
+      "fallback_rate": 0.0
     },
     "dcl": {
       "files": 12,
-      "statements": 36,
-      "fallback": 36,
-      "fallback_rate": 1.0
+      "statements": 72,
+      "fallback": 0,
+      "fallback_rate": 0.0
     },
     "ddls": {
       "files": 133,
-      "statements": 3269,
-      "fallback": 3269,
-      "fallback_rate": 1.0
+      "statements": 2841,
+      "fallback": 0,
+      "fallback_rate": 0.0
     },
     "ddlx": {
       "files": 27,
-      "statements": 2370,
-      "fallback": 2370,
-      "fallback_rate": 1.0
+      "statements": 683,
+      "fallback": 0,
+      "fallback_rate": 0.0
     },
     "srvd": {
       "files": 19,
-      "statements": 134,
-      "fallback": 134,
-      "fallback_rate": 1.0
+      "statements": 180,
+      "fallback": 0,
+      "fallback_rate": 0.0
     }
   },
   "modern": {
     "abap": {
       "files": 200,
       "statements": 35731,
-      "fallback": 35731,
-      "fallback_rate": 1.0
+      "fallback": 1534,
+      "fallback_rate": 0.04293190786711819
     },
     "bdef": {
       "files": 36,
-      "statements": 1561,
-      "fallback": 1561,
-      "fallback_rate": 1.0
+      "statements": 1082,
+      "fallback": 0,
+      "fallback_rate": 0.0
     },
     "dcl": {
       "files": 12,
-      "statements": 36,
-      "fallback": 36,
-      "fallback_rate": 1.0
+      "statements": 72,
+      "fallback": 0,
+      "fallback_rate": 0.0
     },
     "ddls": {
       "files": 133,
-      "statements": 3269,
-      "fallback": 3269,
-      "fallback_rate": 1.0
+      "statements": 2841,
+      "fallback": 0,
+      "fallback_rate": 0.0
     },
     "ddlx": {
       "files": 27,
-      "statements": 2370,
-      "fallback": 2370,
-      "fallback_rate": 1.0
+      "statements": 683,
+      "fallback": 0,
+      "fallback_rate": 0.0
     },
     "srvd": {
       "files": 19,
-      "statements": 134,
-      "fallback": 134,
-      "fallback_rate": 1.0
+      "statements": 180,
+      "fallback": 0,
+      "fallback_rate": 0.0
     }
   }
 }

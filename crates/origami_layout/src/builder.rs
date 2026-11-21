@@ -89,6 +89,12 @@ pub fn hang(docs: Vec<Doc>) -> Doc {
     Doc(Inner::Hang(docs))
 }
 
+/// `(separator, content)` pairs; a separator (a soft line) breaks only when
+/// its content does not fit on the current line.
+pub fn fill(items: Vec<(Doc, Doc)>) -> Doc {
+    Doc(Inner::Fill(items))
+}
+
 pub fn choice(first: Doc, second: Doc) -> Doc {
     Doc(Inner::Choice(Box::new(first), Box::new(second)))
 }

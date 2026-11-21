@@ -791,6 +791,33 @@ Where the author chose between options during drafting without stating a reason,
 
 --------------------------------------------------------------------------------
 
+## Implementation notes (M1, 2026-11-21)
+
+Deviations from the plan above, recorded during implementation:
+
+* **ABAP parsing and layout are combined.** Each statement parser returns its
+  Doc directly (`crates/origami_abap/src/stmt.rs`, `statements.rs`) instead of
+  building a `rowan` tree first. Trivia and comments live in the token stream,
+  so a separate tree was not needed. `rowan` is not used.
+* **Keyword statements are table-driven.** About 50 statements are described
+  by a `Spec` (lead keywords, clause keywords, other keywords, operand mode).
+  Words in keyword positions are re-cased; everything else is parsed as an
+  operand or logical expression. A statement a parser does not fully
+  understand falls back to the generic layout (W003).
+* **Raw sub-spans.** Inside a recognized statement, a bracketed part the parser
+  does not understand (for example `VALUE #( FOR … )`) keeps its own line
+  breaks and moves with the statement.
+* **Fill clauses.** A broken keyword statement breaks only before clauses that
+  do not fit (`APPEND VALUE #( … ) TO itab` keeps `TO itab` on the last line);
+  ABAP SQL breaks before every clause (ABAP-SQL-001).
+* **CDS family: structural layout instead of grammar (M2/M3 phase 1).** Units
+  (annotations, elements, `;` statements, braces), block indentation and `key`
+  alignment; inside a unit the author's line breaks are kept. The fallback
+  rate reported for the CDS family therefore measures nothing yet; grammar-
+  based layout of headers and expressions is future work.
+* **Comments:** trailing blanks after a line comment are whitespace, not
+  comment text.
+
 ## Detailed Implementation Plan
 
 All paths are relative to the repository root. The repository is a Cargo workspace plus three Node packages: the VS Code extension and two CI tools (`tools/abaplint-oracle`, `tools/sap-activation-check`).

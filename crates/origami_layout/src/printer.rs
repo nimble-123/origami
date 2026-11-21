@@ -47,6 +47,9 @@ pub fn print(doc: &Doc, src: &SourceText, tokens: &TokenStream, opts: &PrintOpti
     p.finish()
 }
 
+/// A space, for joining aligned rows printed flat.
+static SPACE_DOC: Doc = Doc(Inner::Space);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Flat,
@@ -146,6 +149,79 @@ impl<'a> Ctx<'a> {
         (a, b)
     }
 
+    /// Width of a raw unit printed on one line: unknown units shrink runs of
+    /// spaces between tokens to one, verbatim and opaque units keep them.
+    fn raw_width(&self, unknown: bool, first: TokenIndex, last: TokenIndex) -> usize {
+        if !unknown {
+            let (a, b) = self.raw_range(first, last);
+            let text = &self.src[a..b];
+            return text.split('\n').next().unwrap_or("").chars().count();
+        }
+        let mut w = 0;
+        for k in first.0..=last.0 {
+            let t = &self.tokens.tokens[k as usize];
+            if k > first.0 && !t.glued {
+                w += 1;
+            }
+            w += self.token_text(TokenIndex(k)).chars().count();
+        }
+        w
+    }
+
+    /// Width of the doc up to its first possible line break (the shortest
+    /// first line it can be printed with).
+    fn min_first_line(&self, doc: &Doc) -> usize {
+        let mut w = 0usize;
+        let mut stack = vec![doc];
+        while let Some(d) = stack.pop() {
+            match &d.0 {
+                Inner::Token { index, .. } => {
+                    w += self.token_text(*index).chars().count();
+                    if self.has_trailing_comments(*index) {
+                        return w;
+                    }
+                }
+                Inner::Space => w += 1,
+                Inner::SoftLine | Inner::SoftBreak | Inner::HardLine => return w,
+                Inner::Group(ds) | Inner::Indent(ds) | Inner::Hang(ds) | Inner::Concat(ds) => {
+                    stack.extend(ds.iter().rev())
+                }
+                Inner::Choice(a, _) => stack.push(a),
+                Inner::Fill(items) => {
+                    for (sep, c) in items.iter().rev() {
+                        stack.push(c);
+                        stack.push(sep);
+                    }
+                }
+                Inner::AlignGroup(items) => {
+                    if let Some(AlignItem::Row(r)) =
+                        items.iter().find(|i| matches!(i, AlignItem::Row(_)))
+                    {
+                        stack.extend(r.tail.iter().rev());
+                        stack.extend(r.head.iter().rev());
+                    }
+                }
+                Inner::Unknown { first, last, .. } => {
+                    let (a, b) = self.raw_range(*first, *last);
+                    if self.src[a..b].contains('\n') {
+                        let line = self.src[a..b].split('\n').next().unwrap_or("");
+                        return w + line.chars().count();
+                    }
+                    w += self.raw_width(true, *first, *last);
+                }
+                Inner::Verbatim { first, last, .. } | Inner::Opaque { first, last, .. } => {
+                    let (a, b) = self.raw_range(*first, *last);
+                    let line = self.src[a..b].split('\n').next().unwrap_or("");
+                    w += line.chars().count();
+                    if self.src[a..b].contains('\n') {
+                        return w;
+                    }
+                }
+            }
+        }
+        w
+    }
+
     /// True when the doc can never be printed on one line.
     fn forced(&self, doc: &Doc, first: &mut bool) -> bool {
         match &doc.0 {
@@ -163,17 +239,19 @@ impl<'a> Ctx<'a> {
                 let (a, b) = self.raw_range(*f, *last);
                 lead || self.src[a..b].contains('\n') || self.has_trailing_comments(*last)
             }
-            Inner::AlignGroup(items) => {
-                items
+            Inner::AlignGroup(items) => items.iter().any(|it| match it {
+                AlignItem::Row(r) => r
+                    .head
                     .iter()
-                    .filter(|i| matches!(i, AlignItem::Row(_)))
-                    .count()
-                    > 1
-            }
+                    .chain(r.tail.iter())
+                    .any(|d| self.forced(d, first)),
+                AlignItem::Break => false,
+            }),
             Inner::Group(ds) | Inner::Indent(ds) | Inner::Hang(ds) | Inner::Concat(ds) => {
                 ds.iter().any(|d| self.forced(d, first))
             }
             Inner::Choice(a, _) => self.forced(a, first),
+            Inner::Fill(items) => items.iter().any(|(_, c)| self.forced(c, first)),
             Inner::Space | Inner::SoftLine | Inner::SoftBreak => false,
         }
     }
@@ -199,7 +277,18 @@ impl<'a> Ctx<'a> {
                     stack.extend(ds.iter().rev())
                 }
                 Inner::Choice(a, _) => stack.push(a),
+                Inner::Fill(items) => {
+                    for (sep, c) in items.iter().rev() {
+                        stack.push(c);
+                        stack.push(sep);
+                    }
+                }
                 Inner::AlignGroup(items) => {
+                    let rows = items
+                        .iter()
+                        .filter(|i| matches!(i, AlignItem::Row(_)))
+                        .count();
+                    w += rows.saturating_sub(1);
                     for it in items {
                         if let AlignItem::Row(r) = it {
                             stack.extend(r.tail.iter().rev());
@@ -207,11 +296,9 @@ impl<'a> Ctx<'a> {
                         }
                     }
                 }
-                Inner::Unknown { first, last, .. }
-                | Inner::Verbatim { first, last, .. }
-                | Inner::Opaque { first, last, .. } => {
-                    let (a, b) = self.raw_range(*first, *last);
-                    w += self.src[a..b].chars().count();
+                Inner::Unknown { first, last, .. } => w += self.raw_width(true, *first, *last),
+                Inner::Verbatim { first, last, .. } | Inner::Opaque { first, last, .. } => {
+                    w += self.raw_width(false, *first, *last)
                 }
             }
         }
@@ -509,15 +596,43 @@ impl<'c, 'a> Printer<'c, 'a> {
                     stack.extend(ds.iter().rev().map(|x| (m, x)));
                 }
                 Inner::Choice(a, _) => stack.push((mode, a)),
+                Inner::Fill(items) => {
+                    for (sep, c) in items.iter().rev() {
+                        stack.push((mode, c));
+                        stack.push((Mode::Flat, sep));
+                    }
+                }
+                Inner::AlignGroup(items) if mode == Mode::Flat => {
+                    let mut flat: Vec<(Mode, &Doc)> = Vec::new();
+                    for (k, it) in items
+                        .iter()
+                        .filter_map(|i| match i {
+                            AlignItem::Row(r) => Some(r),
+                            AlignItem::Break => None,
+                        })
+                        .enumerate()
+                    {
+                        if k > 0 {
+                            flat.push((Mode::Flat, &SPACE_DOC));
+                        }
+                        flat.extend(
+                            it.head
+                                .iter()
+                                .chain(it.tail.iter())
+                                .map(|d| (Mode::Flat, d)),
+                        );
+                    }
+                    stack.extend(flat.into_iter().rev());
+                }
                 Inner::AlignGroup(_) => return remaining >= 0,
                 Inner::Unknown { first, last, .. }
                 | Inner::Verbatim { first, last, .. }
                 | Inner::Opaque { first, last, .. } => {
+                    let unknown = matches!(d.0, Inner::Unknown { .. });
                     let (a, b) = self.ctx.raw_range(*first, *last);
-                    let text = &self.ctx.src[a..b];
-                    let line = text.split('\n').next().unwrap_or("");
-                    remaining -= line.chars().count() as isize;
-                    if text.contains('\n') {
+                    let multiline = self.ctx.src[a..b].contains('\n');
+                    remaining -= self.ctx.raw_width(unknown && !multiline, *first, *last) as isize;
+                    if multiline {
                         return remaining >= 0;
                     }
                 }
@@ -601,6 +716,68 @@ impl<'c, 'a> Printer<'c, 'a> {
                         doc: pick,
                     });
                 }
+                Inner::Fill(items) => {
+                    // Decide each separator when it is reached.
+                    let mut cmds: Vec<Cmd> = Vec::new();
+                    for (sep, c) in items {
+                        cmds.push(Cmd {
+                            indent,
+                            mode,
+                            doc: sep,
+                        });
+                        cmds.push(Cmd {
+                            indent,
+                            mode,
+                            doc: c,
+                        });
+                    }
+                    let mut k = 0;
+                    while k < cmds.len() {
+                        let sep = cmds[k];
+                        let content = cmds[k + 1];
+                        let flat_ok = mode == Mode::Flat
+                            || (!self.pending_eol
+                                && self.fits(
+                                    Cmd {
+                                        indent,
+                                        mode: Mode::Flat,
+                                        doc: content.doc,
+                                    },
+                                    &[],
+                                    width - 1,
+                                ));
+                        let sep_mode = if flat_ok { Mode::Flat } else { Mode::Break };
+                        self.run(vec![Cmd {
+                            indent: sep.indent,
+                            mode: sep_mode,
+                            doc: sep.doc,
+                        }]);
+                        self.run(vec![content]);
+                        k += 2;
+                    }
+                }
+                Inner::AlignGroup(items) if mode == Mode::Flat => {
+                    let mut flat: Vec<Cmd> = Vec::new();
+                    let rows = items.iter().filter_map(|i| match i {
+                        AlignItem::Row(r) => Some(r),
+                        AlignItem::Break => None,
+                    });
+                    for (k, r) in rows.enumerate() {
+                        if k > 0 {
+                            flat.push(Cmd {
+                                indent,
+                                mode,
+                                doc: &SPACE_DOC,
+                            });
+                        }
+                        flat.extend(r.head.iter().chain(r.tail.iter()).map(|d| Cmd {
+                            indent,
+                            mode,
+                            doc: d,
+                        }));
+                    }
+                    stack.extend(flat.into_iter().rev());
+                }
                 Inner::AlignGroup(items) => self.align_group(items, indent, width),
                 Inner::Unknown { first, last, blank } => {
                     self.raw(RawKind::Unknown, *first, *last, indent, *blank)
@@ -657,12 +834,17 @@ impl<'c, 'a> Printer<'c, 'a> {
                 .iter()
                 .any(|r| !matches!(r.tail.first().map(|d| &d.0), Some(Inner::Space)));
             let max = heads.iter().flatten().copied().max().unwrap_or(0);
-            let overflow = seg.iter().zip(&heads).any(|(r, h)| {
-                let tail = self.ctx.flat_width(&crate::builder::concat(r.tail.clone()));
-                match (h, tail) {
-                    (Some(_), Some(t)) => col + max + t > width,
-                    _ => true,
+            // Only rows whose tail can be flat count for overflow; a tail that
+            // breaks anyway (a nested multi-line expression) does not block
+            // alignment.
+            let overflow = seg.iter().zip(&heads).any(|(r, h)| match h {
+                Some(_) => {
+                    let tail = self
+                        .ctx
+                        .min_first_line(&crate::builder::concat(r.tail.clone()));
+                    col + max + tail > width
                 }
+                None => true,
             });
             let aligned = !anchor_glued && !overflow && heads.iter().all(Option::is_some);
             for (r, h) in seg.iter().zip(&heads) {

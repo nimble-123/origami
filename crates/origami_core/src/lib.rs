@@ -18,9 +18,9 @@ use origami_syntax::{Diagnostic, LineIndex, SourceText};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 /// Languages whose printer still runs in identity mode (output equals input).
-/// ABAP formats since M1; the CDS family follows in M2 and M3.
-pub fn identity_mode(lang: Language) -> bool {
-    lang != Language::Abap
+/// None since all six languages format (the CDS family structurally).
+pub fn identity_mode(_lang: Language) -> bool {
+    false
 }
 
 /// Formats one source. Never panics: a panic inside becomes X002.
