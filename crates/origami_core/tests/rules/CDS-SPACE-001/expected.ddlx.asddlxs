@@ -1,6 +1,5 @@
 annotate entity ZC_X with
 {
-  @UI.facet: [ { id: 'Connection',
-                 position: 10 } ]
+  @UI.facet: [ { id: 'Connection', position: 10 } ]
   a;
 }

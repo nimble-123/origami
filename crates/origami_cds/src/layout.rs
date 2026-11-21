@@ -242,6 +242,7 @@ fn mark_key_blocks(text: &str, stream: &TokenStream, units: &mut [CdsUnit]) {
 pub fn layout(
     text: &str,
     stream: &TokenStream,
+    lang: Language,
     units: &[CdsUnit],
     quarantine: &BTreeSet<UnitId>,
     opaque: &BTreeSet<UnitId>,
@@ -258,7 +259,18 @@ pub fn layout(
         } else if quarantine.contains(&uid) {
             b::verbatim(first, last, blank)
         } else {
-            b::unknown(first, last, blank)
+            let g = crate::grammar::G {
+                text,
+                stream,
+                first: u.first,
+                blank,
+            };
+            let parsed = match u.kind {
+                Kind::Annotation => g.annotation(u.first, u.last),
+                Kind::Element => g.header(u.first, u.last, lang),
+                _ => None,
+            };
+            parsed.unwrap_or_else(|| b::unknown(first, last, blank))
         };
         let glued = stream.tokens[u.first].glued;
         let start = if id == 0 || glued {
@@ -268,7 +280,6 @@ pub fn layout(
         };
         let level = u.depth + u.extra;
         docs.push((0..level).fold(b::concat(vec![start, body]), |d, _| b::indent(vec![d])));
-        let _ = text;
     }
     b::concat(docs)
 }
