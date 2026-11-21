@@ -17,9 +17,11 @@ pub use result::{FormatResult, Reported, ReportedRange, Status};
 use origami_syntax::{Diagnostic, LineIndex, SourceText};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-/// M0: the printer runs in identity mode, so output always equals input. The
-/// first M1 pull request sets this to false.
-pub const IDENTITY_MODE: bool = true;
+/// Languages whose printer still runs in identity mode (output equals input).
+/// ABAP formats since M1; the CDS family follows in M2 and M3.
+pub fn identity_mode(lang: Language) -> bool {
+    lang != Language::Abap
+}
 
 /// Formats one source. Never panics: a panic inside becomes X002.
 pub fn format(input: &[u8], hint: &LanguageHint, opts: &Options) -> FormatResult {
@@ -49,7 +51,7 @@ fn format_inner(input: &[u8], hint: &LanguageHint, opts: &Options) -> FormatResu
         Ok(l) => l,
         Err(d) => return error_result(None, &d, src.text()),
     };
-    let checked = check::run(&src, lang, opts, IDENTITY_MODE);
+    let checked = check::run(&src, lang, opts, identity_mode(lang));
     let r = checked.result;
     let index = LineIndex::new(src.text());
     let diagnostics: Vec<Reported> = r

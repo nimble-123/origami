@@ -9,7 +9,7 @@ mod lexer;
 pub mod structure;
 
 use origami_layout::{PrintOptions, builder, print};
-use origami_syntax::{LangOptions, LangResult, Language, SourceText, Stats, UnitId};
+use origami_syntax::{LangOptions, LangResult, Language, SourceText, Stats, TokenIndex, UnitId};
 use std::collections::BTreeSet;
 
 pub use lexer::{dash_comments, lex};
@@ -33,14 +33,14 @@ pub fn format(
     let docs = units
         .iter()
         .map(|u| {
-            let range = stream.tokens[u.tokens.start.0 as usize].start
-                ..stream.tokens[u.tokens.end.0 as usize - 1].end;
+            let first = u.tokens.start;
+            let last = TokenIndex(u.tokens.end.0 - 1);
             if opaque.contains(&u.id) {
-                builder::opaque(range)
+                builder::opaque(first, last, true)
             } else if quarantine.contains(&u.id) {
-                builder::verbatim(range)
+                builder::verbatim(first, last, true)
             } else {
-                builder::unknown(range)
+                builder::unknown(first, last, true)
             }
         })
         .collect();

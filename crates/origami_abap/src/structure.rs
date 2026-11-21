@@ -13,14 +13,48 @@ use std::ops::Range;
 pub struct Statement {
     /// Token range, including the terminating period.
     pub tokens: Range<usize>,
-    /// Block nesting depth.
+    /// Indent level (STYLE ABAP-BLOCK-001, ABAP-CLASS-001): one per block;
+    /// `CASE`, `TRY` and class definitions add one more for their bodies, so
+    /// `WHEN`, `CATCH` and the sections sit one level in.
     pub depth: u32,
+    /// Block role of the statement, if any.
+    pub role: Option<Role>,
+}
+
+/// False when the statement's first word is used as a name: followed by a
+/// glued `(`, `[` or selector, or by an assignment operator.
+fn keyword_position(
+    text: &str,
+    tokens: &[origami_syntax::Token],
+    start: usize,
+    end: usize,
+) -> bool {
+    let (Some(first), Some(next)) = (tokens.get(start), tokens.get(start + 1)) else {
+        return true;
+    };
+    if start + 1 >= end || first.kind != WORD {
+        return true;
+    }
+    if next.glued && matches!(next.kind, LPAREN | LBRACKET | SELECTOR) {
+        return false;
+    }
+    let op = next.text(text);
+    !(next.kind == WORD && matches!(op, "=" | "?=" | "+=" | "-=" | "*=" | "/=" | "&&="))
+}
+
+/// Blocks whose intermediates are indented one level and bodies two.
+fn extra_level(words: &[String]) -> u32 {
+    match words.first().map(String::as_str) {
+        Some("CASE" | "TRY") => 1,
+        Some("CLASS") if words.iter().any(|w| w == "DEFINITION") => 1,
+        _ => 0,
+    }
 }
 
 pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnostic> {
     let tokens = &stream.tokens;
     let mut statements = Vec::new();
-    let mut blocks: Vec<(&'static str, u32)> = Vec::new(); // (closer, opener offset)
+    let mut blocks: Vec<(&'static str, u32, u32)> = Vec::new(); // (closer, opener offset, levels)
     let mut brackets: Vec<(u16, u32)> = Vec::new(); // (closing kind, offset)
     let mut start = 0usize;
 
@@ -61,15 +95,22 @@ pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnos
                     }
                 }
                 let opener_at = tokens[start].start;
-                let level = blocks.len() as u32;
-                let depth_here = match classify(&words, &depth0) {
+                let level: u32 = blocks.iter().map(|b| b.2).sum();
+                // ABAP has no reserved words: `do( ).`, `if = 1.` or
+                // `case->m( ).` are calls or assignments, never blocks.
+                let role = if keyword_position(text, tokens, start, k) {
+                    classify(&words, &depth0)
+                } else {
+                    None
+                };
+                let depth_here = match role {
                     Some(Role::Opener(closer)) => {
-                        blocks.push((closer, opener_at));
+                        blocks.push((closer, opener_at, 1 + extra_level(&words)));
                         level
                     }
                     Some(Role::Closer) => match blocks.pop() {
-                        Some((closer, _)) if closer == words[0] => level - 1,
-                        Some((closer, _)) => {
+                        Some((closer, _, levels)) if closer == words[0] => level - levels,
+                        Some((closer, _, _)) => {
                             return Err(err(
                                 Code::E004,
                                 format!("Found {} but expected {closer}", words[0]),
@@ -90,6 +131,7 @@ pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnos
                 statements.push(Statement {
                     tokens: range,
                     depth: depth_here,
+                    role,
                 });
                 start = k + 1;
             }
@@ -115,7 +157,7 @@ pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnos
             at,
         ));
     }
-    if let Some((closer, at)) = blocks.last() {
+    if let Some((closer, at, _)) = blocks.last() {
         return Err(err(
             Code::E004,
             format!("Missing {closer} for this block"),

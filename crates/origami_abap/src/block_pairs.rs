@@ -91,6 +91,7 @@ pub fn classify(words: &[String], depth0: &[String]) -> Option<Role> {
         "DEFINE" => opener("END-OF-DEFINITION"),
         "EXEC" if w(1) == "SQL" => opener("ENDEXEC"),
         "ELSE" | "ELSEIF" | "WHEN" | "CATCH" | "CLEANUP" => Some(Role::Intermediate),
+        "PUBLIC" | "PROTECTED" | "PRIVATE" if w(1) == "SECTION" => Some(Role::Intermediate),
         _ => None,
     }
 }
