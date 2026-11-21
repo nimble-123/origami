@@ -20,6 +20,9 @@ edition, every output change is listed with its STYLE rule ID.
   selectors after constructor expressions, `CREATE DATA`, `FIND`,
   `REPLACE`, `AUTHORITY-CHECK`, `CALL TRANSFORMATION`, `UPDATE`,
   `RAISE SHORTDUMP`.
+- Write mode no longer forces each file to disk (fsync): formatting the RAP
+  reference project (346 files) takes 0.06 s instead of 0.9 s.
+- Printer unit tests; `docs/adoption.md` (team adoption guide).
 - VS Code extension (`editors/vscode`): formatter for `abap`/`acds` and
   abapGit files, binary resolution with `required_version`, minimal edits,
   Problems panel, untrusted-workspace handling.
