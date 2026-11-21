@@ -5,7 +5,8 @@
 //! 3. Collect the units of every mismatch and, for ABAP, the units of output
 //!    lines over 255 characters that were not over 255 in the input.
 //! 4. Format again with those units quarantined (W001 for mismatches, W002 for
-//!    length) and check again. Units still over 255 are printed opaque.
+//!    length) and check again. Units still over 255 are printed opaque; if a
+//!    new overlong line remains even then, the whole file stays as written.
 //! 5. If the comparison still fails, report X001.
 
 use crate::options::Options;
@@ -45,7 +46,12 @@ pub fn run(src: &SourceText, lang: Language, opts: &Options, identity: bool) -> 
         output = apply_fault(third.output.clone(), opts, 2);
         second = third;
     }
-    let (final_bad, _) = problems(src, lang, &second, &output);
+    let (final_bad, final_long) = problems(src, lang, &second, &output);
+    // Last resort for the 255 rule: the joins between opaque units can still
+    // lengthen a line. Then the whole file stays as written (INVARIANTS 1.5).
+    if final_bad.is_empty() && !final_long.is_empty() {
+        output = src.text().to_string();
+    }
     let mut result = LangResult { output, ..second };
     if !final_bad.is_empty() {
         result.diagnostics.push(Diagnostic::new(

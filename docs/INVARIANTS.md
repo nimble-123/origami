@@ -23,7 +23,9 @@ equal when all of these hold:
    below) that contain the mismatching tokens or the new overlong lines.
 2. It prints them again as written (quarantine), reports W001 (mismatch) or
    W002 (length), and checks again. A unit still over 255 characters is
-   printed byte for byte.
+   printed byte for byte. If a new line over 255 characters remains even
+   then (the joins between units can lengthen a line), the whole file is
+   left as written.
 3. If the check still fails, the result is X001: no output is written, exit 70.
 
 Tests: `crates/origami_core/tests/safety.rs` (run with
