@@ -29,6 +29,14 @@ edition, every output change is listed with its STYLE rule ID.
   call arguments with an unhandled keyword group fall back instead of
   dropping tokens; `message = …` and other assignments to variables named
   like statements are assignments; `TYPE any` / `TYPE line` stay type names.
+- Fuzzing (cargo-fuzz, first local run): fixed four findings, kept as
+  regression tests in `fuzz/found/`: line-break style could flip between
+  runs with `\r\r\n`; a vertical tab ending a comment was dropped; a
+  `/* */` comment between tokens on one line was dropped in unknown units
+  (caught by the self-check). Two idempotency findings on binary garbage
+  input are open (`fuzz/found/open-*`).
+- `ASSIGN structure TO <fs>`: a first operand named like a keyword stays a
+  name (found by comparing with ABAP Cleaner output).
 - ABAP: chains of keyword statements (ABAP-CHAIN-001); `SHIFT`,
   `MOVE-CORRESPONDING`, `CONVERT DATE/TIME STAMP/UTCLONG`, `WAIT UP TO`,
   `TEST-SEAM`/`TEST-INJECTION` and their ends. ABAP fallback 1.3% → 0.9%.

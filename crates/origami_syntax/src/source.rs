@@ -1,7 +1,10 @@
 //! Input decoding, output encoding and position mapping.
 //!
-//! `decode` validates UTF-8, strips a byte-order mark and converts every CRLF
-//! to LF. All spans in origami refer to this normalized text. `encode` restores
+//! `decode` validates UTF-8, strips a byte-order mark and converts every line
+//! break to LF. A line break is an LF together with all CRs directly before
+//! it (`\r\n`, also `\r\r\n`), so the normalized text never has a CR before
+//! an LF and a second run sees the same line breaks. All spans in origami
+//! refer to this normalized text. `encode` restores
 //! the BOM, writes every line break in the style of the input's first line
 //! break, and restores whether the input ended with a newline.
 
@@ -43,7 +46,20 @@ impl SourceText {
             Some(i) if i > 0 && raw.as_bytes()[i - 1] == b'\r' => LineEnding::CrLf,
             _ => LineEnding::Lf,
         };
-        let text = raw.replace("\r\n", "\n");
+        let text = if raw.contains("\r\n") {
+            let mut t = String::with_capacity(raw.len());
+            for c in raw.chars() {
+                if c == '\n' {
+                    while t.ends_with('\r') {
+                        t.pop();
+                    }
+                }
+                t.push(c);
+            }
+            t
+        } else {
+            raw.to_string()
+        };
         let final_newline = text.ends_with('\n');
         Ok(SourceText {
             text,

@@ -81,6 +81,9 @@ The block-pair table and the `SELECT`/`WITH` loop rule are in
 ## 6. Encoding
 
 Input must be UTF-8. A BOM, the line-break style of the first line break, and
-the final-newline state are recorded and restored. Internally every CRLF
-becomes LF; positions and offsets refer to that normalized text. Test:
+the final-newline state are recorded and restored. Internally every line
+break becomes LF; a line break is an LF together with all CRs directly before
+it (so `\r\r\n` is one line break). The printer never writes a CR directly
+before a line break. Both rules keep the line-break style stable from one run
+to the next. Positions and offsets refer to that normalized text. Test:
 `crates/origami_syntax/tests/source.rs`.

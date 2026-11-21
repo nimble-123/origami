@@ -797,6 +797,7 @@ fn gap(p: &P, i: usize, skip: Option<usize>) -> Doc {
 /// Operands and clauses of a keyword statement, from `p.pos` to `p.end`.
 fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
     let skip = (!first_gap).then_some(p.pos);
+    let first_operand = Some(p.pos);
     // Parts: the first follows the lead on its line; each clause starts one.
     let mut parts: Vec<Doc> = Vec::new();
     let mut current: Vec<Doc> = Vec::new();
@@ -812,11 +813,19 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
         } else {
             phrase_at(p, i, spec.clauses)
         };
-        let n_word = if repeated {
+        let mut n_word = if repeated {
             0
         } else {
             phrase_at(p, i, spec.words)
         };
+        // The first operand is a name when a clause or the end of the
+        // statement follows it (`ASSIGN structure TO <fs>`).
+        if n_word > 0
+            && Some(i) == first_operand
+            && (i + n_word >= p.end || phrase_at(p, i + n_word, spec.clauses) > 0)
+        {
+            n_word = 0;
+        }
         prev_kw = None;
         if n_clause > 0 && n_clause >= n_word {
             parts.push(b::concat(std::mem::take(&mut current)));

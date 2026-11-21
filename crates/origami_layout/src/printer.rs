@@ -23,6 +23,9 @@ use origami_syntax::{
     Case, CommentSyntax, Placement, SourceText, TokenIndex, TokenStream, TriviaKind, TriviaPosition,
 };
 
+/// Characters the lexers treat as blanks between tokens.
+const BLANKS: [char; 3] = [' ', '\t', '\r'];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrintOptions {
     pub width: u16,
@@ -168,9 +171,7 @@ impl<'a> Ctx<'a> {
                 if gap.contains('\n') {
                     break;
                 }
-                if !gap.is_empty() {
-                    w += 1;
-                }
+                w += same_line_gap(gap).chars().count();
             }
             let text = self.token_text(TokenIndex(k));
             match text.find('\n') {
@@ -351,7 +352,7 @@ impl<'c, 'a> Printer<'c, 'a> {
         // Comments anchored to the virtual end-of-file token.
         let eof = TokenIndex(self.ctx.tokens.tokens.len() as u32);
         self.leading_comments(eof, 0, true);
-        while self.out.ends_with(' ') {
+        while self.out.ends_with(BLANKS) {
             self.out.pop();
         }
         if !self.out.is_empty() && !self.out.ends_with('\n') {
@@ -361,7 +362,7 @@ impl<'c, 'a> Printer<'c, 'a> {
     }
 
     fn newline(&mut self, indent: usize) {
-        while self.out.ends_with(' ') {
+        while self.out.ends_with(BLANKS) {
             self.out.pop();
         }
         self.prev_blank = self.line_empty;
@@ -523,9 +524,12 @@ impl<'c, 'a> Printer<'c, 'a> {
                 if gap.contains('\n') {
                     self.raw_gap(gap, shift, min_indent, indent);
                 } else if !gap.is_empty() {
-                    // Same line: shrink spaces (unknown) or keep (verbatim).
-                    let text = if kind == RawKind::Unknown { " " } else { gap };
-                    self.write(text, indent);
+                    // Same line: shrink blanks (unknown) or keep (verbatim).
+                    if kind == RawKind::Unknown {
+                        self.write(&same_line_gap(gap), indent);
+                    } else {
+                        self.write(gap, indent);
+                    }
                 }
             }
             let text = ctx.token_text(TokenIndex(k as u32));
@@ -547,14 +551,16 @@ impl<'c, 'a> Printer<'c, 'a> {
         }
         let lines: Vec<&str> = gap.split('\n').collect();
         // Part before the first line break: end-of-line comment or spaces.
-        let head = lines[0].trim();
+        // Only blanks are layout; other whitespace (vertical tab, form feed,
+        // NBSP) belongs to the comment or token next to it.
+        let head = lines[0].trim_matches(BLANKS);
         if !head.is_empty() {
             self.write(" ", indent);
             self.write(head, indent);
         }
         let last = lines.len() - 1;
         for (n, line) in lines.iter().enumerate().skip(1) {
-            let trimmed = line.trim_start_matches([' ', '\t', '\r']);
+            let trimmed = line.trim_start_matches(BLANKS);
             let orig = visual_width(
                 &line[..line.len() - trimmed.len()],
                 self.ctx.opts.indent as usize,
@@ -570,7 +576,7 @@ impl<'c, 'a> Printer<'c, 'a> {
             }
             // Write the line break and indentation.
             self.pending_eol = false;
-            while self.out.ends_with(' ') {
+            while self.out.ends_with(BLANKS) {
                 self.out.pop();
             }
             self.out.push('\n');
@@ -578,11 +584,11 @@ impl<'c, 'a> Printer<'c, 'a> {
             self.line_empty = true;
             if n == last {
                 self.pending_indent = Some(target);
-            } else if trimmed.trim().is_empty() {
+            } else if trimmed.trim_end_matches(BLANKS).is_empty() {
                 self.pending_indent = None;
             } else {
                 self.pending_indent = Some(target);
-                self.write(trimmed.trim_end(), indent);
+                self.write(trimmed.trim_end_matches(BLANKS), indent);
             }
         }
     }
@@ -933,4 +939,26 @@ enum RawKind {
 /// Width of leading indentation; a tab counts as one indent step.
 fn visual_width(s: &str, step: usize) -> usize {
     s.chars().map(|c| if c == '\t' { step } else { 1 }).sum()
+}
+
+/// A same-line gap inside an unknown unit as printed: runs of blanks shrink to
+/// one space; a block comment inside the gap is kept.
+fn same_line_gap(gap: &str) -> String {
+    let inner = gap.trim_matches(BLANKS);
+    if inner.is_empty() {
+        return if gap.is_empty() {
+            String::new()
+        } else {
+            " ".into()
+        };
+    }
+    let mut out = String::new();
+    if gap.starts_with(BLANKS) {
+        out.push(' ');
+    }
+    out.push_str(inner);
+    if gap.ends_with(BLANKS) {
+        out.push(' ');
+    }
+    out
 }
