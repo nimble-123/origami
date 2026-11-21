@@ -29,6 +29,11 @@ edition, every output change is listed with its STYLE rule ID.
   call arguments with an unhandled keyword group fall back instead of
   dropping tokens; `message = …` and other assignments to variables named
   like statements are assignments; `TYPE any` / `TYPE line` stay type names.
+- CDS headers: a clause that does not fit breaks before `on`, `and`, `or`;
+  clauses that fit stay on one line.
+- CI: coverage measured workspace-wide (87%, gate 85%); tests for
+  `--check --diff`, write mode and token comparison; paths found by
+  walking `.` are shown without `./`.
 - Write mode no longer forces each file to disk (fsync): formatting the RAP
   reference project (346 files) takes 0.06 s instead of 0.9 s.
 - Printer unit tests; `docs/adoption.md` (team adoption guide).

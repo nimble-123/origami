@@ -111,3 +111,20 @@ fn comment_moving_lines_is_detected() {
         vec![MismatchKind::CommentKind]
     );
 }
+
+#[test]
+fn comment_count_change_is_detected() {
+    assert_eq!(kinds("a \"x\nb", "a\nb"), vec![MismatchKind::CommentText]);
+}
+
+#[test]
+fn glued_change_is_detected() {
+    // Same token count and texts, but `b` loses its gap: simulate by lexing
+    // a stream where the second token is glued.
+    let a = "a b";
+    let b = "a b";
+    let mut out = lex(b);
+    out.tokens[1].glued = true;
+    let ms = origami_syntax::equivalent(&lex(a), a, &out, b).unwrap_err();
+    assert_eq!(ms[0].kind, MismatchKind::Glued);
+}

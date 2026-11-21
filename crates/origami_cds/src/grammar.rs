@@ -278,7 +278,12 @@ impl G<'_> {
             if segments.is_empty() && docs.len() == 1 {
                 docs.append(segment);
             } else {
-                segments.push(b::indent(vec![b::group(std::mem::take(segment))]));
+                // The clause's own line break stays outside the group, so the
+                // group breaks only when the clause does not fit.
+                let mut seg = std::mem::take(segment);
+                let rest = seg.split_off(1);
+                let head = seg.pop().unwrap_or_else(b::empty);
+                segments.push(b::indent(vec![head, b::group(rest)]));
             }
         };
         while k <= last {
@@ -288,8 +293,11 @@ impl G<'_> {
                 segment.push(self.t(k));
             } else if params.contains(&k) {
                 segment.push(b::indent(vec![self.hl(k), self.t(k)]));
-            } else if !bdef && matches!(self.word(k).as_str(), "and" | "or") && !self.glued(k) {
-                // Long conditions break before and/or, two levels deeper.
+            } else if !bdef
+                && matches!(self.word(k).as_str(), "and" | "or" | "on")
+                && !self.glued(k)
+            {
+                // Long conditions break before on/and/or, two levels deeper.
                 segment.push(b::indent(vec![b::indent(vec![self.ln(k), self.t(k)])]));
             } else {
                 segment.push(self.sp(k));
