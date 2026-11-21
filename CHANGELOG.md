@@ -29,6 +29,12 @@ edition, every output change is listed with its STYLE rule ID.
   call arguments with an unhandled keyword group fall back instead of
   dropping tokens; `message = …` and other assignments to variables named
   like statements are assignments; `TYPE any` / `TYPE line` stay type names.
+- CDS select lists: `case` expressions laid out by grammar (CDS-ELEM-001); DCL `grant select on … where …` compact (DCL-GRANT-001).
+- Release workflow (`release.yml`): 7 targets, optional signing,
+  checksums, third-party notices, GitHub release, crates.io, VSIX per
+  platform.
+- CLI benchmark (`scripts/bench-cli.sh`, bash 3.2 compatible): p95 per
+  file 1.5–2.0 ms including process start, 1,000 files 107 ms.
 - CDS headers: a clause that does not fit breaks before `on`, `and`, `or`;
   clauses that fit stay on one line.
 - CI: coverage measured workspace-wide (87%, gate 85%); tests for

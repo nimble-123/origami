@@ -157,13 +157,26 @@ impl<'a> Ctx<'a> {
             let text = &self.src[a..b];
             return text.split('\n').next().unwrap_or("").chars().count();
         }
+        // Unknown units print single spaces between tokens; measure up to
+        // the first line break, as printed.
         let mut w = 0;
         for k in first.0..=last.0 {
             let t = &self.tokens.tokens[k as usize];
-            if k > first.0 && !t.glued {
-                w += 1;
+            if k > first.0 {
+                let prev_end = self.tokens.tokens[k as usize - 1].end as usize;
+                let gap = &self.src[prev_end..t.start as usize];
+                if gap.contains('\n') {
+                    break;
+                }
+                if !gap.is_empty() {
+                    w += 1;
+                }
             }
-            w += self.token_text(TokenIndex(k)).chars().count();
+            let text = self.token_text(TokenIndex(k));
+            match text.find('\n') {
+                Some(n) => return w + text[..n].chars().count(),
+                None => w += text.chars().count(),
+            }
         }
         w
     }
@@ -203,11 +216,10 @@ impl<'a> Ctx<'a> {
                 }
                 Inner::Unknown { first, last, .. } => {
                     let (a, b) = self.raw_range(*first, *last);
-                    if self.src[a..b].contains('\n') {
-                        let line = self.src[a..b].split('\n').next().unwrap_or("");
-                        return w + line.chars().count();
-                    }
                     w += self.raw_width(true, *first, *last);
+                    if self.src[a..b].contains('\n') {
+                        return w;
+                    }
                 }
                 Inner::Verbatim { first, last, .. } | Inner::Opaque { first, last, .. } => {
                     let (a, b) = self.raw_range(*first, *last);
@@ -657,7 +669,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                     let unknown = matches!(d.0, Inner::Unknown { .. });
                     let (a, b) = self.ctx.raw_range(*first, *last);
                     let multiline = self.ctx.src[a..b].contains('\n');
-                    remaining -= self.ctx.raw_width(unknown && !multiline, *first, *last) as isize;
+                    remaining -= self.ctx.raw_width(unknown, *first, *last) as isize;
                     if multiline {
                         return remaining >= 0;
                     }
