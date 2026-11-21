@@ -79,7 +79,14 @@ pub fn classify(words: &[String], depth0: &[String]) -> Option<Role> {
         "WHILE" => opener("ENDWHILE"),
         "TRY" => opener("ENDTRY"),
         "CATCH" if w(1) == "SYSTEM-EXCEPTIONS" => opener("ENDCATCH"),
-        "AT" if matches!(w(1), "FIRST" | "LAST" | "NEW" | "END") => opener("ENDAT"),
+        // Control levels (`AT NEW f`) and extract field groups (`AT fg`,
+        // `AT fg WITH fg2`) are blocks; event keywords (`AT SELECTION-SCREEN`,
+        // `AT LINE-SELECTION`, `AT USER-COMMAND`, `AT PFnn`) are not.
+        "AT" if !(matches!(w(1), "SELECTION-SCREEN" | "LINE-SELECTION" | "USER-COMMAND")
+            || (w(1).starts_with("PF") && w(1)[2..].parse::<u8>().is_ok())) =>
+        {
+            opener("ENDAT")
+        }
         "SELECT" if select_is_loop(depth0) => opener("ENDSELECT"),
         "WITH" if select_is_loop(depth0) => opener("ENDWITH"),
         "PROVIDE" => opener("ENDPROVIDE"),

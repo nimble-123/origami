@@ -425,6 +425,27 @@ SELECT carrid, connid, fldate
     INTO TABLE @DATA(lt_flights).
 ```
 
+
+### ABAP-SQL-002: Common table expressions and subqueries
+Milestone: M4
+
+Approved by the maintainer, Nils Lutz, on 2026-11-21. In `WITH +cte AS ( SELECT … ) …`
+each common table expression starts its own line, aligned after `WITH`, and
+the main query starts its own line at the statement's indent. A subquery in
+parentheses stays on one line if it fits; otherwise the query starts on the
+line after `(`, one level deeper, follows ABAP-SQL-001, and `)` gets its own
+line. `OPEN CURSOR … FOR SELECT …` and `MERGE INTO …` (8.16) follow
+ABAP-SQL-001.
+
+```abap
+WITH +carriers AS ( SELECT carrid, carrname FROM scarr ),
+     +seats AS (
+       SELECT carrid, connid, SUM( seatsocc ) AS seats
+           FROM sflight
+           GROUP BY carrid, connid
+     )
+SELECT * FROM +seats INTO TABLE @DATA(result).
+```
 ### ABAP-COMMENT-002: End-of-line comments
 Milestone: M1
 

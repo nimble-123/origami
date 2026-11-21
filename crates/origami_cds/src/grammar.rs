@@ -286,7 +286,14 @@ impl G<'_> {
                 segments.push(b::indent(vec![head, b::group(rest)]));
             }
         };
+        // Inside a block written on the header's line (`{ … }`), nothing breaks.
+        let mut braces = 0i32;
         while k <= last {
+            match self.kind(k) {
+                LBRACE => braces += 1,
+                RBRACE => braces -= 1,
+                _ => {}
+            }
             if starts.contains(&k) {
                 flush(&mut segment, &mut segments, &mut docs);
                 segment.push(self.hl(k));
@@ -294,6 +301,7 @@ impl G<'_> {
             } else if params.contains(&k) {
                 segment.push(b::indent(vec![self.hl(k), self.t(k)]));
             } else if !bdef
+                && braces == 0
                 && matches!(self.word(k).as_str(), "and" | "or" | "on")
                 && !self.glued(k)
             {

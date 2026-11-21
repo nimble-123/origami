@@ -79,10 +79,21 @@ pub fn layout(
                 let mut p = P::new(&mut ctx, st.tokens.start, st.tokens.end - 1, blank);
                 statements::parse(&mut p)
             };
+            // Keywords inside constructor bodies (`FOR … IN`, `BASE`,
+            // `MAPPING`, …), whichever layout the statement gets.
+            let mark_ctor = |ctx: &mut Ctx| {
+                let mut p = P::new(ctx, st.tokens.start, st.tokens.end - 1, blank);
+                let end = p.end;
+                p.mark_ctor_keywords(st.tokens.start, end, false);
+            };
             match parsed {
-                Some(d) => d,
+                Some(d) => {
+                    mark_ctor(&mut ctx);
+                    d
+                }
                 None => {
                     ctx.keywords.truncate(saved);
+                    mark_ctor(&mut ctx);
                     unknown += 1;
                     let t = &stream.tokens[first.0 as usize];
                     diagnostics.push(Diagnostic::new(

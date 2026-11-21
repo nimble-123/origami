@@ -101,6 +101,8 @@ pub fn lex(src: &SourceText, lang: Language) -> Result<TokenStream, Diagnostic> 
                 loop {
                     match at(j) {
                         b'\'' if at(j + 1) == b'\'' => j += 2,
+                        // `\'` and `\\` are escapes (`'Days\' Supply'`).
+                        b'\\' if matches!(at(j + 1), b'\'' | b'\\') => j += 2,
                         b'\'' => break (STRING, j + 1),
                         b'\n' => return Err(e001(i, "Unterminated string")),
                         0 if j >= b.len() => return Err(e001(i, "Unterminated string")),

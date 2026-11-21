@@ -29,6 +29,23 @@ edition, every output change is listed with its STYLE rule ID.
   call arguments with an unhandled keyword group fall back instead of
   dropping tokens; `message = …` and other assignments to variables named
   like statements are assignments; `TYPE any` / `TYPE line` stay type names.
+- Statement catalog up to SAP_BASIS 8.16: all 4,576 example statements and
+  333 CDS sources from abaplint's tests (`corpus/catalog/`, MIT) run in a
+  test; no internal errors, no false structural errors, idempotent; 21
+  statements without grammar (18 of them dynpro flow logic). New: ABAP SQL
+  `MERGE INTO` (8.16), `WITH +cte … ` incl. `WITH ASSOCIATIONS`/`HIERARCHY`
+  (ABAP-SQL-002), `OPEN CURSOR … FOR SELECT`, `DELETE … ORDER BY`,
+  SQL functions and path expressions; EML `OPERATIONS`; `RAISE RESUMABLE`,
+  `WAIT FOR … UNTIL`, `CALL FUNCTION … EXCEPTIONS OTHERS`, `CALL METHOD OF`
+  (OLE), about 80 rare and obsolete statements; `&`, `BIT-NOT`, unary signs,
+  chained assignments, qualified constructor types, leading pragmas.
+- Keywords inside constructor expressions (`FOR … IN`, `BASE`, `MAPPING`,
+  `EXCEPT`, `DISCARDING DUPLICATES`, `WHEN … THEN`, `LET`, `INIT`/`NEXT`,
+  `IS [NOT] INITIAL`, `IS NULL`, …) and in RAP handler and event
+  declarations (`FOR VALIDATE ON SAVE`, `keys FOR ACTION … RESULT result`,
+  `FOR EVENT x OF y`) are re-cased.
+- Fixes: `AT fg … ENDAT` in extract loops is a block (was E004); CDS string
+  escapes `\'` (was E001); a CDS header never breaks inside `{ … }`.
 - Robustness (longer fuzzing): a new line over 255 characters that remains
   after quarantine leaves the whole file as written (INVARIANTS 2); an
   opaque unit starting with `*` never lands in column 1; an unclosed pragma
