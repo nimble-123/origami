@@ -11,3 +11,4 @@ fuzz/target/
 editors/vscode/out-tsc/
 editors/vscode/out-test/
 *.vsix
+editors/vscode/.vscode-test/

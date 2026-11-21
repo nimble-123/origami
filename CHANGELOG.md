@@ -29,6 +29,9 @@ edition, every output change is listed with its STYLE rule ID.
   call arguments with an unhandled keyword group fall back instead of
   dropping tokens; `message = …` and other assignments to variables named
   like statements are assignments; `TYPE any` / `TYPE line` stay type names.
+- VS Code extension: ESLint (typescript-eslint strict) and end-to-end tests
+  in a real VS Code instance (`npm run test:e2e`: activation, ABAP and CDS
+  formatting, structural error as diagnostic, idempotency); both in CI.
 - CDS select lists: `case` expressions laid out by grammar (CDS-ELEM-001); DCL `grant select on … where …` compact (DCL-GRANT-001).
 - Release workflow (`release.yml`): 7 targets, optional signing,
   checksums, third-party notices, GitHub release, crates.io, VSIX per
