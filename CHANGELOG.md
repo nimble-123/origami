@@ -29,6 +29,9 @@ edition, every output change is listed with its STYLE rule ID.
   call arguments with an unhandled keyword group fall back instead of
   dropping tokens; `message = …` and other assignments to variables named
   like statements are assignments; `TYPE any` / `TYPE line` stay type names.
+- ABAP: chains of keyword statements (ABAP-CHAIN-001); `SHIFT`,
+  `MOVE-CORRESPONDING`, `CONVERT DATE/TIME STAMP/UTCLONG`, `WAIT UP TO`,
+  `TEST-SEAM`/`TEST-INJECTION` and their ends. ABAP fallback 1.3% → 0.9%.
 - Performance comparison with ABAP Cleaner 1.29.2 on 1,652 ABAP files
   (`docs/benchmark-abap-cleaner.md`).
 - VS Code extension: ESLint (typescript-eslint strict) and end-to-end tests

@@ -306,6 +306,20 @@ TYPES: BEGIN OF ty_item,
        END OF ty_item.
 ```
 
+### ABAP-CHAIN-001: Chains of other statements
+Milestone: M1
+
+Approved by the maintainer, Nils Lutz, on 2026-11-21. A chain of any other keyword
+statement (`CLEAR:`, `INTERFACES:`, `EVENTS:`, `SET HANDLER:`, …) follows the
+declaration rule: on one line if it fits, otherwise one item per line,
+aligned after the colon.
+
+```abap
+CLEAR: lv_count,
+       lt_items,
+       ls_header.
+```
+
 ### ABAP-ALIGN-003: Align `TYPE` in broken declaration chains (A3)
 Milestone: M1
 
