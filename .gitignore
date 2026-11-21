@@ -8,3 +8,6 @@ fuzz/artifacts/
 fuzz/corpus/
 fuzz/target/
 .DS_Store
+editors/vscode/out-tsc/
+editors/vscode/out-test/
+*.vsix

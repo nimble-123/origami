@@ -26,8 +26,17 @@ its own output and refuses to write if anything but layout changed.
 cargo install --path crates/origami_cli   # binary: origami
 ```
 
-Released binaries, `cargo install abap-origami` and the VS Code extension
-follow with v1.0.
+VS Code: build the extension in `editors/vscode` (see below) and install the
+VSIX. Released binaries, `cargo install abap-origami` and Marketplace
+publishing follow with v1.0.
+
+```sh
+cd editors/vscode
+npm ci && npm run build
+mkdir -p bin && cp ../../target/release/origami bin/
+npx vsce package --target darwin-arm64 --no-dependencies --allow-missing-repository
+code --install-extension abap-origami-darwin-arm64-0.1.0.vsix
+```
 
 ## Use
 

@@ -16,6 +16,9 @@ edition, every output change is listed with its STYLE rule ID.
   statements; keyword upper case (STYLE ABAP-*, batch 1).
 - ABAP EML (`READ`/`MODIFY ENTITIES`, `COMMIT ENTITIES`, `GET PERMISSIONS`,
   `SET LOCKS`): STYLE ABAP-EML-001.
+- VS Code extension (`editors/vscode`): formatter for `abap`/`acds` and
+  abapGit files, binary resolution with `required_version`, minimal edits,
+  Problems panel, untrusted-workspace handling.
 - CDS family: structural layout (STYLE CDS-*).
 - M0 walking skeleton:
   - lossless lexers for ABAP and the CDS family;
