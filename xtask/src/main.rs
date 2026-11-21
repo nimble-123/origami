@@ -6,6 +6,7 @@ mod corpus;
 mod freq;
 mod oracle;
 mod release_diff;
+mod stress;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -29,8 +30,9 @@ fn main() -> ExitCode {
         ["oracle"] => oracle::run(),
         ["bench-check", rest @ ..] => bench_check::run(rest),
         ["release-diff", rest @ ..] => release_diff::run(rest),
+        ["stress", rest @ ..] => stress::run(rest),
         _ => Err(
-            "usage: cargo xtask <corpus fetch|corpus run|corpus bless|freq [N]|oracle|bench-check [hyperfine.json...]|release-diff [tag]>"
+            "usage: cargo xtask <corpus fetch|corpus run|corpus bless|freq [N]|oracle|bench-check [hyperfine.json...]|release-diff [tag]|stress [n] [seed]>"
                 .into(),
         ),
     };

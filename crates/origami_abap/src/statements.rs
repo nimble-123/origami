@@ -19,7 +19,15 @@ pub fn parse(p: &mut P) -> Option<Doc> {
     let start = p.pos;
     let w0 = p.upper(start);
     let call_like = p.glued(start + 1) && matches!(p.kind(start + 1), LPAREN | SELECTOR | LBRACKET);
-    if !call_like {
+    // ABAP has no reserved words: `message = …` assigns to a variable named
+    // like the MESSAGE statement.
+    let assign_like = !p.glued(start + 1)
+        && p.kind(start + 1) == WORD
+        && matches!(
+            p.text(start + 1),
+            "=" | "?=" | "+=" | "-=" | "*=" | "/=" | "&&="
+        );
+    if !call_like && !assign_like {
         if DECL_LEADS.contains(&w0.as_str()) {
             if let Some(d) = declaration(p) {
                 return Some(d);
@@ -937,7 +945,15 @@ fn decl_tokens(p: &mut P, from: usize, to: usize) -> Vec<Doc> {
             "WITH" | "UNIQUE" | "NON-UNIQUE" | "DEFAULT" | "EMPTY" | "KEY"
         );
         let keyword_here = !in_components || ends_components;
-        if is_word && !operand_slot && DECL_KW.contains(&w.as_str()) && keyword_here {
+        // Type-phrase words are keywords only with their partner word;
+        // otherwise they are type names (`TYPE any`, a type named `line`).
+        let partner_ok = match w.as_str() {
+            "ANY" | "INDEX" | "STANDARD" | "SORTED" | "HASHED" => p.is(i + 1, "TABLE"),
+            "LINE" | "RANGE" => p.is(i + 1, "OF"),
+            "REF" => p.is(i + 1, "TO"),
+            _ => true,
+        };
+        if is_word && !operand_slot && DECL_KW.contains(&w.as_str()) && keyword_here && partner_ok {
             docs.push(p.kw(i));
             in_components = w == "COMPONENTS";
             prev_kw = Some(w);

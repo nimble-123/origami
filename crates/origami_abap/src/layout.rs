@@ -62,7 +62,14 @@ pub fn layout(
         // One blank line is kept, except directly after an opener and
         // directly before a closer.
         let blank = id > 0 && !opens(prev_role) && !closes(st.role);
-        let body = if opaque.contains(&id) {
+        // A statement glued to the previous one without being an opaque body
+        // (invalid code such as `x.y` split at the period) keeps its bytes:
+        // its position depends on the previous statement's layout, so any
+        // re-indentation would not be stable.
+        let glued_start = id > 0 && stream.tokens[first.0 as usize].glued;
+        let body = if opaque.contains(&id)
+            || (glued_start && stream.tokens[first.0 as usize].kind != crate::kinds::OPAQUE)
+        {
             b::opaque(first, last, blank)
         } else if quarantine.contains(&id) {
             b::verbatim(first, last, blank)

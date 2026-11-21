@@ -56,6 +56,8 @@ jobs:
           tool: hyperfine
       - run: cargo xtask corpus fetch
       - run: cargo xtask corpus run
+      - name: Mutation stress test (stable Rust)
+        run: cargo xtask stress 20000 ${{ github.run_number }}
       - run: npm ci
         working-directory: tools/abaplint-oracle
       - run: cargo xtask oracle

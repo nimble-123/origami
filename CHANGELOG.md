@@ -23,6 +23,12 @@ edition, every output change is listed with its STYLE rule ID.
 - CDS: annotation values laid out like JSON when they do not fit
   (CDS-ANNO-001); DDLS and BDEF headers one clause per line
   (CDS-HEAD-001).
+- Robustness: `cargo xtask stress` (mutation testing on stable Rust, in CI);
+  80,000 mutated inputs without failures after these fixes: a `*` token is
+  never printed in column 1; block comments inside a unit keep their bytes;
+  call arguments with an unhandled keyword group fall back instead of
+  dropping tokens; `message = …` and other assignments to variables named
+  like statements are assignments; `TYPE any` / `TYPE line` stay type names.
 - Write mode no longer forces each file to disk (fsync): formatting the RAP
   reference project (346 files) takes 0.06 s instead of 0.9 s.
 - Printer unit tests; `docs/adoption.md` (team adoption guide).
