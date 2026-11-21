@@ -1,0 +1,31 @@
+[package]
+name = "abap-origami"
+description = "origami: a layout-only formatter for ABAP and the CDS family (CDS, DDLX, DCL, BDEF, SRVD)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "origami"
+path = "src/main.rs"
+
+[dependencies]
+origami_core.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+semver.workspace = true
+ignore.workspace = true
+rayon.workspace = true
+tempfile.workspace = true
+similar.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+jsonschema.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

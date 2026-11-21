@@ -1,0 +1,15 @@
+- id: origami
+  name: origami (check)
+  description: Check ABAP and CDS-family layout with origami
+  entry: origami --check
+  language: system
+  files: \.(abap|asddls|asddlxs|asdcls|asbdef|srvdsrv|acds)$
+  pass_filenames: true
+
+- id: origami-fix
+  name: origami (fix)
+  description: Format ABAP and CDS-family files with origami
+  entry: origami --write
+  language: system
+  files: \.(abap|asddls|asddlxs|asdcls|asbdef|srvdsrv|acds)$
+  pass_filenames: true

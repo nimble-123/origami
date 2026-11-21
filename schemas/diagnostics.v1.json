@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://origami.dev/schemas/diagnostics.v1.json",
+  "title": "origami diagnostics, schema version 1",
+  "description": "Written to stderr by `origami --diagnostics=json`. One object per run.",
+  "type": "object",
+  "required": ["schema", "version", "style_edition", "truncated", "files"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": 1 },
+    "version": { "type": "string", "description": "origami version" },
+    "style_edition": { "type": "string" },
+    "truncated": {
+      "type": "boolean",
+      "description": "True when --max-diagnostics cut the list (the cap applies per run)."
+    },
+    "files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/file" }
+    }
+  },
+  "$defs": {
+    "file": {
+      "type": "object",
+      "required": ["path", "language", "changed", "status", "diagnostics"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "description": "File path, `<stdin>`, `<args>`, or a config file path." },
+        "language": {
+          "enum": ["abap", "ddls", "ddlx", "dcl", "bdef", "srvd", null]
+        },
+        "changed": { "type": "boolean" },
+        "status": { "enum": ["formatted", "unchanged", "error", "skipped"] },
+        "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": ["code", "severity", "message", "range"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": "string", "pattern": "^[EWIX][0-9]{3}$" },
+        "severity": { "enum": ["info", "warning", "error", "internal"] },
+        "message": { "type": "string" },
+        "range": {
+          "type": "object",
+          "required": ["start", "end"],
+          "additionalProperties": false,
+          "properties": {
+            "start": { "$ref": "#/$defs/position" },
+            "end": { "$ref": "#/$defs/position" }
+          }
+        }
+      }
+    },
+    "position": {
+      "type": "object",
+      "required": ["line", "column", "offset"],
+      "additionalProperties": false,
+      "properties": {
+        "line": { "type": "integer", "minimum": 1, "description": "1-based line" },
+        "column": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based column in UTF-16 code units"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "0-based byte offset in the text after CRLF-to-LF normalization"
+        }
+      }
+    }
+  }
+}

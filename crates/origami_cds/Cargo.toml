@@ -1,0 +1,14 @@
+[package]
+name = "origami_cds"
+description = "CDS family (DDLS, DDLX, DCL, BDEF, SRVD) support for the origami formatter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+origami_syntax.workspace = true
+origami_layout.workspace = true
+
+[lints]
+workspace = true

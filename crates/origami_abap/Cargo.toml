@@ -1,0 +1,14 @@
+[package]
+name = "origami_abap"
+description = "ABAP lexer, structure check and layout for the origami formatter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+origami_syntax.workspace = true
+origami_layout.workspace = true
+
+[lints]
+workspace = true

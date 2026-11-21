@@ -1,0 +1,8 @@
+# Template for adopters (see docs/adoption.md).
+#
+# After the one-time mass format with origami, put the full hash of that commit
+# on its own line below, then run:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# GitHub uses this file automatically in its blame view.

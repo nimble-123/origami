@@ -1,0 +1,2 @@
+# Rule test data must keep its exact bytes (CRLF, BOM).
+crates/origami_core/tests/rules/** -text

@@ -1,0 +1,1 @@
+define view entity Z as select from t { a }
