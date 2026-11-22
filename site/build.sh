@@ -2,6 +2,8 @@
 # Builds the website into site/dist: the static page, the diagrams and
 # origami compiled to WebAssembly. Serve it with any static server, e.g.
 #   sh site/build.sh && python3 -m http.server -d site/dist 8000
+# The link preview image (docs/assets/social-preview.png) is rendered from
+# site/og/og.html with a headless browser at 1280x640.
 set -eu
 cd "$(dirname "$0")/.."
 rustup target add wasm32-unknown-unknown >/dev/null 2>&1 || true
@@ -13,4 +15,5 @@ cp target/wasm32-unknown-unknown/release/origami_wasm.wasm site/dist/origami.was
 for f in logo logo-dark pipeline pipeline-dark benchmark benchmark-dark review-demo review-demo-dark; do
   cp "docs/assets/$f.svg" site/dist/assets/
 done
+cp docs/assets/social-preview.png site/dist/assets/
 echo "site/dist: $(du -sh site/dist | cut -f1)"
