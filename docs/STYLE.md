@@ -468,7 +468,11 @@ clause. `INSERT`, `UPDATE`, `MODIFY` and `DELETE` count as database statements
 when their form exists only for database tables: every `UPDATE`,
 `INSERT INTO …`, `INSERT dbtab FROM …`, `DELETE FROM …`,
 `MODIFY dbtab FROM TABLE …`, or any statement with a host variable escaped by
-`@`. `DELETE FROM` and `INSERT INTO` keep the table on the first line. Other
+`@`. `DELETE FROM` and `INSERT INTO` keep the table on the first line.
+Approved by the maintainer, Nils Lutz, on 2026-11-22: in the strict syntax,
+where `FROM` comes before the field list (`SELECT [SINGLE|DISTINCT] FROM dbtab
+… FIELDS …`), the table stays on the first line too, and `FIELDS` starts the
+next clause line. Other
 forms may work on internal tables and keep the layout of keyword statements
 (a line breaks only before a clause that does not fit).
 

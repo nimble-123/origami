@@ -2118,6 +2118,26 @@ fn database_dml(p: &P, start: usize, spec: &Spec) -> bool {
     }
 }
 
+/// The lead of a `SELECT` in strict syntax, where `FROM` comes before the
+/// field list (`SELECT [SINGLE|DISTINCT] FROM …`); `None` otherwise.
+fn strict_select_lead(p: &P, start: usize, spec: &Spec) -> Option<&'static [&'static str]> {
+    if spec.lead != ["SELECT"] {
+        return None;
+    }
+    if p.is(start + 1, "FROM") {
+        return Some(&["SELECT", "FROM"]);
+    }
+    if p.is(start + 2, "FROM") {
+        if p.is(start + 1, "SINGLE") {
+            return Some(&["SELECT", "SINGLE", "FROM"]);
+        }
+        if p.is(start + 1, "DISTINCT") {
+            return Some(&["SELECT", "DISTINCT", "FROM"]);
+        }
+    }
+    None
+}
+
 fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
     let start = p.pos;
     // Database DML follows ABAP-SQL-001 like `SELECT`.
@@ -2138,6 +2158,16 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
         &db
     } else {
         spec
+    };
+    // Strict syntax `SELECT [SINGLE|DISTINCT] FROM dbtab … FIELDS …`: the
+    // table stays on the first line (ABAP-SQL-001).
+    let strict;
+    let spec = match strict_select_lead(p, start, spec) {
+        Some(lead) => {
+            strict = Spec { lead, ..*spec };
+            &strict
+        }
+        None => spec,
     };
     let mut head = Vec::new();
     for k in 0..spec.lead.len() {
@@ -2422,8 +2452,16 @@ fn subquery(p: &mut P, lp: usize, rp: usize) -> Option<Doc> {
     }
     let body = {
         let mut q = P::new(&mut *p.c, lp + 1, rp, false);
-        let head = q.kw(lp + 1);
-        q.pos = lp + 2;
+        let lead = strict_select_lead(&q, lp + 1, select_spec()).unwrap_or(&["SELECT"]);
+        let mut head = Vec::new();
+        for k in 0..lead.len() {
+            if k > 0 {
+                head.push(q.sp(lp + 1 + k));
+            }
+            head.push(q.kw(lp + 1 + k));
+        }
+        let head = b::concat(head);
+        q.pos = lp + 1 + lead.len();
         let body = spec_body(&mut q, select_spec(), true)?;
         if !q.at_end() {
             return None;
