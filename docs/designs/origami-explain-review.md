@@ -1057,9 +1057,10 @@ Cause sentences (`{…}` filled from the note):
 *   comment: "split because of the comment `{text}`";
 *   layout: "laid out on several lines to fit the layout rules".
 
-Known gap: STYLE.md's ABAP-SQL-001 also names database INSERT, UPDATE,
-MODIFY and DELETE, but these statements use the fill layout; their notes
-name the cause only until the implementation or the rule text is aligned.
+Known gap (closed on 2026-11-22): STYLE.md's ABAP-SQL-001 also names
+database INSERT, UPDATE, MODIFY and DELETE, which used the fill layout. The
+implementation now follows the rule for the forms that exist only for
+database tables (see STYLE.md).
 
 --------------------------------------------------------------------------------
 

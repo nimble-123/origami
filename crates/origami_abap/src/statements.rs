@@ -147,6 +147,7 @@ enum Operands {
     Logical,
 }
 
+#[derive(Clone, Copy)]
 struct Spec {
     /// Leading keywords (space-separated words each).
     lead: &'static [&'static str],
@@ -788,6 +789,9 @@ static SPECS: &[Spec] = &[
             "ORDER BY",
             "INTO",
             "APPENDING",
+            // One clause: `FIELDS` here is not the `FIELDS` clause.
+            "INTO CORRESPONDING FIELDS OF",
+            "APPENDING CORRESPONDING FIELDS OF",
             "UP TO",
             "FOR ALL ENTRIES IN",
             "INNER JOIN",
@@ -2079,8 +2083,62 @@ fn operand_follows_glued(p: &P, at: usize) -> bool {
     p.glued(at + 1) && matches!(p.kind(at + 1), LPAREN | SELECTOR | LBRACKET)
 }
 
+/// Whether `INSERT`, `UPDATE`, `MODIFY` or `DELETE` at `start` works on a
+/// database table (ABAP-SQL-001) rather than an internal table. ABAP decides
+/// by the operand's type; without types, a statement counts as database DML
+/// when its form exists only for database tables: every `UPDATE`;
+/// `INSERT INTO …` and `INSERT dbtab FROM …`; `DELETE FROM …`;
+/// `MODIFY dbtab FROM TABLE …`; or any host variable escaped with `@`.
+/// Other forms (`MODIFY x FROM wa`, `DELETE x FROM wa`) stay internal-table
+/// statements.
+fn database_dml(p: &P, start: usize, spec: &Spec) -> bool {
+    let lead = match spec.lead {
+        [w] => *w,
+        _ => return false,
+    };
+    if !matches!(lead, "INSERT" | "UPDATE" | "MODIFY" | "DELETE") {
+        return false;
+    }
+    if lead == "UPDATE" || (start + 1..p.end).any(|k| p.text(k).starts_with('@')) {
+        return true;
+    }
+    let operand =
+        |k: usize| p.kind(k) == WORD && !p.glued(k) && !spec.words.contains(&p.upper(k).as_str());
+    match lead {
+        "INSERT" => {
+            p.is(start + 1, "INTO")
+                || (operand(start + 1)
+                    && !p.is(start + 1, "INITIAL")
+                    && !p.is(start + 1, "LINES")
+                    && p.is(start + 2, "FROM"))
+        }
+        "DELETE" => p.is(start + 1, "FROM"),
+        "MODIFY" => operand(start + 1) && p.is(start + 2, "FROM") && p.is(start + 3, "TABLE"),
+        _ => false,
+    }
+}
+
 fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
     let start = p.pos;
+    // Database DML follows ABAP-SQL-001 like `SELECT`.
+    let db;
+    let spec = if !spec.all_clauses && database_dml(p, start, spec) {
+        // `DELETE FROM dbtab` and `INSERT INTO dbtab` keep the target on the
+        // first line, like `SELECT … FROM`.
+        let lead = match spec.lead {
+            ["DELETE"] if p.is(start + 1, "FROM") => &["DELETE", "FROM"][..],
+            ["INSERT"] if p.is(start + 1, "INTO") => &["INSERT", "INTO"][..],
+            other => other,
+        };
+        db = Spec {
+            lead,
+            all_clauses: true,
+            ..*spec
+        };
+        &db
+    } else {
+        spec
+    };
     let mut head = Vec::new();
     for k in 0..spec.lead.len() {
         let i = start + k;

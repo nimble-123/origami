@@ -6,6 +6,14 @@ edition, every output change is listed with its STYLE rule ID.
 
 ## [Unreleased]
 
+### Fixed
+
+- ABAP-SQL-001: `UPDATE`, `DELETE FROM`, `INSERT INTO` / `INSERT dbtab FROM`,
+  `MODIFY dbtab FROM TABLE` and DML with `@` host variables now break before
+  every clause when they do not fit, as the rule says; before, they broke
+  only before clauses that did not fit. `INTO` / `APPENDING CORRESPONDING
+  FIELDS OF` is no longer split before `FIELDS`. 43 corpus files change.
+
 ### Added
 
 - M1 (ABAP): printer with groups, hanging indentation, fallback choice,
