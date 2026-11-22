@@ -68,7 +68,8 @@ turns these commits into the version number and the changelog.
 | `docs`, `refactor`, `test`, `build`, `ci`, `chore` | everything else | hidden |
 
 Scopes: `abap`, `cds`, `core`, `layout`, `cli`, `mcp`, `vscode`, `wasm`,
-`site`, `xtask`, `release`, `deps`.
+`site`, `xtask`, `release`, `deps` (and `main`, which release-please uses for
+the release pull request).
 
 Examples:
 
