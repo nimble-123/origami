@@ -5,7 +5,8 @@ SVG terminal (light and dark) for the README and the website.
     cargo build --release && python3 docs/demo/terminal.py
 
 The command is typed, the output appears line by line, holds, and loops.
-Colors follow docs/brand.md: added = valley blue, removed = mountain red.
+Colors follow docs/brand.md (Tokyo Night): added = valley blue, removed =
+mountain red, rule IDs cyan.
 """
 import html
 import os
@@ -19,12 +20,13 @@ FILE = "zcl_flight_check.clas.abap"
 ARGS = ["--no-config", "--line-width", "80", "--diagnostics", "human", "--review", FILE]
 
 THEMES = {
-    "light": dict(page="#f4f6f9", sheet="#ffffff", ink="#18214d", dim="#5b6589",
-                  red="#d23a49", blue="#2456d6", red_wash="#fbe9eb", blue_wash="#e6edfc",
-                  edge="#c9d1de", fold="#c9d1de"),
-    "dark": dict(page="#0e1430", sheet="#151d42", ink="#e7ebf6", dim="#8e97ba",
-                 red="#ff7a86", blue="#7fa2ff", red_wash="#3a2140", blue_wash="#1f2c66",
-                 edge="#2e3866", fold="#2e3866"),
+    # Tokyo Night Light and Tokyo Night (docs/brand.md).
+    "light": dict(page="#d5d6db", sheet="#e6e7ed", ink="#343b58", dim="#5f6272",
+                  red="#8c4351", blue="#34548a", cyan="#0f4b6e", red_wash="#dbd3da",
+                  blue_wash="#d1d5e1", edge="#a8aab6", fold="#a8aab6"),
+    "dark": dict(page="#16161e", sheet="#1a1b26", ink="#c0caf5", dim="#828bb8",
+                 red="#f7768e", blue="#7aa2f7", cyan="#7dcfff", red_wash="#37222c",
+                 blue_wash="#20303b", edge="#3b4261", fold="#3b4261"),
 }
 FONT = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
 SIZE = 12
@@ -74,7 +76,7 @@ def style(codes, t):
     if "32" in codes:
         fill = t["blue"]
     if "36" in codes:
-        fill, weight = t["ink"], "600"
+        fill, weight = t["cyan"], "600"
     if "1" in codes:
         weight = "700"
     if "7" in codes:

@@ -19,6 +19,26 @@ const HERO_AFTER = [
   "                                       iv_mode    = 'A' ).",
 ].join("\n");
 
+/** Tokyo Night syntax colors for one line of ABAP or CDS: comments, strings,
+ * numbers and upper-case keywords. Returns text nodes and spans. */
+const SYNTAX =
+  /(^\*.*|".*|\/\/.*)|('(?:[^']|'')*'?|`(?:[^`]|``)*`?|\|(?:[^|\\]|\\.)*\|?)|\b(\d+)\b|\b([A-Z][A-Z-]*[A-Z])\b/g;
+
+function paint(text) {
+  const out = [];
+  let pos = 0;
+  for (const m of text.matchAll(SYNTAX)) {
+    if (m.index > pos) out.push(text.slice(pos, m.index));
+    const s = document.createElement("span");
+    s.className = m[1] ? "com" : m[2] ? "str" : m[3] ? "num-lit" : "kw";
+    s.textContent = m[0];
+    out.push(s);
+    pos = m.index + m[0].length;
+  }
+  if (pos < text.length) out.push(text.slice(pos));
+  return out;
+}
+
 /** Tokens with line and column. origami changes layout only, so the two
  * texts have the same tokens in the same order. */
 function tokens(text) {
@@ -37,8 +57,8 @@ function hero() {
   const after = tokens(HERO_AFTER);
   const spans = before.map((t, i) => {
     const s = document.createElement("span");
-    s.className = /^[A-Z]+\(?$/.test(t.text) && t.text.length > 1 ? "tok kw" : "tok";
-    s.textContent = t.text;
+    s.className = "tok";
+    s.append(...paint(t.text));
     s.style.setProperty("--x", t.x);
     s.style.setProperty("--y", t.y);
     box.append(s);
@@ -208,7 +228,9 @@ function render(r) {
     const row = document.createElement("div");
     row.className = broken.has(n) ? "ln broken" : "ln";
     row.dataset.n = n;
-    row.textContent = text || " ";
+    const code = document.createElement("span");
+    code.append(...(text ? paint(text) : [" "]));
+    row.append(code);
     frag.append(row);
     for (const note of after.get(n) ?? []) {
       const p = document.createElement("p");

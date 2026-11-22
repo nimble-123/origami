@@ -12,14 +12,15 @@ HERE = Path(__file__).parent
 DATA = json.loads((HERE.parent / "benchmark-data.json").read_text())
 
 SKINS = {
-    "light": dict(paper="#f4f6f9", sheet="#ffffff", ink="#18214d", muted="#4a5478",
-                  soft="#5b6589", crease="#c9d1de", accent="#2456d6",
-                  accent_tint="rgba(36,86,214,0.08)", ink_rgb="24,33,77",
-                  series1="#6e7899"),
-    "dark": dict(paper="#0e1430", sheet="#151d42", ink="#e7ebf6", muted="#aeb6d3",
-                 soft="#8e97ba", crease="#2e3866", accent="#7fa2ff",
-                 accent_tint="rgba(127,162,255,0.10)", ink_rgb="231,235,246",
-                 series1="#7d86a8"),
+    # Tokyo Night Light by day, Tokyo Night by night (docs/brand.md).
+    "light": dict(paper="#d5d6db", sheet="#e6e7ed", ink="#343b58", muted="#565a6e",
+                  soft="#5f6272", crease="#a8aab6", accent="#34548a",
+                  accent_tint="rgba(52,84,138,0.10)", ink_rgb="52,59,88",
+                  series1="#7c7f8f"),
+    "dark": dict(paper="#16161e", sheet="#1a1b26", ink="#c0caf5", muted="#a9b1d6",
+                 soft="#828bb8", crease="#3b4261", accent="#7aa2f7",
+                 accent_tint="rgba(122,162,247,0.12)", ink_rgb="192,202,245",
+                 series1="#737aa2"),
 }
 SANS = "'Schibsted Grotesk', system-ui, sans-serif"
 MONO = "'Martian Mono', ui-monospace, monospace"

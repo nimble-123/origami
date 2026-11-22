@@ -7,14 +7,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Martian+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Schibsted Grotesk', system-ui, sans-serif; background: #f4f6f9; color: #18214d;
+    body { font-family: 'Schibsted Grotesk', system-ui, sans-serif; background: #d5d6db; color: #343b58;
            min-height: 100vh; display: flex; align-items: center; justify-content: center;
            padding: 3rem 2rem; }
     .frame { max-width: 1200px; width: 100%; }
     .diagram-container { width: 100%; overflow-x: auto; }
     h1 { font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 800;
           letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 1.5rem; }
-    p.caption { color: #4a5478; font-size: 0.9rem; margin-top: 1rem; max-width: 68ch; }
+    p.caption { color: #565a6e; font-size: 0.9rem; margin-top: 1rem; max-width: 68ch; }
     svg { width: 100%; min-width: 960px; display: block; }
     @media print { .diagram-container { overflow-x: visible; } svg { min-width: 0; } }
   </style>
@@ -27,38 +27,38 @@
         <title id="benchmark-title">Formatting the whole test corpus</title>
         <desc id="benchmark-desc">Bar chart of the time to process the test corpus: ABAP Cleaner takes 11.41 s with its default profile; origami takes 0.74 s on one thread and 0.21 s on ten threads.</desc>
         <defs>
-          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4a5478"/></marker>
-          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2456d6"/></marker>
-          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2456d6"/></marker>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#565a6e"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#34548a"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#34548a"/></marker>
         </defs>
-        <rect width="100%" height="100%" fill="#f4f6f9"/>
-        <line x1="264" y1="40" x2="264" y2="232" stroke="rgba(24,33,77,0.25)" stroke-width="1"/>
-        <text x="264" y="252" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">0 s</text>
-        <line x1="371" y1="40" x2="371" y2="232" stroke="rgba(24,33,77,0.08)" stroke-width="0.8"/>
-        <text x="371" y="252" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">2 s</text>
-        <line x1="477" y1="40" x2="477" y2="232" stroke="rgba(24,33,77,0.08)" stroke-width="0.8"/>
-        <text x="477" y="252" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">4 s</text>
-        <line x1="584" y1="40" x2="584" y2="232" stroke="rgba(24,33,77,0.08)" stroke-width="0.8"/>
-        <text x="584" y="252" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">6 s</text>
-        <line x1="691" y1="40" x2="691" y2="232" stroke="rgba(24,33,77,0.08)" stroke-width="0.8"/>
-        <text x="691" y="252" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">8 s</text>
-        <line x1="797" y1="40" x2="797" y2="232" stroke="rgba(24,33,77,0.08)" stroke-width="0.8"/>
-        <text x="797" y="252" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">10 s</text>
-        <line x1="904" y1="40" x2="904" y2="232" stroke="rgba(24,33,77,0.08)" stroke-width="0.8"/>
-        <text x="904" y="252" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">12 s</text>
-        <rect x="264" y="56" width="609" height="32" fill="#f4f6f9"/>
-        <rect x="264" y="56" width="609" height="32" fill="rgba(24,33,77,0.06)" stroke="#6e7899" stroke-width="1"/>
-        <text x="252" y="76" fill="#18214d" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">ABAP Cleaner, default profile</text>
-        <text x="883" y="76" fill="#4a5478" font-size="9" font-family="'Martian Mono', ui-monospace, monospace">11.41 s</text>
-        <rect x="264" y="116" width="40" height="32" fill="#f4f6f9"/>
-        <rect x="264" y="116" width="40" height="32" fill="rgba(36,86,214,0.08)" stroke="#2456d6" stroke-width="1"/>
-        <text x="252" y="136" fill="#18214d" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">origami, one thread</text>
-        <text x="314" y="136" fill="#2456d6" font-size="9" font-family="'Martian Mono', ui-monospace, monospace">0.74 s, 15× faster</text>
-        <rect x="264" y="176" width="11" height="32" fill="#f4f6f9"/>
-        <rect x="264" y="176" width="11" height="32" fill="rgba(24,33,77,0.06)" stroke="#6e7899" stroke-width="1"/>
-        <text x="252" y="196" fill="#18214d" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">origami, ten threads</text>
-        <text x="285" y="196" fill="#4a5478" font-size="9" font-family="'Martian Mono', ui-monospace, monospace">0.21 s</text>
-        <text x="584" y="276" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">time for the test corpus: ABAP Cleaner 1,920 ABAP files, origami all 2,147 files</text>
+        <rect width="100%" height="100%" fill="#d5d6db"/>
+        <line x1="264" y1="40" x2="264" y2="232" stroke="rgba(52,59,88,0.25)" stroke-width="1"/>
+        <text x="264" y="252" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">0 s</text>
+        <line x1="371" y1="40" x2="371" y2="232" stroke="rgba(52,59,88,0.08)" stroke-width="0.8"/>
+        <text x="371" y="252" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">2 s</text>
+        <line x1="477" y1="40" x2="477" y2="232" stroke="rgba(52,59,88,0.08)" stroke-width="0.8"/>
+        <text x="477" y="252" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">4 s</text>
+        <line x1="584" y1="40" x2="584" y2="232" stroke="rgba(52,59,88,0.08)" stroke-width="0.8"/>
+        <text x="584" y="252" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">6 s</text>
+        <line x1="691" y1="40" x2="691" y2="232" stroke="rgba(52,59,88,0.08)" stroke-width="0.8"/>
+        <text x="691" y="252" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">8 s</text>
+        <line x1="797" y1="40" x2="797" y2="232" stroke="rgba(52,59,88,0.08)" stroke-width="0.8"/>
+        <text x="797" y="252" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">10 s</text>
+        <line x1="904" y1="40" x2="904" y2="232" stroke="rgba(52,59,88,0.08)" stroke-width="0.8"/>
+        <text x="904" y="252" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">12 s</text>
+        <rect x="264" y="56" width="609" height="32" fill="#d5d6db"/>
+        <rect x="264" y="56" width="609" height="32" fill="rgba(52,59,88,0.06)" stroke="#7c7f8f" stroke-width="1"/>
+        <text x="252" y="76" fill="#343b58" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">ABAP Cleaner, default profile</text>
+        <text x="883" y="76" fill="#565a6e" font-size="9" font-family="'Martian Mono', ui-monospace, monospace">11.41 s</text>
+        <rect x="264" y="116" width="40" height="32" fill="#d5d6db"/>
+        <rect x="264" y="116" width="40" height="32" fill="rgba(52,84,138,0.10)" stroke="#34548a" stroke-width="1"/>
+        <text x="252" y="136" fill="#343b58" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">origami, one thread</text>
+        <text x="314" y="136" fill="#34548a" font-size="9" font-family="'Martian Mono', ui-monospace, monospace">0.74 s, 15× faster</text>
+        <rect x="264" y="176" width="11" height="32" fill="#d5d6db"/>
+        <rect x="264" y="176" width="11" height="32" fill="rgba(52,59,88,0.06)" stroke="#7c7f8f" stroke-width="1"/>
+        <text x="252" y="196" fill="#343b58" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">origami, ten threads</text>
+        <text x="285" y="196" fill="#565a6e" font-size="9" font-family="'Martian Mono', ui-monospace, monospace">0.21 s</text>
+        <text x="584" y="276" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">time for the test corpus: ABAP Cleaner 1,920 ABAP files, origami all 2,147 files</text>
 
       </svg>
     </div>

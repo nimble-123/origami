@@ -7,14 +7,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Martian+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Schibsted Grotesk', system-ui, sans-serif; background: #f4f6f9; color: #18214d;
+    body { font-family: 'Schibsted Grotesk', system-ui, sans-serif; background: #d5d6db; color: #343b58;
            min-height: 100vh; display: flex; align-items: center; justify-content: center;
            padding: 3rem 2rem; }
     .frame { max-width: 1200px; width: 100%; }
     .diagram-container { width: 100%; overflow-x: auto; }
     h1 { font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 800;
           letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 1.5rem; }
-    p.caption { color: #4a5478; font-size: 0.9rem; margin-top: 1rem; max-width: 68ch; }
+    p.caption { color: #565a6e; font-size: 0.9rem; margin-top: 1rem; max-width: 68ch; }
     svg { width: 100%; min-width: 960px; display: block; }
     @media print { .diagram-container { overflow-x: visible; } svg { min-width: 0; } }
   </style>
@@ -27,37 +27,37 @@
         <title id="threads-title">Checking the whole corpus</title>
         <desc id="threads-desc">Bar chart of the time origami needs to check the whole test corpus with 1, 2, 4, 8 and 10 threads: 744 ms, 468 ms, 219 ms, 196 ms, 207 ms.</desc>
         <defs>
-          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4a5478"/></marker>
-          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2456d6"/></marker>
-          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2456d6"/></marker>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#565a6e"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#34548a"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#34548a"/></marker>
         </defs>
-        <rect width="100%" height="100%" fill="#f4f6f9"/>
-        <line x1="96" y1="360" x2="920" y2="360" stroke="rgba(24,33,77,0.25)" stroke-width="1"/>
-        <text x="88" y="363" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">0 ms</text>
-        <line x1="96" y1="280" x2="920" y2="280" stroke="rgba(24,33,77,0.08)" stroke-width="0.8"/>
-        <text x="88" y="283" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">200 ms</text>
-        <line x1="96" y1="200" x2="920" y2="200" stroke="rgba(24,33,77,0.08)" stroke-width="0.8"/>
-        <text x="88" y="203" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">400 ms</text>
-        <line x1="96" y1="120" x2="920" y2="120" stroke="rgba(24,33,77,0.08)" stroke-width="0.8"/>
-        <text x="88" y="123" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">600 ms</text>
-        <line x1="96" y1="40" x2="920" y2="40" stroke="rgba(24,33,77,0.08)" stroke-width="0.8"/>
-        <text x="88" y="43" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">800 ms</text>
-        <rect x="136" y="63" width="88" height="297" fill="rgba(24,33,77,0.06)" stroke="#6e7899" stroke-width="1"/>
-        <text x="180" y="55" fill="#4a5478" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">744 ms</text>
-        <text x="180" y="380" fill="#18214d" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">1 thread</text>
-        <rect x="300" y="173" width="88" height="187" fill="rgba(24,33,77,0.06)" stroke="#6e7899" stroke-width="1"/>
-        <text x="344" y="165" fill="#4a5478" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">468 ms</text>
-        <text x="344" y="380" fill="#18214d" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">2 threads</text>
-        <rect x="464" y="273" width="88" height="87" fill="rgba(24,33,77,0.06)" stroke="#6e7899" stroke-width="1"/>
-        <text x="508" y="265" fill="#4a5478" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">219 ms</text>
-        <text x="508" y="380" fill="#18214d" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">4 threads</text>
-        <rect x="628" y="282" width="88" height="78" fill="rgba(24,33,77,0.06)" stroke="#6e7899" stroke-width="1"/>
-        <text x="672" y="274" fill="#4a5478" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">196 ms</text>
-        <text x="672" y="380" fill="#18214d" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">8 threads</text>
-        <rect x="792" y="277" width="88" height="83" fill="rgba(36,86,214,0.08)" stroke="#2456d6" stroke-width="1"/>
-        <text x="836" y="269" fill="#2456d6" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">207 ms</text>
-        <text x="836" y="380" fill="#18214d" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">10 threads</text>
-        <text x="508" y="404" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">origami --check over 2,147 files, median of 5 runs</text>
+        <rect width="100%" height="100%" fill="#d5d6db"/>
+        <line x1="96" y1="360" x2="920" y2="360" stroke="rgba(52,59,88,0.25)" stroke-width="1"/>
+        <text x="88" y="363" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">0 ms</text>
+        <line x1="96" y1="280" x2="920" y2="280" stroke="rgba(52,59,88,0.08)" stroke-width="0.8"/>
+        <text x="88" y="283" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">200 ms</text>
+        <line x1="96" y1="200" x2="920" y2="200" stroke="rgba(52,59,88,0.08)" stroke-width="0.8"/>
+        <text x="88" y="203" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">400 ms</text>
+        <line x1="96" y1="120" x2="920" y2="120" stroke="rgba(52,59,88,0.08)" stroke-width="0.8"/>
+        <text x="88" y="123" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">600 ms</text>
+        <line x1="96" y1="40" x2="920" y2="40" stroke="rgba(52,59,88,0.08)" stroke-width="0.8"/>
+        <text x="88" y="43" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">800 ms</text>
+        <rect x="136" y="63" width="88" height="297" fill="rgba(52,59,88,0.06)" stroke="#7c7f8f" stroke-width="1"/>
+        <text x="180" y="55" fill="#565a6e" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">744 ms</text>
+        <text x="180" y="380" fill="#343b58" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">1 thread</text>
+        <rect x="300" y="173" width="88" height="187" fill="rgba(52,59,88,0.06)" stroke="#7c7f8f" stroke-width="1"/>
+        <text x="344" y="165" fill="#565a6e" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">468 ms</text>
+        <text x="344" y="380" fill="#343b58" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">2 threads</text>
+        <rect x="464" y="273" width="88" height="87" fill="rgba(52,59,88,0.06)" stroke="#7c7f8f" stroke-width="1"/>
+        <text x="508" y="265" fill="#565a6e" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">219 ms</text>
+        <text x="508" y="380" fill="#343b58" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">4 threads</text>
+        <rect x="628" y="282" width="88" height="78" fill="rgba(52,59,88,0.06)" stroke="#7c7f8f" stroke-width="1"/>
+        <text x="672" y="274" fill="#565a6e" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">196 ms</text>
+        <text x="672" y="380" fill="#343b58" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">8 threads</text>
+        <rect x="792" y="277" width="88" height="83" fill="rgba(52,84,138,0.10)" stroke="#34548a" stroke-width="1"/>
+        <text x="836" y="269" fill="#34548a" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">207 ms</text>
+        <text x="836" y="380" fill="#343b58" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">10 threads</text>
+        <text x="508" y="404" fill="#565a6e" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">origami --check over 2,147 files, median of 5 runs</text>
 
       </svg>
     </div>

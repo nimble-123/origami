@@ -1,19 +1,27 @@
 /* origami website. Tokens and rules: docs/brand.md ("every line break is a
-   fold"): cool paper, indigo ink, valley blue for what origami adds, mountain
-   red for what goes away, dashed creases as dividers. */
+   fold"), colors from the Tokyo Night themes (Light by day, Night by night):
+   valley blue for what origami adds, mountain red for what goes away, dashed
+   creases as dividers, Tokyo Night syntax colors in code. */
 
 :root {
-  --paper: #f4f6f9;
-  --sheet: #ffffff;
-  --ink: #18214d;
-  --ink-soft: #4a5478;
-  --valley: #2456d6;
-  --mountain: #d23a49;
-  --crease: #c9d1de;
-  --valley-wash: #e6edfc;
-  --mountain-wash: #fbe9eb;
-  --fold-shadow: rgba(24, 33, 77, 0.10);
+  --paper: #d5d6db;
+  --sheet: #e6e7ed;
+  --ink: #343b58;
+  --ink-soft: #565a6e;
+  --ink-dim: #6c6e75;
+  --valley: #34548a;
+  --mountain: #8c4351;
+  --crease: #a8aab6;
+  --valley-wash: #d1d5e1;
+  --mountain-wash: #dbd3da;
+  --fold-shadow: rgba(52, 59, 88, 0.14);
   --outline: oklch(0 0 0 / 0.1);
+  /* Syntax (Tokyo Night Light); comments lifted to AA contrast. */
+  --syn-keyword: #5a4a78;
+  --syn-string: #485e30;
+  --syn-number: #965027;
+  --syn-comment: #5f6272;
+  --syn-rule: #0f4b6e;
 
   --sans: "Schibsted Grotesk", system-ui, sans-serif;
   --mono: "Martian Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -36,17 +44,23 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #0e1430;
-    --sheet: #151d42;
-    --ink: #e7ebf6;
-    --ink-soft: #aeb6d3;
-    --valley: #7fa2ff;
-    --mountain: #ff7a86;
-    --crease: #2e3866;
-    --valley-wash: #1f2c66;
-    --mountain-wash: #3a2140;
-    --fold-shadow: rgba(0, 0, 0, 0.35);
-    --outline: oklch(1 0 0 / 0.1);
+    --paper: #16161e;
+    --sheet: #1a1b26;
+    --ink: #c0caf5;
+    --ink-soft: #a9b1d6;
+    --ink-dim: #737aa2;
+    --valley: #7aa2f7;
+    --mountain: #f7768e;
+    --crease: #3b4261;
+    --valley-wash: #20303b;
+    --mountain-wash: #37222c;
+    --fold-shadow: rgba(0, 0, 0, 0.4);
+    --outline: oklch(1 0 0 / 0.08);
+    --syn-keyword: #bb9af7;
+    --syn-string: #9ece6a;
+    --syn-number: #ff9e64;
+    --syn-comment: #828bb8;
+    --syn-rule: #7dcfff;
     color-scheme: dark;
   }
 }
@@ -216,7 +230,13 @@ p, li, dd { text-wrap: pretty; }
   transition: translate 640ms var(--ease);
   transition-delay: calc(var(--y) * 70ms);
 }
-.hero-code .kw { font-weight: 600; }
+.hero-code .kw { color: var(--syn-keyword); }
+
+/* Syntax colors (Tokyo Night) in the hero and the playground output. */
+.kw { color: var(--syn-keyword); }
+.str { color: var(--syn-string); }
+.num-lit { color: var(--syn-number); }
+.com { color: var(--syn-comment); font-style: italic; }
 .hero-code .crease {
   position: absolute; top: 0; width: 0; height: var(--lh);
   border-left: 1.5px dashed var(--valley);
@@ -281,7 +301,7 @@ textarea.code:focus-visible { outline-offset: 0; }
   padding-inline: 0.5rem 1rem; white-space: pre; min-width: max-content;
 }
 .output .ln::before {
-  content: attr(data-n); color: var(--ink-soft); opacity: 0.7; text-align: right;
+  content: attr(data-n); color: var(--ink-dim); text-align: right;
   font-variant-numeric: tabular-nums;
 }
 /* Lines of a construct that origami broke: a valley crease in the margin. */
@@ -290,7 +310,7 @@ textarea.code:focus-visible { outline-offset: 0; }
   padding: 0.15rem 1rem 0.45rem calc(0.5rem + 4.2ch);
   white-space: normal; min-width: 0;
 }
-.output .ln-note a { color: inherit; text-decoration-color: var(--valley); }
+.output .ln-note a { color: var(--syn-rule); text-decoration-color: currentColor; }
 .output .empty { padding: 0 1rem; color: var(--ink-soft); font-family: var(--sans); font-size: var(--t-sm); }
 
 .status { min-height: 1.6em; margin: 0.9rem 0 0; color: var(--ink-soft); font-size: var(--t-sm); }

@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="origami">
-  <path d="M8 10 A2 2 0 0 1 10 8 H54 A2 2 0 0 1 56 10 L8 56 Z" fill="#FFFFFF" stroke="#18214D" stroke-width="2.5" stroke-linejoin="round"/>
-  <path d="M56 14 V54 A2 2 0 0 1 54 56 H14 Z" fill="#C9D1DE" stroke="#18214D" stroke-width="2.5" stroke-linejoin="round"/>
-  <line x1="50.5" y1="13.5" x2="13.5" y2="50.5" stroke="#2456D6" stroke-width="2.5" stroke-dasharray="4 3" stroke-linecap="round"/>
-  <g stroke="#18214D" stroke-width="3.5" stroke-linecap="round">
-    <line x1="15" y1="17" x2="38" y2="17"/>
-    <line x1="15" y1="26" x2="29" y2="26"/>
-    <line x1="15" y1="35" x2="20" y2="35"/>
+  <path d="M8 10 A2 2 0 0 1 10 8 H54 A2 2 0 0 1 56 10 L8 56 Z" fill="#E6E7ED" stroke="#343B58" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M56 14 V54 A2 2 0 0 1 54 56 H14 Z" fill="#A8AAB6" stroke="#343B58" stroke-width="2.5" stroke-linejoin="round"/>
+  <line x1="50.5" y1="13.5" x2="13.5" y2="50.5" stroke="#34548A" stroke-width="2.5" stroke-dasharray="4 3" stroke-linecap="round"/>
+  <g stroke-width="3.5" stroke-linecap="round">
+    <line x1="15" y1="17" x2="38" y2="17" stroke="#5A4A78"/>
+    <line x1="15" y1="26" x2="29" y2="26" stroke="#0F4B6E"/>
+    <line x1="15" y1="35" x2="20" y2="35" stroke="#485E30"/>
   </g>
 </svg>
