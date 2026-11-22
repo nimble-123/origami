@@ -1,0 +1,23 @@
+[package]
+name = "origami_wasm"
+description = "origami compiled to WebAssembly for the website playground (not published)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+origami_core.workspace = true
+serde_json.workspace = true
+
+# The C ABI for JavaScript needs `no_mangle` and raw pointers; everything else
+# follows the workspace lints.
+[lints.rust]
+unsafe_code = "allow"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }

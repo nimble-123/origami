@@ -1,0 +1,327 @@
+/* origami website. Tokens and rules: docs/brand.md ("every line break is a
+   fold"): cool paper, indigo ink, valley blue for what origami adds, mountain
+   red for what goes away, dashed creases as dividers. */
+
+:root {
+  --paper: #f4f6f9;
+  --sheet: #ffffff;
+  --ink: #18214d;
+  --ink-soft: #4a5478;
+  --valley: #2456d6;
+  --mountain: #d23a49;
+  --crease: #c9d1de;
+  --valley-wash: #e6edfc;
+  --mountain-wash: #fbe9eb;
+  --fold-shadow: rgba(24, 33, 77, 0.10);
+  --outline: oklch(0 0 0 / 0.1);
+
+  --sans: "Schibsted Grotesk", system-ui, sans-serif;
+  --mono: "Martian Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Scale 1.25 from 17px. */
+  --t-sm: 0.8rem;
+  --t-base: 1.0625rem;
+  --t-md: 1.328rem;
+  --t-lg: 1.66rem;
+  --t-xl: 2.075rem;
+  --t-2xl: 2.594rem;
+  --t-3xl: 3.242rem;
+
+  --measure: 68ch;
+  --page: 72rem;
+  --gutter: clamp(1rem, 4vw, 2.5rem);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0e1430;
+    --sheet: #151d42;
+    --ink: #e7ebf6;
+    --ink-soft: #aeb6d3;
+    --valley: #7fa2ff;
+    --mountain: #ff7a86;
+    --crease: #2e3866;
+    --valley-wash: #1f2c66;
+    --mountain-wash: #3a2140;
+    --fold-shadow: rgba(0, 0, 0, 0.35);
+    --outline: oklch(1 0 0 / 0.1);
+    color-scheme: dark;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 var(--t-base) / 1.55 var(--sans);
+}
+
+a { color: var(--valley); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 2px solid var(--valley); outline-offset: 3px; border-radius: 2px; }
+
+code, pre, textarea, .code { font-family: var(--mono); }
+code { font-size: 0.82em; }
+
+h1, h2 { font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; text-wrap: balance; margin: 0; }
+p, li, dd { text-wrap: pretty; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+.skip { position: absolute; left: -999px; top: 0.5rem; }
+.skip:focus { left: var(--gutter); background: var(--sheet); padding: 0.5rem 0.75rem; z-index: 2; }
+
+/* ---- page frame -------------------------------------------------------- */
+
+.top, main > section, .foot {
+  width: min(100% - 2 * var(--gutter), var(--page));
+  margin-inline: auto;
+}
+
+.top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding-block: 1.25rem;
+}
+
+.brand {
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  color: var(--ink); text-decoration: none;
+  font-weight: 800; font-size: var(--t-md); letter-spacing: -0.02em;
+}
+.brand img { display: block; }
+
+.top { flex-wrap: wrap; }
+.top nav { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-right: -0.65rem; }
+@media (max-width: 40rem) {
+  .top nav { margin-left: -0.65rem; }
+  .top nav a { padding-inline: 0.55rem; font-size: var(--t-sm); }
+}
+.top nav a {
+  color: var(--ink-soft); text-decoration: none; font-weight: 500;
+  padding: 0.6rem 0.65rem; border-radius: 4px; min-height: 44px;
+  display: inline-flex; align-items: center;
+  transition-property: color, background-color; transition-duration: 150ms; transition-timing-function: var(--ease);
+}
+.top nav a:hover { color: var(--ink); background: var(--valley-wash); }
+
+/* Sections are separated by a crease: a dashed rule. */
+.band {
+  padding-block: clamp(3rem, 7vw, 5rem);
+  border-top: 1px dashed var(--crease);
+}
+
+.section-head { max-width: var(--measure); margin-bottom: 2rem; }
+.section-head h2 { font-size: clamp(var(--t-lg), 3.2vw, var(--t-2xl)); margin-bottom: 0.75rem; }
+.section-head p { margin: 0; color: var(--ink-soft); }
+
+/* ---- sheets ------------------------------------------------------------ */
+
+.sheet {
+  background: var(--sheet);
+  border: 1px solid var(--crease);
+  border-radius: 4px;
+}
+
+/* The folded corner: used once per view, on the main sheet. */
+.fold { position: relative; }
+.fold::after {
+  content: ""; position: absolute; top: -1px; right: -1px;
+  width: 22px; height: 22px;
+  background: linear-gradient(225deg, var(--paper) 50%, var(--crease) 50%);
+  border-bottom-left-radius: 2px;
+  box-shadow: -1px 1px 2px var(--fold-shadow);
+}
+
+/* ---- hero -------------------------------------------------------------- */
+
+.hero {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(2rem, 5vw, 3.5rem);
+  padding-block: clamp(2.5rem, 7vw, 5.5rem) clamp(3rem, 7vw, 5rem);
+}
+
+.hero h1 {
+  font-size: clamp(var(--t-xl), 6.2vw, 4.4rem);
+  line-height: 1.02; letter-spacing: -0.035em;
+  max-width: 14ch;
+}
+
+.lede { font-size: var(--t-md); line-height: 1.45; max-width: 46ch; color: var(--ink-soft); margin: 1.25rem 0 1.75rem; }
+
+.install-line {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  background: var(--sheet); border: 1px solid var(--crease); border-radius: 6px;
+  padding: 0.25rem 0.25rem 0.25rem 1rem; max-width: 100%;
+}
+.install-line code { font-size: 0.85rem; white-space: nowrap; overflow-x: auto; min-width: 0; }
+.install-line code::before { content: "$ "; color: var(--valley); }
+
+.copy {
+  position: relative; display: inline-grid; place-items: center;
+  min-width: 40px; min-height: 40px; padding: 0 0.5rem;
+  border: 0; border-radius: 4px; background: transparent; color: var(--ink-soft);
+  font: 500 var(--t-sm) var(--sans); cursor: pointer;
+  transition-property: color, background-color, scale; transition-duration: 150ms; transition-timing-function: var(--ease);
+}
+.copy:hover { color: var(--ink); background: var(--valley-wash); }
+.copy:active { scale: 0.96; }
+.copy .icon {
+  grid-area: 1 / 1; width: 18px; height: 18px;
+  fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+  transition-property: opacity, scale, filter; transition-duration: 200ms; transition-timing-function: var(--ease);
+}
+.copy .icon-done { opacity: 0; scale: 0.25; filter: blur(4px); color: var(--valley); }
+.copy.done .icon-copy { opacity: 0; scale: 0.25; filter: blur(4px); }
+.copy.done .icon-done { opacity: 1; scale: 1; filter: blur(0); }
+.copy.text.done { color: var(--valley); }
+
+.hero-links { margin: 1rem 0 0; font-weight: 500; }
+
+/* The long line sticks out of the sheet until it is folded into it. */
+.hero { overflow-x: clip; }
+.hero > * { min-width: 0; }
+.hero-sheet { margin: 0; padding: 1.5rem 1.5rem 1.25rem; overflow-x: auto; }
+@media (min-width: 64rem) { .hero-sheet { overflow-x: visible; } }
+
+/* Token grid: every token is placed by (line, column) in ch units, so the
+   fold moves each token from its place in the long line to its place in the
+   formatted lines. */
+.hero-code {
+  --lh: 1.7em;
+  position: relative;
+  font: 400 13px / 1 var(--mono);
+  height: calc(3 * var(--lh));
+  min-width: 72ch;
+}
+.hero-code .tok {
+  position: absolute; left: 0; top: 0; white-space: pre;
+  line-height: var(--lh);
+  translate: calc(var(--x) * 1ch) calc(var(--y) * var(--lh));
+  transition: translate 640ms var(--ease);
+  transition-delay: calc(var(--y) * 70ms);
+}
+.hero-code .kw { font-weight: 600; }
+.hero-code .crease {
+  position: absolute; top: 0; width: 0; height: var(--lh);
+  border-left: 1.5px dashed var(--valley);
+  translate: calc(var(--x) * 1ch - 0.5ch) 0;
+  opacity: 0;
+  transition: opacity 180ms var(--ease);
+  transition-delay: calc(var(--i) * 90ms);
+}
+.hero-code.creased .crease { opacity: 1; }
+.hero-code.folded .crease { opacity: 0; transition-delay: 0ms; }
+
+.note {
+  font: 600 0.78rem / 1.5 var(--mono); color: var(--ink);
+  margin: 0;
+}
+.note-mark { color: var(--valley); }
+.hero-note {
+  margin-top: 1rem; padding-top: 0.85rem; border-top: 1px dashed var(--crease);
+  opacity: 0; translate: 0 4px;
+  transition-property: opacity, translate; transition-duration: 300ms; transition-timing-function: var(--ease);
+}
+.hero-note.show { opacity: 1; translate: 0 0; }
+
+@media (min-width: 64rem) {
+  /* Headline left, lede and install right; the sheet spans the page below,
+     wide enough for the long line before it folds. */
+  .hero { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); align-items: end; column-gap: 4rem; }
+  .hero-sheet { grid-column: 1 / -1; }
+  .lede { margin-top: 0; }
+}
+
+/* ---- playground --------------------------------------------------------- */
+
+.pg-controls { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; margin-bottom: 1rem; }
+.pg-controls label { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 500; color: var(--ink-soft); }
+select {
+  font: 500 var(--t-sm) var(--sans); color: var(--ink);
+  background: var(--sheet); border: 1px solid var(--crease); border-radius: 4px;
+  min-height: 40px; padding: 0 0.6rem;
+}
+
+.pg { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+@media (min-width: 56rem) { .pg { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.pg-pane { min-width: 0; display: flex; flex-direction: column; }
+
+.pane-label {
+  display: flex; align-items: center; justify-content: space-between;
+  min-height: 40px; font-weight: 600;
+}
+
+.code {
+  font-size: 12.5px; line-height: 1.6; color: var(--ink);
+  height: clamp(22rem, 60vh, 34rem); width: 100%;
+  padding: 0.9rem 1rem; overflow: auto; margin: 0;
+}
+textarea.code { resize: vertical; tab-size: 2; white-space: pre; }
+textarea.code:focus-visible { outline-offset: 0; }
+
+.output { padding: 0.9rem 0; }
+.output .ln {
+  display: grid; grid-template-columns: 3.2ch 1fr; column-gap: 1ch;
+  padding-inline: 0.5rem 1rem; white-space: pre; min-width: max-content;
+}
+.output .ln::before {
+  content: attr(data-n); color: var(--ink-soft); opacity: 0.7; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* Lines of a construct that origami broke: a valley crease in the margin. */
+.output .ln.broken { box-shadow: inset 2px 0 0 var(--valley); background: color-mix(in srgb, var(--valley-wash) 55%, transparent); }
+.output .ln-note {
+  padding: 0.15rem 1rem 0.45rem calc(0.5rem + 4.2ch);
+  white-space: normal; min-width: 0;
+}
+.output .ln-note a { color: inherit; text-decoration-color: var(--valley); }
+.output .empty { padding: 0 1rem; color: var(--ink-soft); font-family: var(--sans); font-size: var(--t-sm); }
+
+.status { min-height: 1.6em; margin: 0.9rem 0 0; color: var(--ink-soft); font-size: var(--t-sm); }
+.status .num { font-variant-numeric: tabular-nums; }
+.status.error { color: var(--mountain); }
+
+/* ---- figures, facts, install ------------------------------------------ */
+
+.figure { margin: 0; }
+.figure img { display: block; width: 100%; height: auto; border-radius: 4px; outline: 1px solid var(--outline); outline-offset: -1px; }
+.figure.terminal img { outline: none; }
+.figure figcaption { margin-top: 0.75rem; color: var(--ink-soft); font-size: var(--t-sm); max-width: var(--measure); }
+
+.facts { list-style: none; padding: 0; margin: 2.25rem 0 0; display: grid; gap: 1.25rem 2.5rem; }
+@media (min-width: 56rem) { .facts { grid-template-columns: 1.1fr 1fr 0.9fr; } }
+.facts li { padding-top: 0.85rem; border-top: 1px solid var(--crease); color: var(--ink-soft); }
+.facts strong { color: var(--ink); font-weight: 600; }
+
+.install { display: grid; gap: 0.5rem 2rem; margin: 0; max-width: 60rem; }
+@media (min-width: 48rem) { .install { grid-template-columns: 13rem 1fr; } }
+.install dt { font-weight: 600; padding-top: 0.9rem; }
+.install dd { margin: 0; padding-top: 0.9rem; color: var(--ink-soft); }
+@media (min-width: 48rem) {
+  .install dt, .install dd { border-top: 1px dashed var(--crease); }
+}
+.install dd code { color: var(--ink); }
+
+.foot {
+  border-top: 1px dashed var(--crease);
+  padding-block: 2rem 3rem; color: var(--ink-soft); font-size: var(--t-sm);
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem;
+}
+.foot p { margin: 0; }
+.foot p + p a + a { margin-left: 1rem; }

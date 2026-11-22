@@ -65,8 +65,8 @@ With the [pre-commit](https://pre-commit.com) framework:
 
 ```yaml
 repos:
-  - repo: <origami repository URL>
-    rev: <tag>
+  - repo: https://github.com/nimble-123/origami
+    rev: v0.1.0 # x-release-please-version
     hooks:
       - id: origami        # check only
       # - id: origami-fix  # or rewrite the staged files

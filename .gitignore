@@ -12,3 +12,8 @@ editors/vscode/out-tsc/
 editors/vscode/out-test/
 *.vsix
 editors/vscode/.vscode-test/
+
+# EGM design workflow working files (briefs, drafts, review reports)
+.egm/
+.diagram-design
+site/dist/
