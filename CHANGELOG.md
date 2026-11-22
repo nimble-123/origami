@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0 (2026-11-22)
+
+
+### Features
+
+* website, playground, brand, Homebrew and release automation ([2dab75f](https://github.com/nimble-123/origami/commit/2dab75f65f7d3df5f1ad78d496e8902401c78e2c))
+
+
+### Fixes
+
+* **abap:** upper-case SINGLE and DISTINCT in SELECT ... FROM ... FIELDS (ABAP-SQL-001) ([7229148](https://github.com/nimble-123/origami/commit/7229148e9546caf756c6839bf57683f93d5fd268))
+
+## Changelog
+
 All notable changes to origami are documented here. From 0.1.0 on,
 [release-please](https://github.com/googleapis/release-please) writes this file
 from [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)

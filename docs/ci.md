@@ -91,6 +91,6 @@ origami --check
 
 The JSON diagnostics (`--diagnostics json`, on stderr) follow
 [schemas/diagnostics.v1.json](../schemas/diagnostics.v1.json);
-`--diagnostics sarif` produces SARIF 2.1.0 for tools that read it.
+`--diagnostics sarif` produces SARIF 0.1.0 for tools that read it.
 
 <!-- x-release-please-end -->
