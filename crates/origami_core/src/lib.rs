@@ -4,14 +4,18 @@
 
 mod check;
 pub mod detect;
+mod explain;
 pub mod options;
 pub mod result;
 
 pub use detect::LanguageHint;
+pub use explain::Explained;
 #[cfg(feature = "fault-injection")]
 pub use options::Fault;
 pub use options::Options;
-pub use origami_syntax::{Case, Code, Edition, Language, Position, Severity, Stats};
+pub use origami_syntax::{
+    BreakCause, Case, Code, Edition, Language, Note, Position, RuleId, Scope, Severity, Stats,
+};
 pub use result::{FormatResult, Reported, ReportedRange, Status};
 
 use origami_syntax::{Diagnostic, LineIndex, SourceText};
@@ -39,18 +43,27 @@ pub fn format_lines(
     opts: &Options,
     lines: &[(u32, u32)],
 ) -> FormatResult {
-    match catch_unwind(AssertUnwindSafe(|| format_inner(input, hint, opts, lines))) {
-        Ok(r) => r,
-        Err(payload) => {
-            let msg = payload
-                .downcast_ref::<&str>()
-                .map(|s| s.to_string())
-                .or_else(|| payload.downcast_ref::<String>().cloned())
-                .unwrap_or_else(|| "unknown panic".into());
-            let d = Diagnostic::new(Code::X002, format!("Internal error: {msg}"), 0..0);
-            error_result(None, &d, "")
-        }
-    }
+    guarded(|| format_inner(input, hint, opts, lines, false).result)
+        .unwrap_or_else(|d| error_result(None, &d, ""))
+}
+
+/// Runs `f`; a panic inside becomes an X002 diagnostic.
+fn guarded<T>(f: impl FnOnce() -> T) -> Result<T, Diagnostic> {
+    catch_unwind(AssertUnwindSafe(f)).map_err(|payload| {
+        let msg = payload
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| payload.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "unknown panic".into());
+        Diagnostic::new(Code::X002, format!("Internal error: {msg}"), 0..0)
+    })
+}
+
+/// A formatting result and, when explanations were requested and the
+/// source formatted without error, what the explain pass needs.
+pub(crate) struct Inner {
+    pub result: FormatResult,
+    pub parts: Option<explain::Parts>,
 }
 
 fn format_inner(
@@ -58,27 +71,44 @@ fn format_inner(
     hint: &LanguageHint,
     opts: &Options,
     lines: &[(u32, u32)],
-) -> FormatResult {
+    explain: bool,
+) -> Inner {
+    let plain = |result| Inner {
+        result,
+        parts: None,
+    };
     if let Err(d) = opts.validate() {
-        return error_result(None, &d, "");
+        return plain(error_result(None, &d, ""));
     }
     let src = match SourceText::decode(input) {
         Ok(s) => s,
-        Err(d) => return error_result(None, &d, ""),
+        Err(d) => return plain(error_result(None, &d, "")),
     };
     let lang = match detect::detect(&src, hint) {
         Ok(l) => l,
-        Err(d) => return error_result(None, &d, src.text()),
+        Err(d) => return plain(error_result(None, &d, src.text())),
     };
-    let checked = check::run(&src, lang, opts, identity_mode(lang));
-    let mut r = checked.result;
+    let identity = identity_mode(lang);
+    let checked = check::run(&src, lang, opts, identity, explain);
+    // The final pass before line selection, for the explain pass.
+    let full = explain.then(|| checked.result.clone());
+    let check::Checked {
+        result: mut r,
+        quarantine,
+        opaque,
+        whole_file_fallback,
+    } = checked;
     let failed_early = r
         .diagnostics
         .iter()
         .any(|d| d.severity() >= Severity::Error);
+    let mut map = None;
     if !lines.is_empty() && !failed_early {
         match check::select_lines(&src, lang, &r, lines) {
-            Some(mixed) => r.output = mixed,
+            Some((mixed, m)) => {
+                r.output = mixed;
+                map = Some(m);
+            }
             None => {
                 r.output = src.text().to_string();
                 r.diagnostics.push(Diagnostic::new(
@@ -100,18 +130,18 @@ fn format_inner(
         .iter()
         .any(|d| d.severity() >= Severity::Error);
     if failed {
-        return FormatResult {
+        return plain(FormatResult {
             output: None,
             changed: false,
             language: Some(lang),
             status: Status::Error,
             diagnostics,
             stats: r.stats,
-        };
+        });
     }
     let bytes = src.encode(&r.output);
     let changed = bytes != input;
-    FormatResult {
+    let result = FormatResult {
         output: Some(bytes),
         changed,
         language: Some(lang),
@@ -122,7 +152,43 @@ fn format_inner(
         },
         diagnostics,
         stats: r.stats,
-    }
+    };
+    let parts = full.map(|full| explain::Parts {
+        lang,
+        identity,
+        checked: check::Checked {
+            result: full,
+            quarantine,
+            opaque,
+            whole_file_fallback,
+        },
+        selection: (!lines.is_empty()).then_some(map),
+        output_text: r.output,
+        src,
+    });
+    Inner { result, parts }
+}
+
+/// Formats like [`format_lines`] and explains the line breaks origami
+/// introduced (one [`Note`] per broken construct and cause). `result` is the
+/// same as `format_lines` returns. Never panics: a panic inside becomes X002
+/// with no notes.
+pub fn explain(
+    input: &[u8],
+    hint: &LanguageHint,
+    opts: &Options,
+    lines: &[(u32, u32)],
+) -> Explained {
+    guarded(|| {
+        let inner = format_inner(input, hint, opts, lines, true);
+        explain::explain(inner, opts)
+    })
+    .unwrap_or_else(|d| Explained {
+        result: error_result(None, &d, ""),
+        notes: Vec::new(),
+        input_text: String::new(),
+        output_text: String::new(),
+    })
 }
 
 fn error_result(lang: Option<Language>, d: &Diagnostic, text: &str) -> FormatResult {

@@ -59,6 +59,16 @@ edition, every output change is listed with its STYLE rule ID.
 - VS Code: "origami: Preview Changes" opens the built-in diff view (the
   document as it is, the formatted text); "origami: Apply Preview" applies
   it and reformats instead if the document was edited meanwhile.
+- Line-break explanations (core): `origami_core::explain` formats like
+  `format_lines` and returns one note per construct and cause for the line
+  breaks origami introduced (width with the measured column, a style rule,
+  or an end-of-line comment); `cargo xtask explain FILE` and
+  `cargo xtask explain --corpus` (checked in CI). Formatting output is
+  unchanged (corpus hashes identical to the Stage 0 baseline).
+- `origami_syntax`: new `explain` module (`RuleSpan`, `Note`, `BreakCause`,
+  `Scope`, `RuleId`); `LangResult` has a new field `rule_spans` (code that
+  builds `LangResult` with a struct literal must add it). The ABAP and CDS
+  crates have `format_explained`.
 - Dynpro flow logic (`*.screen_<nr>.abap`) is formatted: `PROCESS` blocks
   indented like event blocks, `CHAIN … ENDCHAIN`, table-control loops,
   `MODULE` calls, `FIELD`.

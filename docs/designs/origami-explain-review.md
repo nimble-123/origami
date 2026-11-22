@@ -207,6 +207,16 @@ formats:
         token before it carries an end-of-line comment;
     *   **introduced, rule**: the break survives the wide print for another
         reason (a style rule that always breaks).
+
+    Stage 2 finding: an ABAP line comment always ends its line in the input
+    too, so "the token before it carries an end-of-line comment" never
+    applies to ABAP. What does happen is that an end-of-line comment
+    *inside* a construct forces the construct onto several lines. So a break
+    that no rule explains (a rule break without a rule ID, or a width break
+    where neither N nor M exceeds the limit) is attributed to the first
+    end-of-line comment inside its construct, if there is one; only the
+    remaining width breaks become `Layout`. In the corpus this moved 43 of 63
+    `Layout` notes to comment notes.
 4.  Introduced breaks are grouped into **one note per construct and
     cause**. The construct is the innermost rule span that contains the
     break, or else the ABAP statement or CDS layout unit. A construct whose
@@ -285,7 +295,10 @@ pushed in exactly one function.
     the raw fallbacks that print a sub-span as written after a partly
     successful sub-parse (in stmt.rs around the predicate, constructor-row
     and parenthesis fallbacks, and in statements.rs around the
-    `WITH ASSOCIATIONS` / raw-group fallback). Spans:
+    `WITH ASSOCIATIONS` / raw-group fallback). Stage 2 finding: at the raw
+    fallbacks the keywords of the failed sub-parse were never rolled back
+    (they keep their case); rolling them back now could change output, so
+    these sites roll back only the spans (`reset_spans`). Spans:
 
     | Rule | Construct | Pushed in |
     |---|---|---|
@@ -395,7 +408,7 @@ table:
 *   width, no rule: "split because the statement would end at column 131
     (limit 120)";
 *   rule: "ABAP-SQL-001: each clause on its own line";
-*   comment: "line ends here because of the comment `" check`";
+*   comment: "split because of the comment `" check`";
 *   layout: "laid out on several lines to fit the layout rules".
 
 Terms from origami's internals (group, fill, doc) never appear.
@@ -1007,7 +1020,7 @@ Cause sentences (`{…}` filled from the note):
 *   rule: "{RULE}: {phrase}";
 *   rule without a span: "line break required by the layout of this
     {noun}";
-*   comment: "line ends here because of the comment `{text}`";
+*   comment: "split because of the comment `{text}`";
 *   layout: "laid out on several lines to fit the layout rules".
 
 Known gap: STYLE.md's ABAP-SQL-001 also names database INSERT, UPDATE,

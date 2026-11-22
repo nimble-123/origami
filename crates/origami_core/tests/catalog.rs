@@ -21,7 +21,13 @@ fn catalog(name: &str) -> serde_json::Value {
 fn check(label: &str, lang: Language, text: &str) -> Vec<Code> {
     let hint = LanguageHint::Explicit(lang);
     let opts = Options::default();
-    let r = format(format!("{text}\n").as_bytes(), &hint, &opts);
+    let src = format!("{text}\n");
+    let r = format(src.as_bytes(), &hint, &opts);
+    assert_eq!(
+        origami_core::explain(src.as_bytes(), &hint, &opts, &[]).result,
+        r,
+        "{label}: explain differs from format on {text:?}"
+    );
     let codes: Vec<Code> = r.diagnostics.iter().map(|d| d.code).collect();
     assert!(
         !r.has(Code::X001) && !r.has(Code::X002),

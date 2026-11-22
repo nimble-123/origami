@@ -2,6 +2,7 @@
 //! so that the language crates do not depend on the core.
 
 use crate::diagnostic::Diagnostic;
+use crate::explain::RuleSpan;
 use crate::token::{TokenIndex, TokenStream};
 use serde::Serialize;
 use std::ops::Range;
@@ -119,6 +120,9 @@ pub struct LangResult {
     pub units: Vec<Unit>,
     pub diagnostics: Vec<Diagnostic>,
     pub stats: Stats,
+    /// Constructs and the rules that laid them out; recorded only when
+    /// explanations are requested (`format_explained`).
+    pub rule_spans: Vec<RuleSpan>,
 }
 
 impl LangResult {
@@ -129,6 +133,7 @@ impl LangResult {
             units: Vec::new(),
             diagnostics: vec![diagnostic],
             stats: Stats::default(),
+            rule_spans: Vec::new(),
         }
     }
 

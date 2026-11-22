@@ -37,3 +37,29 @@ fn panic_is_x002() {
     assert!(r.has(Code::X002));
     assert!(r.output.is_none());
 }
+
+#[test]
+fn quarantined_units_get_no_notes() {
+    // `RETURN.` has no space to drop, so the fault hits the second
+    // statement, which is quarantined; its statement break gets no note.
+    let src = b"RETURN. lv_b = 2.\n";
+    let hint = LanguageHint::Path("z.prog.abap".into());
+    let plain = origami_core::explain(src, &hint, &Options::default(), &[]);
+    assert_eq!(plain.notes.len(), 1, "{:#?}", plain.notes);
+    let mut opts = Options::default();
+    opts.fault = Some(Fault::DropSpaceOnce);
+    let e = origami_core::explain(src, &hint, &opts, &[]);
+    assert!(e.result.has(Code::W001));
+    assert!(e.result.changed);
+    assert!(e.notes.is_empty(), "{:#?}", e.notes);
+}
+
+#[test]
+fn explain_panic_is_x002_without_notes() {
+    std::panic::set_hook(Box::new(|_| {}));
+    let mut opts = Options::default();
+    opts.fault = Some(Fault::Panic);
+    let e = origami_core::explain(SRC, &LanguageHint::Path("z.clas.abap".into()), &opts, &[]);
+    assert!(e.result.has(Code::X002));
+    assert!(e.notes.is_empty());
+}

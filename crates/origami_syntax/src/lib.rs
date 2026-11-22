@@ -6,6 +6,7 @@
 
 pub mod compare;
 pub mod diagnostic;
+pub mod explain;
 pub mod lang;
 pub mod source;
 pub mod token;
@@ -13,6 +14,7 @@ pub mod trivia;
 
 pub use compare::{Mismatch, MismatchKind, equivalent};
 pub use diagnostic::{Code, Diagnostic, Severity};
+pub use explain::{BreakCause, Note, RuleId, RuleSpan, Scope};
 pub use lang::{Case, Edition, LangOptions, LangResult, Language, Stats, Unit, UnitId};
 pub use source::{LineEnding, LineIndex, Position, SourceText};
 pub use token::{Token, TokenIndex, TokenStream};

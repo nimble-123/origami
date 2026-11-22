@@ -1,0 +1,5 @@
+3: split because the statement would end at column 150 (limit 120)
+17: ABAP-STMT-001: each statement on its own line
+18: split because the statement would end at column 133 (limit 120)
+25: split because the statement would end at column 146 (limit 120)
+28: split because the statement would end at column 122 (limit 120)

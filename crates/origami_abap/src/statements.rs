@@ -60,11 +60,11 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             && (p.is(start + 1, "ENTITIES") || p.is(start + 1, "ENTITY"))
             && !eml_ops
         {
-            let saved = p.c.keywords.len();
+            let saved = p.c.mark();
             if let Some(d) = eml(p) {
                 return Some(d);
             }
-            p.c.keywords.truncate(saved);
+            p.c.reset(saved);
             p.pos = start;
             return None;
         }
@@ -73,38 +73,38 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             && (p.is(start + 1, "FUNCTION") || p.is(start + 1, "METHOD"))
             && !(p.is(start + 1, "METHOD") && p.is(start + 2, "OF"))
         {
-            let saved = p.c.keywords.len();
+            let saved = p.c.mark();
             if let Some(d) = call_with_groups(p) {
                 return Some(d);
             }
-            p.c.keywords.truncate(saved);
+            p.c.reset(saved);
             p.pos = start;
             return None;
         }
         if w0 == "OPEN" && p.is(start + 1, "CURSOR") {
-            let saved = p.c.keywords.len();
+            let saved = p.c.mark();
             if let Some(d) = open_cursor(p) {
                 return Some(d);
             }
-            p.c.keywords.truncate(saved);
+            p.c.reset(saved);
             p.pos = start;
         }
         if w0 == "WITH" && p.text(start + 1).starts_with('+') {
-            let saved = p.c.keywords.len();
+            let saved = p.c.mark();
             if let Some(d) = with_select(p) {
                 return Some(d);
             }
-            p.c.keywords.truncate(saved);
+            p.c.reset(saved);
             p.pos = start;
         }
         if w0 == "FORM" && p.kind(start + 1) == WORD {
-            let saved = p.c.keywords.len();
+            let saved = p.c.mark();
             let lead = p.kw(start);
             if let Some(item) = method_item(p, start + 1, p.end, FORM_SECTIONS) {
                 p.pos = p.end;
                 return Some(b::group(vec![lead, p.sp(start + 1), item, p.period()]));
             }
-            p.c.keywords.truncate(saved);
+            p.c.reset(saved);
             p.pos = start;
         }
         if w0 == "METHODS" || w0 == "CLASS-METHODS" {
@@ -125,11 +125,11 @@ pub fn parse(p: &mut P) -> Option<Doc> {
                 continue;
             }
             if matches_words(p, start, spec.lead) {
-                let saved = p.c.keywords.len();
+                let saved = p.c.mark();
                 if let Some(d) = keyword_statement(p, spec) {
                     return Some(d);
                 }
-                p.c.keywords.truncate(saved);
+                p.c.reset(saved);
                 p.pos = start;
             }
         }
@@ -2097,7 +2097,7 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
     }
     // Keywords before the colon belong to every item (`WRITE /: a, b.`).
     if !spec.commas {
-        let saved = p.c.keywords.len();
+        let saved = p.c.mark();
         let mut prefix = Vec::new();
         let mut q = p.pos;
         loop {
@@ -2116,7 +2116,7 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
             head.extend(prefix);
             return spec_chain(p, spec, b::concat(head));
         }
-        p.c.keywords.truncate(saved);
+        p.c.reset(saved);
     }
     let body = spec_body(p, spec, true)?;
     Some(b::group(vec![b::concat(head), body, p.period()]))
@@ -2233,7 +2233,7 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
             p.pos = i + 1;
             continue;
         }
-        let saved_kw = p.c.keywords.len();
+        let saved_kw = p.c.mark();
         let operand = match mode {
             Operands::Expr => p.expr(),
             Operands::Logical => p.logical(),
@@ -2244,7 +2244,7 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
                 // Bracket groups the expression parser does not know
                 // (`( c1, c2 )`, `div( a, b )`, path filters `[ … ]`) stay
                 // as written.
-                p.c.keywords.truncate(saved_kw);
+                p.c.reset(saved_kw);
                 p.pos = i;
                 let open = if matches!(p.kind(i), LPAREN | LBRACKET) {
                     i

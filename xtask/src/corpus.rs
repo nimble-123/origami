@@ -323,6 +323,10 @@ pub fn hashes(out_file: &str) -> Result<(), String> {
             let hint = LanguageHint::Path(path.to_string_lossy().into_owned());
             for (name, opts) in [("default", &default), ("w80-i4-lower", &variant)] {
                 let res = format(&bytes, &hint, opts);
+                if origami_core::explain(&bytes, &hint, opts, &[]).result != res {
+                    not_idempotent
+                        .push(format!("{}/{} (explain differs from format)", r.name, rel));
+                }
                 let value = match &res.output {
                     Some(out) if res.status != Status::Error => format!("{:016x}", fnv1a(out)),
                     _ => format!(

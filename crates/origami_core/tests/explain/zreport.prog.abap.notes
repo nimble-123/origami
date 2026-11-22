@@ -1,0 +1,3 @@
+3: ABAP-STMT-001: each statement on its own line
+3: split because the statement would end at column 127 (limit 120)
+5: split because the statement would end at column 133 (limit 120)

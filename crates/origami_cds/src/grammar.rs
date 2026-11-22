@@ -5,16 +5,57 @@
 
 use crate::kinds::*;
 use origami_layout::{Doc, builder as b};
-use origami_syntax::{Language, TokenIndex, TokenStream};
+use origami_syntax::{Language, RuleId, RuleSpan, TokenIndex, TokenStream};
+use std::cell::RefCell;
 
 pub struct G<'a> {
     pub text: &'a str,
     pub stream: &'a TokenStream,
     pub first: usize,
     pub blank: bool,
+    /// Record rule spans (explanations requested).
+    pub explain: bool,
+    /// Spans of the unit being laid out. A helper collects its spans locally
+    /// and appends them here only when it succeeds.
+    pub spans: RefCell<Vec<RuleSpan>>,
 }
 
 impl G<'_> {
+    pub fn new<'a>(
+        text: &'a str,
+        stream: &'a TokenStream,
+        first: usize,
+        blank: bool,
+        explain: bool,
+    ) -> G<'a> {
+        G {
+            text,
+            stream,
+            first,
+            blank,
+            explain,
+            spans: RefCell::new(Vec::new()),
+        }
+    }
+
+    /// Appends `spans` (collected by a helper that succeeded).
+    #[allow(dead_code)] // first used by the rule spans (explain design, Stage 3)
+    fn keep_spans(&self, spans: Vec<RuleSpan>) {
+        if self.explain {
+            self.spans.borrow_mut().extend(spans);
+        }
+    }
+
+    /// A span for tokens `first..=last` laid out by `rule`.
+    #[allow(dead_code)] // first used by the rule spans (explain design, Stage 3)
+    fn span(first: usize, last: usize, rule: RuleId) -> RuleSpan {
+        RuleSpan {
+            first: TokenIndex(first as u32),
+            last: TokenIndex(last as u32),
+            rule,
+        }
+    }
+
     fn kind(&self, i: usize) -> u16 {
         self.stream
             .tokens
