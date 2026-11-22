@@ -3,10 +3,13 @@
 //! Reads the rule IDs and `Milestone:` lines from `docs/STYLE.md`. For every
 //! rule up to `CURRENT_MILESTONE` it checks `format(input) == expected`,
 //! `format(expected) == expected`, that no W001 or X001 is reported and that
-//! `explain` returns the same result as `format`. It
+//! `explain` returns the same result as `format`. If a rule directory has a
+//! `notes.txt`, the line-break notes for `input.*` must equal it (one line per
+//! note: `<first line>: <text>`); `ORIGAMI_BLESS=1` writes it for every rule
+//! in the sentence table. It
 //! also checks that every rule has a directory and every directory a rule.
 
-use origami_core::{Code, LanguageHint, Options, explain, format};
+use origami_core::{Code, LanguageHint, Options, RULE_PHRASES, explain, format};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -112,6 +115,30 @@ fn style_rules() {
                 String::from_utf8_lossy(&out),
                 String::from_utf8_lossy(&exp_bytes),
                 "{id}: {label} does not format to expected"
+            );
+        }
+        let notes_file = dir.join("notes.txt");
+        let ex = explain(
+            &in_bytes,
+            &LanguageHint::Path(input.to_string_lossy().into_owned()),
+            &opts,
+            &[],
+        );
+        let notes: String = ex
+            .notes
+            .iter()
+            .map(|n| format!("{}: {}\n", n.lines.start(), n.text))
+            .collect();
+        if std::env::var_os("ORIGAMI_BLESS").is_some()
+            && RULE_PHRASES.iter().any(|(r, ..)| r == id)
+            && !notes.is_empty()
+        {
+            std::fs::write(&notes_file, &notes).unwrap();
+        } else if notes_file.is_file() {
+            assert_eq!(
+                notes,
+                std::fs::read_to_string(&notes_file).unwrap(),
+                "{id}: notes differ from notes.txt"
             );
         }
         ran += 1;

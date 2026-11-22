@@ -1,5 +1,5 @@
-3: split because the statement would end at column 150 (limit 120)
+3: ABAP-METHODS-001: each section and parameter on its own line, because the method signature would end at column 149 (limit 120)
 17: ABAP-STMT-001: each statement on its own line
-18: split because the statement would end at column 133 (limit 120)
-25: split because the statement would end at column 146 (limit 120)
-28: split because the statement would end at column 122 (limit 120)
+18: ABAP-CALL-001: one parameter per line, because the call would end at column 132 (limit 120)
+25: ABAP-VALUE-001: one row per line, because the constructor expression would end at column 145 (limit 120)
+28: ABAP-COND-001: condition split before AND, OR, because the condition would end at column 121 (limit 120)

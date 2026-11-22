@@ -1,0 +1,2 @@
+1: CDS-HEAD-001: each clause of the header on its own line
+1: CDS-HEAD-001: each clause of the header on its own line, because the header would end at column 127 (limit 120)

@@ -65,6 +65,11 @@ edition, every output change is listed with its STYLE rule ID.
   or an end-of-line comment); `cargo xtask explain FILE` and
   `cargo xtask explain --corpus` (checked in CI). Formatting output is
   unchanged (corpus hashes identical to the Stage 0 baseline).
+- Notes name the rule that laid out the construct, for the rules
+  ABAP-STMT/CALL/VALUE/COND/DECL/CHAIN/METHODS/FORM/SQL/EML and
+  CDS-UNIT/ANNO/HEAD/ELEM, DCL-GRANT; each of these rules has an
+  `Explanation:` line in STYLE.md, checked against the code by a test, and
+  rule fixtures may carry a `notes.txt`.
 - `origami_syntax`: new `explain` module (`RuleSpan`, `Note`, `BreakCause`,
   `Scope`, `RuleId`); `LangResult` has a new field `rule_spans` (code that
   builds `LangResult` with a struct literal must add it). The ABAP and CDS

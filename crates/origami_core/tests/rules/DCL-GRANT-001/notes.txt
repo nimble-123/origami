@@ -1,0 +1,2 @@
+2: CDS-UNIT-001: each annotation and element on its own line
+3: DCL-GRANT-001: condition split before AND, OR, because the access condition would end at column 145 (limit 120)

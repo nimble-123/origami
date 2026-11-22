@@ -89,13 +89,101 @@ pub(crate) fn explain(inner: Inner, opts: &Options) -> Explained {
 
 // ---- sentences ------------------------------------------------------------
 
-/// Rule phrase (STYLE.md `Explanation:` line) and construct noun.
+/// Rule ID, rule phrase and construct noun. Each phrase is also the
+/// `Explanation:` line of its rule in docs/STYLE.md (checked by a test).
+pub const RULE_PHRASES: &[(RuleId, &str, &str)] = &[
+    (
+        "ABAP-STMT-001",
+        "each statement on its own line",
+        "statement",
+    ),
+    ("ABAP-CALL-001", "one parameter per line", "call"),
+    (
+        "ABAP-CALL-002",
+        "each parameter group on its own line",
+        "call",
+    ),
+    (
+        "ABAP-CALL-003",
+        "each parameter group on its own line",
+        "call",
+    ),
+    (
+        "ABAP-VALUE-001",
+        "one row per line",
+        "constructor expression",
+    ),
+    (
+        "ABAP-COND-001",
+        "condition split before AND, OR",
+        "condition",
+    ),
+    ("ABAP-DECL-001", "one declaration per line", "declaration"),
+    ("ABAP-CHAIN-001", "one item per line", "chain"),
+    (
+        "ABAP-METHODS-001",
+        "each section and parameter on its own line",
+        "method signature",
+    ),
+    (
+        "ABAP-FORM-001",
+        "each section and parameter on its own line",
+        "FORM signature",
+    ),
+    ("ABAP-SQL-001", "each clause on its own line", "statement"),
+    (
+        "ABAP-SQL-002",
+        "each common table expression on its own line",
+        "query",
+    ),
+    (
+        "ABAP-EML-001",
+        "each entity and operation on its own line",
+        "statement",
+    ),
+    (
+        "CDS-UNIT-001",
+        "each annotation and element on its own line",
+        "element",
+    ),
+    (
+        "CDS-ANNO-001",
+        "annotation values on their own lines",
+        "annotation",
+    ),
+    (
+        "CDS-HEAD-001",
+        "each clause of the header on its own line",
+        "header",
+    ),
+    (
+        "CDS-ELEM-001",
+        "each WHEN on its own line",
+        "case expression",
+    ),
+    (
+        "DCL-GRANT-001",
+        "condition split before AND, OR",
+        "access condition",
+    ),
+];
+
+/// Rules that break whatever the width; all other rules break a construct
+/// only when it does not fit.
+const ALWAYS_BREAKS: &[RuleId] = &[
+    "ABAP-STMT-001",
+    "ABAP-SQL-002",
+    "CDS-UNIT-001",
+    "CDS-HEAD-001",
+    "CDS-ELEM-001",
+];
+
+/// Rule phrase and construct noun of `rule`.
 pub(crate) fn rule_phrase(rule: RuleId) -> Option<(&'static str, &'static str)> {
-    Some(match rule {
-        "ABAP-STMT-001" => ("each statement on its own line", "statement"),
-        "CDS-UNIT-001" => ("each annotation and element on its own line", "element"),
-        _ => return None,
-    })
+    RULE_PHRASES
+        .iter()
+        .find(|(r, ..)| *r == rule)
+        .map(|&(_, phrase, noun)| (phrase, noun))
 }
 
 fn sentence(rule: Option<RuleId>, cause: &BreakCause, noun: &str) -> String {
@@ -302,10 +390,14 @@ fn notes(parts: &Parts, opts: &Options) -> Vec<Located> {
             let inner_comment =
                 || (first..last).find_map(|j| trailing_comment(output, &out_stream, j));
             let (cause, rule) = match kind {
-                Kind::Rule if rule.is_none() => match inner_comment() {
-                    Some(text) => (BreakCause::Comment { text }, None),
-                    None => (BreakCause::Rule, None),
-                },
+                // A rule that breaks only for width cannot cause a break that
+                // survives the wide print; a comment inside does.
+                Kind::Rule if rule.is_none_or(|r| !ALWAYS_BREAKS.contains(&r)) => {
+                    match inner_comment() {
+                        Some(text) => (BreakCause::Comment { text }, None),
+                        None => (BreakCause::Rule, rule),
+                    }
+                }
                 Kind::Rule => (BreakCause::Rule, rule),
                 Kind::Comment => (
                     BreakCause::Comment {

@@ -1,0 +1,1 @@
+1: ABAP-FORM-001: each section and parameter on its own line, because the FORM signature would end at column 130 (limit 120)

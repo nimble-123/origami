@@ -1,0 +1,1 @@
+1: ABAP-VALUE-001: one row per line, because the constructor expression would end at column 124 (limit 120)

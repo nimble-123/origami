@@ -4,7 +4,10 @@
 //! (one line per note: `<first line>: <text>`). Set `ORIGAMI_BLESS=1` to
 //! rewrite the `.notes` files.
 
-use origami_core::{BreakCause, Explained, LanguageHint, Options, explain, format, format_lines};
+use origami_core::{
+    BreakCause, Explained, LanguageHint, Options, RULE_PHRASES, Scope, explain, format,
+    format_lines,
+};
 use std::path::{Path, PathBuf};
 
 fn samples() -> Vec<PathBuf> {
@@ -91,7 +94,8 @@ fn width_note_measures_the_statement() {
         panic!("not a width note: {:?}", e.notes[0]);
     };
     assert_eq!(limit, 120);
-    assert_eq!(column as usize, src.trim_end().chars().count());
+    // The call's construct ends at `)`, one column before the period.
+    assert_eq!(column as usize, src.trim_end().chars().count() - 1);
     assert!(column > 120);
 }
 
@@ -164,4 +168,98 @@ fn lines_keep_only_notes_of_kept_changes_and_map_them() {
     assert_eq!(all.notes.len(), 2, "{:#?}", all.notes);
     assert_eq!(*all.notes[0].lines.start(), 2);
     assert_eq!(*all.notes[1].lines.start(), 5);
+}
+
+#[test]
+fn rule_phrases_equal_the_explanation_lines_in_style_md() {
+    let style =
+        std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/STYLE.md"))
+            .unwrap();
+    let mut documented = std::collections::BTreeMap::new();
+    let mut rule = None;
+    for line in style.lines() {
+        if let Some(h) = line.strip_prefix("### ") {
+            rule = h.split(':').next().map(str::to_string);
+        } else if let Some(phrase) = line.strip_prefix("Explanation: ") {
+            documented.insert(
+                rule.clone().expect("Explanation before a rule"),
+                phrase.to_string(),
+            );
+        }
+    }
+    for (id, phrase, _) in RULE_PHRASES {
+        assert_eq!(
+            documented.get(*id).map(String::as_str),
+            Some(*phrase),
+            "{id}: the Explanation line in STYLE.md differs from the code"
+        );
+    }
+    assert_eq!(
+        documented.len(),
+        RULE_PHRASES.len(),
+        "STYLE.md has Explanation lines without a code entry"
+    );
+}
+
+#[test]
+fn a_long_call_gets_one_call_001_width_note() {
+    let src = "rv_ok = zcl_check=>validate( iv_id = iv_id iv_date = iv_date iv_mode = iv_mode iv_flag = abap_false iv_x = 1 iv_y = 2 iv_z = 3 ).\n";
+    let e = run("z.prog.abap", src);
+    assert_eq!(e.notes.len(), 1, "{:#?}", e.notes);
+    let n = &e.notes[0];
+    assert_eq!(n.rule, Some("ABAP-CALL-001"));
+    let BreakCause::Width { column, scope, .. } = n.cause else {
+        panic!("{n:?}");
+    };
+    assert!(column > 120);
+    assert_eq!(scope, Scope::Construct);
+    assert!(
+        n.text.starts_with(
+            "ABAP-CALL-001: one parameter per line, because the call would end at column"
+        ),
+        "{}",
+        n.text
+    );
+}
+
+#[test]
+fn call_function_with_a_keyword_group_gets_call_003() {
+    let src = "CALL FUNCTION 'Z_LONG_FUNCTION_NAME' EXPORTING iv_first = lv_first iv_second = lv_second IMPORTING ev_result = lv_result EXCEPTIONS OTHERS = 1.\n";
+    let e = run("z.prog.abap", src);
+    assert!(!e.notes.is_empty(), "{}", e.output_text);
+    assert!(
+        e.notes.iter().all(|n| n.rule == Some("ABAP-CALL-003")),
+        "{:#?}\n{}",
+        e.notes,
+        e.output_text
+    );
+}
+
+#[test]
+fn a_cds_header_clause_gets_cds_head_001() {
+    let e = run(
+        "zi_a.ddls.asddls",
+        "define view entity ZI_A as select from t association [0..1] to ZI_B as _B on $projection.a = _B.a {\n  key a,\n  _B\n}\n",
+    );
+    assert!(
+        e.notes.iter().any(|n| n.rule == Some("CDS-HEAD-001")),
+        "{:#?}\n{}",
+        e.notes,
+        e.output_text
+    );
+}
+
+#[test]
+fn a_failed_parse_attempt_leaves_no_span() {
+    // `READ ENTITIES` with an unknown addition fails in the EML parser and
+    // falls back to the keyword-statement engine or the generic layout; no
+    // EML-001 note may survive the failed attempt.
+    let src = "READ ENTITIES OF zi_travel ENTITY travel FIELDS ( a b ) WITH VALUE #( ( a = 1 ) ) RESULT DATA(lt) FAILED DATA(f) REPORTED DATA(r) UNKNOWN_ADDITION x.\n";
+    let e = run("z.prog.abap", src);
+    assert!(
+        e.notes.iter().all(|n| n.rule != Some("ABAP-EML-001")),
+        "{:#?}\n{}",
+        e.notes,
+        e.output_text
+    );
 }

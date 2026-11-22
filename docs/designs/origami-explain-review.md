@@ -217,6 +217,13 @@ formats:
     end-of-line comment inside its construct, if there is one; only the
     remaining width breaks become `Layout`. In the corpus this moved 43 of 63
     `Layout` notes to comment notes.
+
+    Stage 3 finding: most rules break a construct only when it does not fit
+    (ABAP-CALL-*, ABAP-VALUE-001, ABAP-COND-001, …). A break that survives the
+    wide print inside such a construct was forced by an end-of-line comment,
+    not by the rule; it is attributed to the comment when there is one. Only
+    ABAP-STMT-001, ABAP-SQL-002, CDS-UNIT-001, CDS-HEAD-001 and CDS-ELEM-001
+    break regardless of width.
 4.  Introduced breaks are grouped into **one note per construct and
     cause**. The construct is the innermost rule span that contains the
     break, or else the ABAP statement or CDS layout unit. A construct whose
@@ -313,6 +320,14 @@ pushed in exactly one function.
     | ABAP-SQL-001 | `SELECT` and `MERGE` (specs with `all_clauses`) | `keyword_statement` |
     | ABAP-SQL-002 | CTE list and each subquery | `with_select`, `subquery` |
     | ABAP-EML-001 | EML statement | `eml` |
+
+    Stage 3 finding: in the keyword-group layout the list span is
+    ABAP-CALL-002 (the breaks before `EXPORTING`, `IMPORTING`, …) and each
+    group gets an ABAP-CALL-001 span (the breaks between its parameters),
+    because those are the rules that place these breaks. Inside `CALL
+    FUNCTION` / `CALL METHOD` all breaks belong to ABAP-CALL-003. A FORM or
+    method signature span runs from the name to the last parameter; a
+    `METHODS:` chain also gets an ABAP-CHAIN-001 span for the whole statement.
 
     `call_args` gets a parameter that says whether it serves a method call or
     a constructor; constructors (`NEW`, `CONV`, `REF`, …) push no

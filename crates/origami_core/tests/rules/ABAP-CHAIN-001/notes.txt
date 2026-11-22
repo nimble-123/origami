@@ -1,0 +1,1 @@
+4: ABAP-CHAIN-001: one item per line, because the chain would end at column 128 (limit 120)
