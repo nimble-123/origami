@@ -1,0 +1,22 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;800&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;width:1280px;height:640px;background:#f4f6f9;color:#18214d;font-family:"Schibsted Grotesk",sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{padding:72px 80px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:18px;font-weight:800;font-size:44px;letter-spacing:-.02em}
+  h1{font-size:64px;line-height:1.04;letter-spacing:-.035em;margin:0;font-weight:800;max-width:500px}
+  .sheet{position:absolute;right:80px;top:250px;width:560px;background:#fff;border:1px solid #c9d1de;border-radius:4px;padding:26px 28px;font:400 17px/1.75 "Martian Mono",monospace;white-space:pre}
+  .sheet::after{content:"";position:absolute;top:-1px;right:-1px;width:26px;height:26px;background:linear-gradient(225deg,#f4f6f9 50%,#c9d1de 50%)}
+  .note{margin-top:14px;padding-top:12px;border-top:1px dashed #c9d1de;font:600 14px/1.5 "Martian Mono",monospace;white-space:normal}
+  .note b{color:#2456d6}
+  .foot{font-weight:500;font-size:26px;color:#4a5478}
+</style></head><body><div class="wrap">
+  <div class="brand"><img src="../../docs/assets/logo.svg" width="56" height="56">origami</div>
+  <h1>A long line of ABAP, folded into shape.</h1>
+  <div class="foot">Layout-only formatter for ABAP and CDS</div>
+</div>
+<div class="sheet">get( iv_carrier = is_flight-carrid
+     iv_date    = sy-datum
+     iv_mode    = 'A' ).<div class="note"><b>↳</b> ABAP-CALL-001: one parameter per line, because the call would end at column 103</div></div>
+</body></html>
