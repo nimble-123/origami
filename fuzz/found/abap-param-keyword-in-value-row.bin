@@ -1,0 +1,5 @@
+report ztest.
+data x type i.
+x = value #( ( a = 1
+importing
+  b = 2 ) ).
