@@ -85,6 +85,12 @@ Configuration discovery, the self-check and the diagnostic codes are the same
 as on the command line. Nothing is written unless `format_files` gets
 `"write": true`.
 
+`format_files` works only below the server's working directory. A path that
+resolves outside it (absolute, through `..`, or through a symbolic link) makes
+the whole call fail with `isError: true` and `structuredContent.outside`
+listing those paths; nothing is read or written. Directory walks do not
+follow symbolic links.
+
 ## Review view (`--review`)
 
 `origami --review` shows what origami would change, for people: for each file

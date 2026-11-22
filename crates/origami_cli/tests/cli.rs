@@ -842,3 +842,64 @@ fn review_with_changed_shows_only_changed_lines() {
     assert!(view.contains("│+lv_c{+ +}={+ +}4.\n"), "{view}");
     assert!(view.contains("↳ ABAP-STMT-001"), "{view}");
 }
+
+#[test]
+fn mcp_format_files_stays_below_the_working_directory() {
+    let outer = tempfile::tempdir().unwrap();
+    write(outer.path(), "outside.prog.abap", "lv_a   =   1.\n");
+    let d = outer.path().join("project");
+    fs::create_dir_all(d.join(".git")).unwrap();
+    write(&d, "src/z.prog.abap", "lv_b   =   2.\n");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(
+        outer.path().join("outside.prog.abap"),
+        d.join("src/link.prog.abap"),
+    )
+    .unwrap();
+    let call = |id: u32, args: &str| {
+        format!(
+            r#"{{"jsonrpc":"2.0","id":{id},"method":"tools/call","params":{{"name":"format_files","arguments":{args}}}}}"#
+        )
+    };
+    let session = [
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}"#.to_string(),
+        call(2, r#"{"paths":["../outside.prog.abap"],"write":true}"#),
+        call(3, &format!(r#"{{"paths":["{}"],"write":true}}"#, outer.path().join("outside.prog.abap").display())),
+        call(4, r#"{"paths":["src/../../outside.prog.abap"],"write":true}"#),
+        call(5, r#"{"paths":["src/link.prog.abap"],"write":true}"#),
+        call(6, r#"{"paths":["src"],"write":true}"#),
+    ]
+    .join("\n");
+    let out = origami()
+        .current_dir(&d)
+        .arg("--mcp")
+        .write_stdin(session)
+        .output()
+        .unwrap();
+    let replies: Vec<serde_json::Value> = String::from_utf8(out.stdout)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    for r in &replies[1..4] {
+        assert_eq!(r["result"]["isError"], true, "{r}");
+    }
+    // A symbolic link to a file outside is refused when named; a directory
+    // walk does not follow it.
+    #[cfg(unix)]
+    assert_eq!(replies[4]["result"]["isError"], true, "{}", replies[4]);
+    assert_eq!(replies[5]["result"]["isError"], false, "{}", replies[5]);
+    assert_eq!(
+        replies[5]["result"]["structuredContent"]["changed"], 1,
+        "{}",
+        replies[5]
+    );
+    assert_eq!(
+        fs::read_to_string(outer.path().join("outside.prog.abap")).unwrap(),
+        "lv_a   =   1.\n"
+    );
+    assert_eq!(
+        fs::read_to_string(d.join("src/z.prog.abap")).unwrap(),
+        "lv_b = 2.\n"
+    );
+}
