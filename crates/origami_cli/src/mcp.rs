@@ -207,6 +207,50 @@ fn format_tool(a: &Value) -> Value {
     }
 }
 
+/// The paths (as given) that do not resolve to a place below the current
+/// working directory. A path that does not exist is resolved through its
+/// nearest existing parent.
+fn outside_cwd<'a>(paths: impl Iterator<Item = &'a PathBuf>) -> Vec<String> {
+    let Ok(cwd) = std::env::current_dir().and_then(|d| d.canonicalize()) else {
+        return paths.map(|p| p.display().to_string()).collect();
+    };
+    paths
+        .filter(|p| {
+            let abs = if p.is_absolute() {
+                p.to_path_buf()
+            } else {
+                cwd.join(p)
+            };
+            // Resolve the longest existing prefix; `..` in the rest counts.
+            let mut base = abs.as_path();
+            let mut rest = Vec::new();
+            let resolved = loop {
+                if let Ok(c) = base.canonicalize() {
+                    break Some(c);
+                }
+                match (base.parent(), base.file_name()) {
+                    (Some(parent), Some(name)) => {
+                        rest.push(name.to_os_string());
+                        base = parent;
+                    }
+                    _ => break None,
+                }
+            };
+            let Some(mut full) = resolved else {
+                return true;
+            };
+            if rest.iter().any(|r| r == "..") {
+                return true;
+            }
+            for part in rest.iter().rev() {
+                full.push(part);
+            }
+            !full.starts_with(&cwd)
+        })
+        .map(|p| p.display().to_string())
+        .collect()
+}
+
 fn files_tool(a: &Value) -> Value {
     let paths: Vec<PathBuf> = a["paths"]
         .as_array()
@@ -217,6 +261,17 @@ fn files_tool(a: &Value) -> Value {
         })
         .unwrap_or_default();
     let write = a["write"].as_bool().unwrap_or(false);
+    // The tool works only below the server's working directory.
+    let outside = outside_cwd(paths.iter());
+    if !outside.is_empty() {
+        return tool_error(
+            format!(
+                "Paths must lie below the server's working directory; nothing was done: {}",
+                outside.join(", ")
+            ),
+            json!({"outside": outside}),
+        );
+    }
     let selected: Vec<(PathBuf, crate::changed::Ranges)> = match a["changed"].as_str() {
         Some(rev) => match crate::changed::files(rev, &paths) {
             Ok(f) => f,
@@ -234,6 +289,17 @@ fn files_tool(a: &Value) -> Value {
                 .collect()
         }
     };
+    // Files reached through symbolic links must stay inside too.
+    let outside = outside_cwd(selected.iter().map(|(p, _)| p));
+    if !outside.is_empty() {
+        return tool_error(
+            format!(
+                "Files outside the server's working directory (symbolic links?); nothing was done: {}",
+                outside.join(", ")
+            ),
+            json!({"outside": outside}),
+        );
+    }
     let args = default_args();
     let configs = Configs::new(&args);
     let mut files = Vec::new();
