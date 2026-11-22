@@ -2218,8 +2218,13 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
         };
         // The first operand is a name when a clause or the end of the
         // statement follows it (`ASSIGN structure TO <fs>`).
+        // `SELECT SINGLE FROM …` / `SELECT DISTINCT FROM …` (strict syntax,
+        // field list in FIELDS): these words are never names.
+        let select_modifier =
+            spec.lead == ["SELECT"] && matches!(p.upper(i).as_str(), "SINGLE" | "DISTINCT");
         if n_word > 0
             && Some(i) == first_operand
+            && !select_modifier
             && p.text(i)
                 .starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
             && (i + n_word >= p.end || phrase_at(p, i + n_word, spec.clauses) > 0)

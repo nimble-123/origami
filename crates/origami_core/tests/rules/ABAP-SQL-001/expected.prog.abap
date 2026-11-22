@@ -13,3 +13,4 @@ DELETE FROM zflights
     WHERE carrid = @lv_carrier AND connid = @lv_connection AND fldate < @lv_cutoff_date_for_the_deletion_run.
 MODIFY lt_flights FROM ls_flight TRANSPORTING price currency
     WHERE carrid = lv_carrier AND connid = lv_connection AND fldate < lv_cutoff.
+SELECT SINGLE FROM sflight FIELDS price WHERE carrid = @lv_carrier INTO @DATA(lv_price).
