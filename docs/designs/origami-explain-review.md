@@ -118,7 +118,11 @@ brief `concepts_brief.md` (two rounds of independent review). A desktop app
 
 ## Open Questions
 
-*   **Q3. Printer facts to confirm in a spike before implementation.** (a) A
+*   **Q3 (resolved in Stage 0).** (a) confirmed and fixed: an end-of-line
+    comment after the period forced the statement's group to break; (b)
+    confirmed and fixed: the fill check ignored the text after the last
+    clause, so lines ended at column 121; (c) documented; (d) fixed. Original
+    question: **Printer facts to confirm in a spike before implementation.** (a) A
     comment after the period seems to force `CALL FUNCTION` to break; (b) the
     fill check may ignore the statement's period; (c) `--changed` takes the next
     argument as its revision (documented, no behavior change); (d) the human code frame prints

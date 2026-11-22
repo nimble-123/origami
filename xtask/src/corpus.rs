@@ -6,6 +6,10 @@
 //! identity mode every statement counts as unknown), separately for `modern`
 //! repositories, and fails when a rate rises above `corpus/baseline.json`.
 //! `bless` rewrites the baseline.
+//!
+//! `hashes` (`corpus run --hashes FILE`) writes one line per file and setting
+//! with a hash of the formatted output, for checking that a change leaves all
+//! output byte for byte unchanged (design origami-explain-review, goal G3).
 
 use crate::root;
 use origami_core::detect::{FileKind, by_file_name};
@@ -288,6 +292,77 @@ pub fn run(bless: bool) -> Result<(), String> {
     }
     println!("corpus OK: no failures, idempotent, no fallback regression");
     Ok(())
+}
+
+/// 64-bit FNV-1a; only compared for equality.
+fn fnv1a(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in bytes {
+        h ^= u64::from(*b);
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
+}
+
+/// `corpus run --hashes FILE`: for every corpus file, the hash of the
+/// formatted output at the default settings and at width 80, indent 4,
+/// lower-case keywords (`ERR <code>` when formatting fails), sorted. Also
+/// checks idempotency at the non-default setting.
+pub fn hashes(out_file: &str) -> Result<(), String> {
+    let m = manifest()?;
+    let default = Options::default();
+    let mut variant = Options::default();
+    variant.lang.line_width = 80;
+    variant.lang.indent_width = 4;
+    variant.lang.abap_keyword_case = origami_core::Case::Lower;
+    let mut lines = Vec::new();
+    let mut not_idempotent = Vec::new();
+    for r in &m.repo {
+        for (rel, path) in files(r) {
+            let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+            let hint = LanguageHint::Path(path.to_string_lossy().into_owned());
+            for (name, opts) in [("default", &default), ("w80-i4-lower", &variant)] {
+                let res = format(&bytes, &hint, opts);
+                let value = match &res.output {
+                    Some(out) if res.status != Status::Error => format!("{:016x}", fnv1a(out)),
+                    _ => format!(
+                        "ERR {}",
+                        res.diagnostics
+                            .iter()
+                            .find(|d| d.code.as_str().starts_with(['E', 'X']))
+                            .map(|d| d.code.as_str())
+                            .unwrap_or("?")
+                    ),
+                };
+                if name != "default"
+                    && let Some(out) = &res.output
+                    && format(out, &hint, opts).output.as_deref() != Some(&out[..])
+                {
+                    not_idempotent.push(format!("{}/{}", r.name, rel));
+                }
+                lines.push(format!("{value} {name} {}/{}", r.name, rel));
+            }
+        }
+    }
+    lines.sort();
+    let path = root().join(out_file);
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, lines.join("\n") + "\n").map_err(|e| e.to_string())?;
+    println!(
+        "hashes: {} lines written to {}",
+        lines.len(),
+        path.display()
+    );
+    if not_idempotent.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "not idempotent at width 80 / indent 4 / lower case: {}",
+            not_idempotent.join(", ")
+        ))
+    }
 }
 
 #[cfg(test)]

@@ -236,13 +236,16 @@ impl<'a> Ctx<'a> {
     }
 
     /// True when the doc can never be printed on one line.
-    fn forced(&self, doc: &Doc, first: &mut bool) -> bool {
+    /// `end`: the doc's last token. An end-of-line comment after it breaks
+    /// the line only after the doc, so it does not force the doc to break.
+    fn forced(&self, doc: &Doc, first: &mut bool, end: Option<TokenIndex>) -> bool {
+        let trailing = |i: TokenIndex| Some(i) != end && self.has_trailing_comments(i);
         match &doc.0 {
             Inner::HardLine => true,
             Inner::Token { index, .. } => {
                 let lead = !*first && self.has_leading_comments(*index);
                 *first = false;
-                lead || self.has_trailing_comments(*index)
+                lead || trailing(*index)
             }
             Inner::Unknown { first: f, last, .. }
             | Inner::Verbatim { first: f, last, .. }
@@ -250,27 +253,27 @@ impl<'a> Ctx<'a> {
                 let lead = !*first && self.has_leading_comments(*f);
                 *first = false;
                 let (a, b) = self.raw_range(*f, *last);
-                lead || self.src[a..b].contains('\n') || self.has_trailing_comments(*last)
+                lead || self.src[a..b].contains('\n') || trailing(*last)
             }
             Inner::AlignGroup(items) => items.iter().any(|it| match it {
                 AlignItem::Row(r) => r
                     .head
                     .iter()
                     .chain(r.tail.iter())
-                    .any(|d| self.forced(d, first)),
+                    .any(|d| self.forced(d, first, end)),
                 AlignItem::Break => false,
             }),
             Inner::Group(ds) | Inner::Indent(ds) | Inner::Hang(ds) | Inner::Concat(ds) => {
-                ds.iter().any(|d| self.forced(d, first))
+                ds.iter().any(|d| self.forced(d, first, end))
             }
-            Inner::Choice(a, _) => self.forced(a, first),
-            Inner::Fill(items) => items.iter().any(|(_, c)| self.forced(c, first)),
+            Inner::Choice(a, _) => self.forced(a, first, end),
+            Inner::Fill(items) => items.iter().any(|(_, c)| self.forced(c, first, end)),
             Inner::Space | Inner::SoftLine | Inner::SoftBreak => false,
         }
     }
 
     fn is_forced(&self, doc: &Doc) -> bool {
-        self.forced(doc, &mut true)
+        self.forced(doc, &mut true, last_token(doc))
     }
 
     /// Width of the doc printed flat, or `None` if it cannot be flat.
@@ -789,6 +792,9 @@ impl<'c, 'a> Printer<'c, 'a> {
                     while k < cmds.len() {
                         let sep = cmds[k];
                         let content = cmds[k + 1];
+                        // The last item shares its line with what follows the
+                        // fill (for example the statement's period).
+                        let rest: &[Cmd] = if k + 2 >= cmds.len() { &stack } else { &[] };
                         let flat_ok = mode == Mode::Flat
                             || (!self.pending_eol
                                 && self.fits(
@@ -797,7 +803,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                                         mode: Mode::Flat,
                                         doc: content.doc,
                                     },
-                                    &[],
+                                    rest,
                                     width - 1,
                                 ));
                         let sep_mode = if flat_ok { Mode::Flat } else { Mode::Break };
@@ -971,4 +977,29 @@ fn same_line_gap(gap: &str) -> String {
         out.push(' ');
     }
     out
+}
+
+/// The last token of a doc, if it has one.
+fn last_token(doc: &Doc) -> Option<TokenIndex> {
+    match &doc.0 {
+        Inner::Token { index, .. } => Some(*index),
+        Inner::Unknown { last, .. } | Inner::Verbatim { last, .. } | Inner::Opaque { last, .. } => {
+            Some(*last)
+        }
+        Inner::Group(ds) | Inner::Indent(ds) | Inner::Hang(ds) | Inner::Concat(ds) => {
+            ds.iter().rev().find_map(last_token)
+        }
+        Inner::Choice(a, _) => last_token(a),
+        Inner::Fill(items) => items.iter().rev().find_map(|(_, c)| last_token(c)),
+        Inner::AlignGroup(items) => items.iter().rev().find_map(|it| match it {
+            AlignItem::Row(r) => r
+                .head
+                .iter()
+                .chain(r.tail.iter())
+                .rev()
+                .find_map(last_token),
+            AlignItem::Break => None,
+        }),
+        Inner::Space | Inner::SoftLine | Inner::SoftBreak | Inner::HardLine => None,
+    }
 }
