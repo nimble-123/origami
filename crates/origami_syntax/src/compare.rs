@@ -36,11 +36,18 @@ pub fn equivalent(
 ) -> Result<(), Vec<Mismatch>> {
     let mut mismatches = Vec::new();
     let n = input.tokens.len().min(output.tokens.len());
+    // Same text, or a keyword that only changed case.
+    let same_text = |i: usize| {
+        let a = &input.tokens[i];
+        let (ta, tb) = (a.text(input_src), output.tokens[i].text(output_src));
+        ta == tb || (a.keyword && ta.eq_ignore_ascii_case(tb))
+    };
     // Different counts shift every later token, so only the first difference
-    // is meaningful.
+    // is meaningful. A keyword that only changed case is not a difference:
+    // the mismatch must point at the unit that lost or gained tokens.
     if input.tokens.len() != output.tokens.len() {
         let first = (0..n)
-            .find(|&i| input.tokens[i].text(input_src) != output.tokens[i].text(output_src))
+            .find(|&i| input.tokens[i].kind != output.tokens[i].kind || !same_text(i))
             .unwrap_or(n);
         return Err(vec![Mismatch {
             input_index: TokenIndex(first.min(input.tokens.len().saturating_sub(1)) as u32),
@@ -51,13 +58,12 @@ pub fn equivalent(
         let a = &input.tokens[i];
         let b = &output.tokens[i];
         let at = TokenIndex(i as u32);
-        let (ta, tb) = (a.text(input_src), b.text(output_src));
         if a.kind != b.kind {
             mismatches.push(Mismatch {
                 input_index: at,
                 kind: MismatchKind::Kind,
             });
-        } else if !(ta == tb || (a.keyword && ta.eq_ignore_ascii_case(tb))) {
+        } else if !same_text(i) {
             mismatches.push(Mismatch {
                 input_index: at,
                 kind: MismatchKind::Text,

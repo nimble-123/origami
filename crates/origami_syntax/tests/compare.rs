@@ -128,3 +128,16 @@ fn glued_change_is_detected() {
     let ms = origami_syntax::equivalent(&lex(a), a, &out, b).unwrap_err();
     assert_eq!(ms[0].kind, MismatchKind::Glued);
 }
+
+#[test]
+fn count_mismatch_points_past_keyword_case_changes() {
+    // The output lost `importing b`; the upper-cased keyword before it is
+    // not the difference.
+    let (a, b) = ("methods x importing b", "METHODS x");
+    let mut input = lex(a);
+    input.tokens[0].keyword = true;
+    let ms = equivalent(&input, a, &lex(b), b).unwrap_err();
+    assert_eq!(ms.len(), 1);
+    assert_eq!(ms[0].kind, MismatchKind::Count);
+    assert_eq!(ms[0].input_index.0, 2);
+}
