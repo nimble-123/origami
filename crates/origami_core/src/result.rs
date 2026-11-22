@@ -56,7 +56,7 @@ impl Reported {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FormatResult {
     /// Encoded output bytes. `None` on any error.
     pub output: Option<Vec<u8>>,

@@ -55,6 +55,8 @@ jobs:
           tool: hyperfine
       - run: cargo xtask corpus fetch
       - run: cargo xtask corpus run
+      - name: Line-break explanations (checks a-d)
+        run: cargo xtask explain --corpus
       - name: Mutation stress test (stable Rust)
         run: cargo xtask stress 20000 ${{ github.run_number }}
       - run: npm ci

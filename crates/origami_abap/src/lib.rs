@@ -30,6 +30,29 @@ pub fn format(
     opaque: &BTreeSet<UnitId>,
     identity: bool,
 ) -> LangResult {
+    format_with(src, opts, quarantine, opaque, identity, false)
+}
+
+/// Like [`format`], and also records the rule spans for explanations
+/// (`LangResult::rule_spans`). The output is the same.
+pub fn format_explained(
+    src: &SourceText,
+    opts: &LangOptions,
+    quarantine: &BTreeSet<UnitId>,
+    opaque: &BTreeSet<UnitId>,
+    identity: bool,
+) -> LangResult {
+    format_with(src, opts, quarantine, opaque, identity, true)
+}
+
+fn format_with(
+    src: &SourceText,
+    opts: &LangOptions,
+    quarantine: &BTreeSet<UnitId>,
+    opaque: &BTreeSet<UnitId>,
+    identity: bool,
+    explain: bool,
+) -> LangResult {
     let mut stream = match lex(src) {
         Ok(s) => s,
         Err(d) => return LangResult::failed(d),
@@ -47,7 +70,14 @@ pub fn format(
         })
         .collect();
 
-    let laid = layout::layout(src.text(), &stream, &statements, quarantine, opaque);
+    let laid = layout::layout(
+        src.text(),
+        &stream,
+        &statements,
+        quarantine,
+        opaque,
+        explain,
+    );
     if !identity {
         for &k in &laid.keywords {
             stream.tokens[k].keyword = true;
@@ -76,5 +106,6 @@ pub fn format(
             unknown: laid.unknown,
             ..Stats::default()
         },
+        rule_spans: laid.rule_spans,
     }
 }

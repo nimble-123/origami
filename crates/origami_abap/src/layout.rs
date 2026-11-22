@@ -10,7 +10,7 @@ use crate::statements;
 use crate::stmt::{Ctx, P};
 use crate::structure::Statement;
 use origami_layout::{Doc, builder as b};
-use origami_syntax::{Code, Diagnostic, TokenIndex, TokenStream, TriviaPosition, UnitId};
+use origami_syntax::{Code, Diagnostic, RuleSpan, TokenIndex, TokenStream, TriviaPosition, UnitId};
 use std::collections::BTreeSet;
 
 pub struct Laid {
@@ -18,6 +18,8 @@ pub struct Laid {
     pub diagnostics: Vec<Diagnostic>,
     pub unknown: u32,
     pub keywords: Vec<usize>,
+    /// Rule spans (only when `explain`).
+    pub rule_spans: Vec<RuleSpan>,
 }
 
 fn nest(level: u32, doc: Doc) -> Doc {
@@ -38,6 +40,7 @@ pub fn layout(
     statements: &[Statement],
     quarantine: &BTreeSet<UnitId>,
     opaque: &BTreeSet<UnitId>,
+    explain: bool,
 ) -> Laid {
     let mut commented = vec![false; stream.tokens.len() + 1];
     for t in &stream.trivia {
@@ -50,6 +53,8 @@ pub fn layout(
         stream,
         commented: &commented,
         keywords: Vec::new(),
+        explain,
+        rule_spans: Vec::new(),
     };
     let mut docs = Vec::with_capacity(statements.len());
     let mut diagnostics = Vec::new();
@@ -74,7 +79,7 @@ pub fn layout(
         } else if quarantine.contains(&id) {
             b::verbatim(first, last, blank)
         } else {
-            let saved = ctx.keywords.len();
+            let saved = ctx.mark();
             let parsed = {
                 let mut p = P::new(&mut ctx, st.tokens.start, st.tokens.end - 1, blank);
                 statements::parse(&mut p)
@@ -92,7 +97,7 @@ pub fn layout(
                     d
                 }
                 None => {
-                    ctx.keywords.truncate(saved);
+                    ctx.reset(saved);
                     mark_ctor(&mut ctx);
                     unknown += 1;
                     let t = &stream.tokens[first.0 as usize];
@@ -121,5 +126,6 @@ pub fn layout(
         diagnostics,
         unknown,
         keywords: ctx.keywords,
+        rule_spans: ctx.rule_spans,
     }
 }

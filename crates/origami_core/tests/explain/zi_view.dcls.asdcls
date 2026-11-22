@@ -1,0 +1,4 @@
+@EndUserText.label: 'Access' @MappingRole: true
+define role ZI_View {
+  grant select on ZI_View where ( carrid ) = aspect pfcg_auth( s_carrid, carrid, actvt = '03' ) and connid <> '0000' and fldate >= '20200101';
+}

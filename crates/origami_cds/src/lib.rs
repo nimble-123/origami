@@ -28,6 +28,31 @@ pub fn format(
     opaque: &BTreeSet<UnitId>,
     identity: bool,
 ) -> LangResult {
+    format_with(src, lang, opts, quarantine, opaque, identity, false)
+}
+
+/// Like [`format`], and also records the rule spans for explanations
+/// (`LangResult::rule_spans`). The output is the same.
+pub fn format_explained(
+    src: &SourceText,
+    lang: Language,
+    opts: &LangOptions,
+    quarantine: &BTreeSet<UnitId>,
+    opaque: &BTreeSet<UnitId>,
+    identity: bool,
+) -> LangResult {
+    format_with(src, lang, opts, quarantine, opaque, identity, true)
+}
+
+fn format_with(
+    src: &SourceText,
+    lang: Language,
+    opts: &LangOptions,
+    quarantine: &BTreeSet<UnitId>,
+    opaque: &BTreeSet<UnitId>,
+    identity: bool,
+    explain: bool,
+) -> LangResult {
     let stream = match lex(src, lang) {
         Ok(s) => s,
         Err(d) => return LangResult::failed(d),
@@ -44,7 +69,15 @@ pub fn format(
             tokens: TokenIndex(u.first as u32)..TokenIndex(u.last as u32 + 1),
         })
         .collect();
-    let doc = layout::layout(src.text(), &stream, lang, &cds_units, quarantine, opaque);
+    let (doc, rule_spans) = layout::layout(
+        src.text(),
+        &stream,
+        lang,
+        &cds_units,
+        quarantine,
+        opaque,
+        explain,
+    );
     let print_opts = PrintOptions {
         width: opts.line_width,
         indent: opts.indent_width,
@@ -62,5 +95,6 @@ pub fn format(
             statements: n,
             ..Stats::default()
         },
+        rule_spans,
     }
 }

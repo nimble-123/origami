@@ -2,10 +2,11 @@
 //!
 //! Reads the rule IDs and `Milestone:` lines from `docs/STYLE.md`. For every
 //! rule up to `CURRENT_MILESTONE` it checks `format(input) == expected`,
-//! `format(expected) == expected`, and that no W001 or X001 is reported. It
+//! `format(expected) == expected`, that no W001 or X001 is reported and that
+//! `explain` returns the same result as `format`. It
 //! also checks that every rule has a directory and every directory a rule.
 
-use origami_core::{Code, LanguageHint, Options, format};
+use origami_core::{Code, LanguageHint, Options, explain, format};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -95,6 +96,11 @@ fn style_rules() {
         for (label, bytes) in [("input", &in_bytes), ("expected", &exp_bytes)] {
             let hint = LanguageHint::Path(input.to_string_lossy().into_owned());
             let r = format(bytes, &hint, &opts);
+            assert_eq!(
+                explain(bytes, &hint, &opts, &[]).result,
+                r,
+                "{id}: explain differs from format on {label}"
+            );
             assert!(
                 !r.has(Code::W001) && !r.has(Code::X001),
                 "{id}: self-check problem on {label}"

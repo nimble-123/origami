@@ -6,7 +6,7 @@
 
 use crate::kinds::*;
 use origami_layout::{Doc, builder as b};
-use origami_syntax::{Language, TokenIndex, TokenStream, UnitId};
+use origami_syntax::{Language, RuleSpan, TokenIndex, TokenStream, UnitId};
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -255,8 +255,10 @@ pub fn layout(
     units: &[CdsUnit],
     quarantine: &BTreeSet<UnitId>,
     opaque: &BTreeSet<UnitId>,
-) -> Doc {
+    explain: bool,
+) -> (Doc, Vec<RuleSpan>) {
     let mut docs = Vec::with_capacity(units.len());
+    let mut spans = Vec::new();
     for (id, u) in units.iter().enumerate() {
         let first = TokenIndex(u.first as u32);
         let last = TokenIndex(u.last as u32);
@@ -268,12 +270,7 @@ pub fn layout(
         } else if quarantine.contains(&uid) {
             b::verbatim(first, last, blank)
         } else {
-            let g = crate::grammar::G {
-                text,
-                stream,
-                first: u.first,
-                blank,
-            };
+            let g = crate::grammar::G::new(text, stream, u.first, blank, explain);
             let parsed = match u.kind {
                 Kind::Annotation => g.annotation(u.first, u.last),
                 Kind::Element => g.header(u.first, u.last, lang).or_else(|| match lang {
@@ -283,7 +280,13 @@ pub fn layout(
                 }),
                 _ => None,
             };
-            parsed.unwrap_or_else(|| b::unknown(first, last, blank))
+            match parsed {
+                Some(d) => {
+                    spans.extend(g.spans.into_inner());
+                    d
+                }
+                None => b::unknown(first, last, blank),
+            }
         };
         let glued = stream.tokens[u.first].glued;
         let start = if id == 0 || glued {
@@ -294,5 +297,5 @@ pub fn layout(
         let level = u.depth + u.extra;
         docs.push((0..level).fold(b::concat(vec![start, body]), |d, _| b::indent(vec![d])));
     }
-    b::concat(docs)
+    (b::concat(docs), spans)
 }

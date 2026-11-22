@@ -8,7 +8,7 @@
 
 use crate::kinds::*;
 use origami_layout::{AlignItem, Doc, builder as b};
-use origami_syntax::{TokenIndex, TokenStream};
+use origami_syntax::{RuleId, RuleSpan, TokenIndex, TokenStream};
 
 pub struct Ctx<'a> {
     pub text: &'a str,
@@ -17,6 +17,50 @@ pub struct Ctx<'a> {
     pub commented: &'a [bool],
     /// Tokens recognized as keywords.
     pub keywords: Vec<usize>,
+    /// Record rule spans (explanations requested).
+    pub explain: bool,
+    /// Constructs and their layout rules; only filled when `explain`.
+    pub rule_spans: Vec<RuleSpan>,
+}
+
+/// State of a [`Ctx`] before a parse attempt, to roll back a failed one.
+#[derive(Debug, Clone, Copy)]
+pub struct Mark {
+    keywords: usize,
+    spans: usize,
+}
+
+impl Ctx<'_> {
+    pub fn mark(&self) -> Mark {
+        Mark {
+            keywords: self.keywords.len(),
+            spans: self.rule_spans.len(),
+        }
+    }
+
+    /// Drops the keywords and spans recorded since `m`.
+    pub fn reset(&mut self, m: Mark) {
+        self.keywords.truncate(m.keywords);
+        self.rule_spans.truncate(m.spans);
+    }
+
+    /// Drops only the spans since `m`: a sub-span printed as written after a
+    /// partly successful parse keeps its keywords (their case), as before.
+    pub fn reset_spans(&mut self, m: Mark) {
+        self.rule_spans.truncate(m.spans);
+    }
+
+    /// Records that tokens `first..=last` are laid out by `rule`.
+    #[allow(dead_code)] // first used by the rule spans (explain design, Stage 3)
+    pub fn span(&mut self, first: usize, last: usize, rule: RuleId) {
+        if self.explain {
+            self.rule_spans.push(RuleSpan {
+                first: TokenIndex(first as u32),
+                last: TokenIndex(last as u32),
+                rule,
+            });
+        }
+    }
 }
 
 pub const PARAM_KEYWORDS: &[&str] = &[
@@ -271,6 +315,7 @@ impl<'c, 'a> P<'c, 'a> {
             LPAREN => {
                 let close = self.matching(i)?;
                 self.pos = i + 1;
+                let mark = self.c.mark();
                 match self.expr() {
                     Some(inner) if self.pos == close => docs.push(b::group(vec![
                         self.t(i),
@@ -279,7 +324,10 @@ impl<'c, 'a> P<'c, 'a> {
                         self.sp(close),
                         self.t(close),
                     ])),
-                    _ => docs.push(self.raw(i, close)),
+                    _ => {
+                        self.c.reset_spans(mark);
+                        docs.push(self.raw(i, close))
+                    }
                 }
                 self.pos = close + 1;
             }
@@ -383,7 +431,7 @@ impl<'c, 'a> P<'c, 'a> {
         if rp == lp + 1 {
             return Some(self.flat(lp, rp));
         }
-        let saved_kw = self.c.keywords.len();
+        let saved_kw = self.c.mark();
         let mut inner = P {
             c: &mut *self.c,
             pos: lp + 1,
@@ -401,7 +449,7 @@ impl<'c, 'a> P<'c, 'a> {
         match parsed {
             Some(d) => Some(d),
             None => {
-                self.c.keywords.truncate(saved_kw);
+                self.c.reset(saved_kw);
                 Some(self.raw(lp, rp))
             }
         }
@@ -519,6 +567,7 @@ impl<'c, 'a> P<'c, 'a> {
                     return None;
                 }
                 let close = self.matching(open)?;
+                let mark = self.c.mark();
                 let row = {
                     let mut inner = P {
                         c: &mut *self.c,
@@ -543,7 +592,10 @@ impl<'c, 'a> P<'c, 'a> {
                         self.sp(close),
                         self.t(close),
                     ]),
-                    None => self.raw(open, close),
+                    None => {
+                        self.c.reset_spans(mark);
+                        self.raw(open, close)
+                    }
                 };
                 if !items.is_empty() {
                     items.push(self.ln(open));
@@ -657,6 +709,7 @@ impl<'c, 'a> P<'c, 'a> {
         if self.kind(self.pos) == LPAREN && !self.glued(self.pos) {
             let lp = self.pos;
             let rp = self.matching(lp)?;
+            let mark = self.c.mark();
             let inner = {
                 let mut q = P {
                     c: &mut *self.c,
@@ -677,7 +730,10 @@ impl<'c, 'a> P<'c, 'a> {
                     self.sp(rp),
                     self.t(rp),
                 ]),
-                None => self.raw(lp, rp),
+                None => {
+                    self.c.reset_spans(mark);
+                    self.raw(lp, rp)
+                }
             });
             self.pos = rp + 1;
             return Some(b::concat(docs));
@@ -797,7 +853,7 @@ impl<'c, 'a> P<'c, 'a> {
     /// Assignment `target op expr.` or standalone call `operand( … ).`.
     pub fn assignment_or_call(&mut self) -> Option<Doc> {
         let start = self.pos;
-        let saved_kw = self.c.keywords.len();
+        let saved_kw = self.c.mark();
         if let Some(target) = self.operand() {
             let op = self.pos;
             if !self.at_end()
@@ -837,7 +893,7 @@ impl<'c, 'a> P<'c, 'a> {
             }
         }
         self.pos = start;
-        self.c.keywords.truncate(saved_kw);
+        self.c.reset(saved_kw);
         None
     }
 }
@@ -909,3 +965,34 @@ const CTOR_TAKES_OPERAND: &[&str] = &[
     "BASE", "FOR", "IN", "INTO", "UNTIL", "WHILE", "THEN", "NEXT", "INIT", "LET", "MAPPING",
     "EXCEPT", "DEFAULT", "WHEN", "ELSE", "KEY", "GROUPS", "OF", "BY", "STEP",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::Ctx;
+    use origami_syntax::TokenStream;
+
+    #[test]
+    fn reset_drops_spans_of_a_failed_attempt() {
+        let stream = TokenStream::default();
+        let mut c = Ctx {
+            text: "",
+            stream: &stream,
+            commented: &[],
+            keywords: vec![1],
+            explain: true,
+            rule_spans: Vec::new(),
+        };
+        c.span(0, 3, "ABAP-STMT-001");
+        let m = c.mark();
+        c.keywords.push(2);
+        c.span(1, 2, "ABAP-CALL-001");
+        c.reset_spans(m);
+        assert_eq!((c.keywords.len(), c.rule_spans.len()), (2, 1));
+        c.span(1, 2, "ABAP-CALL-001");
+        c.reset(m);
+        assert_eq!((c.keywords.len(), c.rule_spans.len()), (1, 1));
+        c.explain = false;
+        c.span(1, 2, "ABAP-CALL-001");
+        assert_eq!(c.rule_spans.len(), 1);
+    }
+}
