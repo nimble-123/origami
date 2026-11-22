@@ -53,6 +53,11 @@ pub struct Args {
     #[arg(long, requires = "check")]
     pub diff: bool,
 
+    /// Show the changes origami would make, with notes on introduced line
+    /// breaks; writes nothing (implies --check).
+    #[arg(long, conflicts_with_all = ["diff", "write"])]
+    pub review: bool,
+
     /// Exit 5 if any warning was emitted.
     #[arg(long)]
     pub strict: bool,
@@ -130,6 +135,11 @@ impl Args {
                 DiagFormat::Human
             }
         })
+    }
+
+    /// Write nothing and report what would change: `--check` or `--review`.
+    pub fn check_mode(&self) -> bool {
+        self.check || self.review
     }
 
     pub fn stdin_mode(&self) -> bool {

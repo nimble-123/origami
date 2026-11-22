@@ -4,7 +4,9 @@ use crate::args::{Args, DiagFormat};
 use crate::config::{self, ConfigIssue, FileConfig, Resolver};
 use crate::report::{self, FileReport, Run};
 use origami_core::detect::LanguageHint;
-use origami_core::{Code, Edition, Language, Options, Reported, Severity, Status, format_lines};
+use origami_core::{
+    Code, Edition, Language, Options, Reported, Severity, Status, explain, format_lines,
+};
 use rayon::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -285,7 +287,15 @@ fn stdin_mode(args: &Args) -> i32 {
         Some(n) => LanguageHint::StdinPath(n.clone()),
         None => LanguageHint::None,
     });
-    let r = format_lines(&input, &hint, &opts, &ranges);
+    let (r, view) = if args.review {
+        let e = explain(&input, &hint, &opts, &ranges);
+        let path = name.as_deref().unwrap_or("<stdin>");
+        let color = report::color_enabled(report::Stream::Stdout);
+        let view = report::review::render(path, &input, &e, color);
+        (e.result, Some(view))
+    } else {
+        (format_lines(&input, &hint, &opts, &ranges), None)
+    };
     let mut report = FileReport {
         path: name.unwrap_or_else(|| "<stdin>".into()),
         language: r.language,
@@ -297,7 +307,7 @@ fn stdin_mode(args: &Args) -> i32 {
     annotate_panic(&mut report.diagnostics);
     let success = matches!(report.status, Status::Formatted | Status::Unchanged);
     if success
-        && !args.check
+        && !args.check_mode()
         && let Some(out) = &r.output
     {
         let mut stdout = std::io::stdout().lock();
@@ -312,11 +322,14 @@ fn stdin_mode(args: &Args) -> i32 {
     {
         print!("{}", report::diff::unified(&report.path, &input, out));
     }
+    if let Some(view) = view.filter(|_| success) {
+        print!("{view}");
+    }
     let mut all = configs.warnings();
     all.push(report);
     print_diagnostics(args, &all);
     all.iter().fold(0, |acc, f| {
-        worst(acc, exit_code(f, args.check, args.strict))
+        worst(acc, exit_code(f, args.check_mode(), args.strict))
     })
 }
 
@@ -371,6 +384,8 @@ fn path_mode(args: &Args) -> i32 {
         }
     }
 
+    let color = report::color_enabled(report::Stream::Stdout);
+    // `diff`: the unified diff (`--diff`) or the review view (`--review`).
     let process = |path: &PathBuf| -> (FileReport, Option<String>) {
         // Paths found by walking `.` are shown without the `./` prefix.
         let display = path.strip_prefix(".").unwrap_or(path).display().to_string();
@@ -388,12 +403,20 @@ fn path_mode(args: &Args) -> i32 {
         };
         let opts = &opts_by_dir[&dir_of(path)];
         let ranges = ranges_of[path].as_deref().unwrap_or(&[]);
-        let r = format_lines(&input, &LanguageHint::Path(display.clone()), opts, ranges);
+        let hint = LanguageHint::Path(display.clone());
+        let mut diff = None;
+        let r = if args.review {
+            let e = explain(&input, &hint, opts, ranges);
+            let view = report::review::render(&display, &input, &e, color);
+            diff = Some(view).filter(|v| !v.is_empty());
+            e.result
+        } else {
+            format_lines(&input, &hint, opts, ranges)
+        };
         let mut diagnostics = r.diagnostics;
         annotate_panic(&mut diagnostics);
-        let mut diff = None;
         if let (true, Some(out)) = (r.changed, &r.output) {
-            if args.check {
+            if args.check_mode() {
                 if args.diff {
                     diff = Some(report::diff::unified(&display, &input, out));
                 }
@@ -434,7 +457,7 @@ fn path_mode(args: &Args) -> i32 {
     reports.extend(results.into_iter().map(|(r, _)| r));
     print_diagnostics(args, &reports);
     reports.iter().fold(0, |acc, f| {
-        worst(acc, exit_code(f, args.check, args.strict))
+        worst(acc, exit_code(f, args.check_mode(), args.strict))
     })
 }
 
@@ -442,7 +465,7 @@ fn print_diagnostics(args: &Args, files: &[FileReport]) {
     let run = Run {
         files,
         max_diagnostics: args.max_diagnostics,
-        check: args.check,
+        check: args.check_mode(),
     };
     let mut err = std::io::stderr().lock();
     let _ = match args.diag_format() {

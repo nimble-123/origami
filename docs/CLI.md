@@ -17,6 +17,9 @@ origami [OPTIONS] [PATHS...]
   --write               rewrite files in place (default for PATHS)
   --check               write nothing; exit 1 if any file would change
   --diff                with --check: print a unified diff to stdout
+  --review              show the changes with notes on introduced line breaks
+                        (stdout); writes nothing, implies --check; not with
+                        --diff or --write
   --strict              exit 5 if any warning was emitted
   --lines START:END     format only changes that touch these lines (1-based,
                         inclusive, repeatable); stdin mode or one file
@@ -82,17 +85,54 @@ Configuration discovery, the self-check and the diagnostic codes are the same
 as on the command line. Nothing is written unless `format_files` gets
 `"write": true`.
 
+## Review view (`--review`)
+
+`origami --review` shows what origami would change, for people: for each file
+that would change, a header with the path and counts, then each change with
+two lines of context, old and new line numbers, removed (`-`) and added (`+`)
+lines, and within changed lines only the changed characters highlighted.
+Below each construct whose line breaks origami introduced, a note says why
+(see "Line-break notes" in [STYLE.md](STYLE.md)):
+
+```text
+zcl_travel.clas.abap  (1 change, 1 note)
+ 41 41 │   METHOD validate.
+ 42    │-    ls_res = zcl_check=>run( iv_id = ls_travel-id iv_date = sy-datum iv_mode = 'X' ).
+    42 │+    ls_res = zcl_check=>run( iv_id   = ls_travel-id
+    43 │+                             iv_date = sy-datum
+    44 │+                             iv_mode = 'X' ).
+       │   ↳ ABAP-CALL-001: one parameter per line, because the call would end at column 134 (limit 120)
+ 43 45 │   ENDMETHOD.
+```
+
+* Exit codes as for `--check`; files are never written. Works on paths, on
+  stdin, with `--lines` and with `--changed` (only the kept changes and their
+  notes are shown).
+* Colors only when stdout is a terminal (`NO_COLOR` and `CLICOLOR_FORCE` as for
+  the diagnostics). Without colors, changed characters are marked `[-…-]`
+  (removed) and `{+…+}` (added).
+* The view shows the text with LF line ends and without a byte-order mark;
+  the header says `CRLF` or `BOM` when the file has them.
+* Control characters from the source are shown escaped (`\x1b`, `\u{202e}`).
+* The view and its notes are for reading: their layout and wording may change
+  in any release. Scripts and `git apply` use `--check --diff`, whose output
+  stays a plain unified diff. A colored diff of that output is also
+  available through a diff viewer: `origami --check --diff | delta`.
+
 ## Streams
 
-* **stdout** carries only formatted text (stdin mode) or the diff (`--diff`).
+* **stdout** carries only formatted text (stdin mode), the diff (`--diff`) or
+  the review view (`--review`).
 * **stderr** carries diagnostics in every format.
 
 ## stdin mode
 
 * Success means file status `formatted` or `unchanged`, even when the exit
   code is 5. The formatted text then goes to stdout.
-* With `--check`, stdout stays empty, and the exit code is 1 if the input would
-  change.
+* With `--check`, stdout carries nothing but the diff (`--diff`), and the exit
+  code is 1 if the input would change.
+* With `--review`, stdout carries the review view instead of the formatted
+  text.
 * On any error, stdout stays empty. Never write empty stdout back to a source.
 * Language: `--language`, else the `--stdin-filepath` name, else content
   sniffing. A name that matches no pattern falls back to sniffing.

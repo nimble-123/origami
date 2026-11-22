@@ -256,7 +256,7 @@ pub fn write(run: &Run, out: &mut dyn Write) -> std::io::Result<()> {
     let hint = if errors > 0 {
         Some("files with errors were left unchanged; fix them and run origami again")
     } else if run.check && changed > 0 {
-        Some("run `origami` to format, or `origami --check --diff` to see the changes")
+        Some("run `origami` to format, or `origami --review` to see the changes")
     } else {
         None
     };

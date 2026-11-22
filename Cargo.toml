@@ -33,7 +33,7 @@ semver = "1.0"
 ignore = "0.4"
 rayon = "1.12"
 tempfile = "3.27"
-similar = "3.2"
+similar = { version = "3.2", features = ["inline"] }
 criterion = "0.8"
 assert_cmd = "2.2"
 jsonschema = "0.62"

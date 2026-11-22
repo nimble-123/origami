@@ -18,6 +18,13 @@ same output. Raise the range in a pull request when you move to a new version.
 
 ## 2. Format everything once, in its own commit
 
+Look first: `origami --review` shows every change origami would make, with a
+note below each line break it introduces ("ABAP-CALL-001: one parameter per
+line, because the call would end at column 134 (limit 120)"). It writes
+nothing. A plain diff, for example in a diff viewer, comes from
+`origami --check --diff | delta`. In VS Code, "origami: Preview Changes" shows
+the formatting of the open file in the diff view.
+
 ```sh
 origami                     # formats all supported files below .
 git commit -am "Format with origami"
