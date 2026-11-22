@@ -1,6 +1,6 @@
-// One formatting request: spawn origami with the document text on stdin.
+// One formatting request: spawn origami with a text on stdin.
 //
-// Exit 0 or 5: apply the edits. Exit 2: structural error, no edits, show the
+// Exit 0 or 5: the formatted text (or none if nothing changes). Exit 2: structural error, no edits, show the
 // diagnostics. Any other exit, a timeout or a cancellation: no edits.
 
 import * as vscode from "vscode";
@@ -11,13 +11,23 @@ import { JsonRun, parseRun } from "./diagnosticsModel";
 import { Resolved } from "./binary";
 import { targetFor } from "./uri";
 
+export type Status = "ok" | "error" | "timeout" | "failed";
+
 export interface Outcome {
   edits: vscode.TextEdit[];
   run?: JsonRun;
-  status: "ok" | "error" | "timeout" | "failed";
+  status: Status;
 }
 
-const TIMEOUT_MS = 2000;
+export interface TextOutcome {
+  /** The formatted text; undefined if nothing changes or on failure. */
+  text?: string;
+  run?: JsonRun;
+  status: Status;
+}
+
+/** Timeout of a formatting request from the editor. */
+export const FORMAT_TIMEOUT_MS = 2000;
 
 /** 1-based inclusive line ranges for `--lines`; a range that ends at
  * column 0 of a later line does not include that line. */
@@ -32,13 +42,39 @@ export function linesArgs(ranges: readonly vscode.Range[]): string[] {
   });
 }
 
-export function formatDocument(
+export async function formatDocument(
   document: vscode.TextDocument,
   resolved: Resolved,
   token: vscode.CancellationToken,
   log: (m: string) => void,
   ranges: readonly vscode.Range[] = [],
 ): Promise<Outcome> {
+  const original = document.getText();
+  const o = await formatText(original, document, resolved, token, log, ranges, FORMAT_TIMEOUT_MS);
+  const edits =
+    o.text === undefined
+      ? []
+      : computeEdits(original, o.text).map(
+          (e) =>
+            new vscode.TextEdit(
+              new vscode.Range(e.start.line, e.start.character, e.end.line, e.end.character),
+              e.text,
+            ),
+        );
+  return { edits, run: o.run, status: o.status };
+}
+
+/** Formats `text` as the content of `document` (its name, language and
+ * configuration). */
+export function formatText(
+  text: string,
+  document: vscode.TextDocument,
+  resolved: Resolved,
+  token: vscode.CancellationToken,
+  log: (m: string) => void,
+  ranges: readonly vscode.Range[],
+  timeoutMs: number,
+): Promise<TextOutcome> {
   const target = targetFor(document);
   const args = ["--stdin", "--stdin-filepath", target.name, "--diagnostics=json", ...linesArgs(ranges)];
   if (target.language) {
@@ -58,7 +94,7 @@ export function formatDocument(
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const finish = (o: Outcome) => {
+    const finish = (o: TextOutcome) => {
       if (!settled) {
         settled = true;
         clearTimeout(timer);
@@ -67,11 +103,11 @@ export function formatDocument(
     };
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
-      finish({ edits: [], status: "timeout" });
-    }, TIMEOUT_MS);
+      finish({ status: "timeout" });
+    }, timeoutMs);
     token.onCancellationRequested(() => {
       child.kill("SIGKILL");
-      finish({ edits: [], status: "failed" });
+      finish({ status: "failed" });
     });
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
@@ -79,7 +115,7 @@ export function formatDocument(
     child.stderr.on("data", (d: string) => (stderr += d));
     child.on("error", (err) => {
       log(`origami: cannot start ${resolved.binary}: ${err.message}`);
-      finish({ edits: [], status: "failed" });
+      finish({ status: "failed" });
     });
     child.on("close", (code) => {
       if (stderr) {
@@ -87,26 +123,18 @@ export function formatDocument(
       }
       const run = parseRun(stderr);
       if (code === 0 || code === 5) {
-        const original = document.getText();
-        const changed = run?.files[0]?.changed ?? stdout !== original;
+        const changed = run?.files[0]?.changed ?? stdout !== text;
         if (!changed || stdout.length === 0) {
-          finish({ edits: [], run, status: "ok" });
+          finish({ run, status: "ok" });
           return;
         }
-        const edits = computeEdits(original, stdout).map(
-          (e) =>
-            new vscode.TextEdit(
-              new vscode.Range(e.start.line, e.start.character, e.end.line, e.end.character),
-              e.text,
-            ),
-        );
-        finish({ edits, run, status: "ok" });
+        finish({ text: stdout, run, status: "ok" });
       } else if (code === 2) {
-        finish({ edits: [], run, status: "error" });
+        finish({ run, status: "error" });
       } else {
-        finish({ edits: [], run, status: "failed" });
+        finish({ run, status: "failed" });
       }
     });
-    child.stdin.end(document.getText(), "utf8");
+    child.stdin.end(text, "utf8");
   });
 }
