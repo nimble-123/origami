@@ -592,7 +592,9 @@ impl<'c, 'a> P<'c, 'a> {
                         period_at: close,
                     };
                     if inner.is_named_row(open + 1) {
-                        inner.rows().map(b::align)
+                        // A parameter keyword ends the rows early; the row
+                        // must still be used up, or its rest would be lost.
+                        inner.rows().filter(|_| inner.at_end()).map(b::align)
                     } else {
                         inner.expr().filter(|_| inner.at_end())
                     }
