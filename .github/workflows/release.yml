@@ -32,8 +32,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { target: x86_64-apple-darwin, os: macos-14, tool: cargo, vscode: darwin-x64 }
-          - { target: aarch64-apple-darwin, os: macos-14, tool: cargo, vscode: darwin-arm64 }
+          - { target: x86_64-apple-darwin, os: macos-latest, tool: cargo, vscode: darwin-x64 }
+          - { target: aarch64-apple-darwin, os: macos-latest, tool: cargo, vscode: darwin-arm64 }
           - { target: x86_64-pc-windows-msvc, os: windows-latest, tool: cargo, vscode: win32-x64 }
           - { target: aarch64-pc-windows-msvc, os: windows-latest, tool: cargo, vscode: win32-arm64 }
           - { target: x86_64-unknown-linux-gnu.2.17, os: ubuntu-latest, tool: zigbuild, vscode: linux-x64 }
