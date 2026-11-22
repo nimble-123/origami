@@ -10,5 +10,7 @@ python3 docs/diagrams/build.py          # writes pipeline*.html, benchmark*.html
 python3 docs/demo/terminal.py           # docs/assets/review-demo*.svg (needs target/release/origami)
 ```
 
-The benchmark numbers come from [docs/benchmark-abap-cleaner.md](../benchmark-abap-cleaner.md);
-update both together.
+The benchmark charts (`benchmark`, `latency`, `threads`) read
+[docs/benchmark-data.json](../benchmark-data.json), which
+`cargo xtask bench-matrix` writes together with [docs/benchmark.md](../benchmark.md).
+After a new measurement, run `build.py` and export the SVGs again.

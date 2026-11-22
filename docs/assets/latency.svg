@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="latency-title latency-desc" id="latency-root">
+        <title id="latency-title">How long one call takes</title>
+        <desc id="latency-desc">Dumbbell chart, log scale, of the median and 99th percentile time per call: origami in process, through MCP, in WebAssembly and as a new process, and ABAP Cleaner with a warm and with a new JVM.</desc>
+        <defs>
+      <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');
+      #latency-root { font-family: 'Schibsted Grotesk', system-ui, sans-serif; color: #18214d; }
+      #latency-root .diagram-container { width: 100%; overflow-x: auto; }
+      #latency-root p.caption { color: #4a5478; font-size: 0.9rem; margin-top: 1rem; max-width: 68ch; }
+      @media print {
+#latency-root .diagram-container { overflow-x: visible; }
+}</style>
+          <marker id="latency-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4a5478"/></marker>
+          <marker id="latency-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2456d6"/></marker>
+          <marker id="latency-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2456d6"/></marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#f4f6f9"/>
+        <line x1="280" y1="40" x2="280" y2="420" stroke="#18214d" stroke-width="1" stroke-opacity="0.25"/>
+        <text x="280" y="440" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">0.01 ms</text>
+        <line x1="412" y1="40" x2="412" y2="420" stroke="#18214d" stroke-width="0.8" stroke-opacity="0.08"/>
+        <text x="412" y="440" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">0.1 ms</text>
+        <line x1="544" y1="40" x2="544" y2="420" stroke="#18214d" stroke-width="0.8" stroke-opacity="0.08"/>
+        <text x="544" y="440" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">1 ms</text>
+        <line x1="676" y1="40" x2="676" y2="420" stroke="#18214d" stroke-width="0.8" stroke-opacity="0.08"/>
+        <text x="676" y="440" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">10 ms</text>
+        <line x1="808" y1="40" x2="808" y2="420" stroke="#18214d" stroke-width="0.8" stroke-opacity="0.08"/>
+        <text x="808" y="440" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">100 ms</text>
+        <line x1="940" y1="40" x2="940" y2="420" stroke="#18214d" stroke-width="0.8" stroke-opacity="0.08"/>
+        <text x="940" y="440" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">1000 ms</text>
+        <text x="610" y="456" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">milliseconds per call, log scale</text>
+        <line x1="395" y1="76" x2="621" y2="76" stroke="#18214d" stroke-width="1" stroke-opacity="0.55"/>
+        <circle cx="395" cy="76" r="6" fill="#f4f6f9" stroke="#4a5478" stroke-width="1.5"/>
+        <circle cx="621" cy="76" r="6" fill="#2456d6" stroke="#18214d" stroke-width="1"/>
+        <text x="383" y="80" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">0.07</text>
+        <text x="633" y="80" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace">3.9</text>
+        <text x="256" y="80" fill="#18214d" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">origami, in process</text>
+        <line x1="449" y1="140" x2="642" y2="140" stroke="#18214d" stroke-width="1" stroke-opacity="0.55"/>
+        <circle cx="449" cy="140" r="6" fill="#f4f6f9" stroke="#4a5478" stroke-width="1.5"/>
+        <circle cx="642" cy="140" r="6" fill="#2456d6" stroke="#18214d" stroke-width="1"/>
+        <text x="437" y="144" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">0.19</text>
+        <text x="654" y="144" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace">5.5</text>
+        <text x="256" y="144" fill="#18214d" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">origami, MCP request</text>
+        <line x1="459" y1="204" x2="683" y2="204" stroke="#18214d" stroke-width="1" stroke-opacity="0.55"/>
+        <circle cx="459" cy="204" r="6" fill="#f4f6f9" stroke="#4a5478" stroke-width="1.5"/>
+        <circle cx="683" cy="204" r="6" fill="#2456d6" stroke="#18214d" stroke-width="1"/>
+        <text x="447" y="208" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">0.23</text>
+        <text x="695" y="208" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace">11</text>
+        <text x="256" y="208" fill="#18214d" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">origami, WebAssembly</text>
+        <line x1="578" y1="268" x2="583" y2="268" stroke="#18214d" stroke-width="1" stroke-opacity="0.55"/>
+        <circle cx="578" cy="268" r="6" fill="#f4f6f9" stroke="#4a5478" stroke-width="1.5"/>
+        <circle cx="583" cy="268" r="6" fill="#2456d6" stroke="#18214d" stroke-width="1"/>
+        <text x="566" y="272" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">1.8</text>
+        <text x="595" y="272" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace">2.0</text>
+        <text x="256" y="272" fill="#18214d" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">origami, new process</text>
+        <line x1="584" y1="332" x2="778" y2="332" stroke="#18214d" stroke-width="1" stroke-opacity="0.55"/>
+        <circle cx="584" cy="332" r="6" fill="#f4f6f9" stroke="#4a5478" stroke-width="1.5"/>
+        <circle cx="778" cy="332" r="6" fill="#2456d6" stroke="#18214d" stroke-width="1"/>
+        <text x="572" y="336" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">2.0</text>
+        <text x="790" y="336" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace">59</text>
+        <text x="256" y="336" fill="#18214d" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">ABAP Cleaner, warm JVM</text>
+        <line x1="874" y1="396" x2="878" y2="396" stroke="#18214d" stroke-width="1" stroke-opacity="0.55"/>
+        <circle cx="874" cy="396" r="6" fill="#f4f6f9" stroke="#4a5478" stroke-width="1.5"/>
+        <circle cx="878" cy="396" r="6" fill="#2456d6" stroke="#18214d" stroke-width="1"/>
+        <text x="862" y="400" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">314</text>
+        <text x="890" y="400" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace">340</text>
+        <text x="256" y="400" fill="#18214d" font-size="11" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="end">ABAP Cleaner, new JVM</text>
+        <line x1="30" y1="476" x2="930" y2="476" stroke="#18214d" stroke-width="0.8" stroke-opacity="0.10"/>
+        <circle cx="40" cy="493" r="5" fill="#f4f6f9" stroke="#4a5478" stroke-width="1.5"/>
+        <text x="52" y="497" fill="#4a5478" font-size="9" font-family="'Schibsted Grotesk', system-ui, sans-serif">median (p50)</text>
+        <circle cx="160" cy="493" r="5" fill="#2456d6" stroke="#18214d" stroke-width="1"/>
+        <text x="172" y="497" fill="#4a5478" font-size="9" font-family="'Schibsted Grotesk', system-ui, sans-serif">p99: 99 % of calls are faster</text>
+        <text x="930" y="497" fill="#4a5478" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end">new process: median-sized file, 91 lines</text>
+
+      </svg>

@@ -43,7 +43,7 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 - **Layout only.** Whitespace, line breaks, indentation and the case of ABAP keywords. origami never renames, reorders or rewrites a statement, so a formatted diff is easy to review.
 - **Checked, every time.** After formatting, origami lexes its own output and compares every token and comment with your file. If anything but layout differs, that statement is left as written. A file with a structural error is never touched.
 - **Explained.** `origami --review` shows the changes before anything is written, with a note on every line break origami adds: which rule, and at which column the line would have ended.
-- **Fast.** About 2 ms per file including start-up, 0.2 s for 1,650 files. Fast enough for format-on-save and pre-commit hooks ([benchmark](docs/benchmark-abap-cleaner.md)).
+- **Fast.** A median file takes 0.07 ms in process and 1.8 ms as a new process, start-up included; 99 % of files take under 4 ms. The whole 2,100-file test corpus takes 0.2 s. Fast enough for format-on-save, pre-commit hooks and agents ([benchmark](docs/benchmark.md)).
 - **Fits how SAP teams work.** abapGit repositories, ADT for VS Code documents, `--changed` for brownfield code, a GitHub Action, and an MCP server for AI agents.
 
 ## Features
@@ -185,13 +185,13 @@ format that ends with a `NEXT:` line.
 <div align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/benchmark-dark.svg">
-    <img alt="Time for 1,652 ABAP files on one thread: ABAP Cleaner default profile 10.44 s, essential profile 6.69 s, parse only 1.93 s; origami 0.70 s, 15 times faster." src="docs/assets/benchmark.svg" width="860">
+    <img alt="Time to process the test corpus: ABAP Cleaner, default profile, 11.41 s for 1,920 ABAP files; origami 0.74 s on one thread and 0.21 s on ten threads for all 2,147 files, 15 times faster." src="docs/assets/benchmark.svg" width="860">
   </picture>
 </div>
 
 ABAP Cleaner applies about 100 cleanup rules, several of which change code;
 origami only changes layout. The numbers compare the time to process the same
-files, not the same work ([method](docs/benchmark-abap-cleaner.md)).
+files, not the same work. Per-file latencies (p50, p95, p99), cold and warm starts, MCP, WebAssembly and thread scaling: [docs/benchmark.md](docs/benchmark.md).
 
 ## Supported files
 
@@ -212,6 +212,7 @@ files, not the same work ([method](docs/benchmark-abap-cleaner.md)).
 - [Invariants](docs/INVARIANTS.md): what "layout only" means and how it is checked
 - [Command line](docs/CLI.md): flags, exit codes, diagnostics, configuration
 - [CI](docs/ci.md) and [adopting origami in a team](docs/adoption.md)
+- [Performance](docs/benchmark.md): per-file latencies, cold and warm starts, agents, threads, ABAP Cleaner
 - [Design](docs/designs/origami.md) and [line-break explanations](docs/designs/origami-explain-review.md)
 - [Visual design](docs/brand.md)
 

@@ -1,5 +1,10 @@
 # Performance: origami vs ABAP Cleaner
 
+> The current, generated measurements (per-file percentiles, cold and warm
+> starts, MCP, WebAssembly, thread scaling, ABAP Cleaner warm and cold) are in
+> [benchmark.md](benchmark.md). This page keeps the first comparison and
+> explains how ABAP Cleaner is run.
+
 Measured on 2026-11-21. Apple M4 (10 cores), macOS, Temurin JDK 27.0.1,
 ABAP Cleaner 1.29.2 (GitHub release), origami at commit `ae9dc0f`.
 
@@ -28,10 +33,6 @@ number for ABAP Cleaner is a lower bound. The harness runs on one thread.
 
 ## Results
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/benchmark-dark.svg">
-  <img alt="Time for 1,652 ABAP files on one thread: ABAP Cleaner default profile 10.44 s, essential profile 6.69 s, parse only 1.93 s; origami 0.70 s." src="assets/benchmark.svg" width="860">
-</picture>
 
 Whole corpus, warm (third of three passes; ABAP Cleaner after JIT warm-up):
 

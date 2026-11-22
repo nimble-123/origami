@@ -12,7 +12,7 @@ rm -rf site/dist
 mkdir -p site/dist/assets
 cp site/index.html site/style.css site/app.js site/dist/
 cp target/wasm32-unknown-unknown/release/origami_wasm.wasm site/dist/origami.wasm
-for f in logo logo-dark pipeline pipeline-dark benchmark benchmark-dark review-demo review-demo-dark; do
+for f in logo logo-dark pipeline pipeline-dark benchmark benchmark-dark latency latency-dark review-demo review-demo-dark; do
   cp "docs/assets/$f.svg" site/dist/assets/
 done
 cp docs/assets/social-preview.png site/dist/assets/

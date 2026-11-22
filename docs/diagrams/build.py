@@ -4,9 +4,12 @@
 Palette and type: docs/brand.md. Run: python3 docs/diagrams/build.py
 Then export the SVGs for README and website (see docs/diagrams/README.md).
 """
+import json
+import math
 from pathlib import Path
 
 HERE = Path(__file__).parent
+DATA = json.loads((HERE.parent / "benchmark-data.json").read_text())
 
 SKINS = {
     "light": dict(paper="#f4f6f9", sheet="#ffffff", ink="#18214d", muted="#4a5478",
@@ -143,39 +146,140 @@ def pipeline(theme):
 def benchmark(theme):
     s = SKINS[theme]
     slug = "benchmark" if theme == "light" else "benchmark-dark"
-    rows = [("ABAP Cleaner, default profile", 10.44, False),
-            ("ABAP Cleaner, essential profile", 6.69, False),
-            ("ABAP Cleaner, parse only", 1.93, False),
-            ("origami, one thread", 0.70, True)]
-    x0, x1, ceil = 264, 904, 12
+    acb = DATA["abap_cleaner"]
+    threads = {r["threads"]: r["time"]["p50"] for r in DATA["corpus_by_threads"]}
+    one, ten = threads[1] / 1000, threads[10] / 1000
+    cleaner = acb["corpus_warm_ms"] / 1000
+    rows = [("ABAP Cleaner, default profile", cleaner, False),
+            ("origami, one thread", one, True),
+            ("origami, ten threads", ten, False)]
+    x0, x1 = 264, 904
+    ceil = math.ceil(cleaner / 2) * 2
     px = (x1 - x0) / ceil
     body = ""
     for t in range(0, ceil + 1, 2):
         x = round(x0 + t * px)
         stroke = f"rgba({s['ink_rgb']},0.25)" if t == 0 else f"rgba({s['ink_rgb']},0.08)"
-        body += f'        <line x1="{x}" y1="40" x2="{x}" y2="292" stroke="{stroke}" stroke-width="{1 if t == 0 else 0.8}"/>\n'
-        body += f'        <text x="{x}" y="312" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="middle">{t} s</text>\n'
+        body += f'        <line x1="{x}" y1="40" x2="{x}" y2="232" stroke="{stroke}" stroke-width="{1 if t == 0 else 0.8}"/>\n'
+        body += f'        <text x="{x}" y="252" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="middle">{t} s</text>\n'
     for i, (name, v, focal) in enumerate(rows):
         y = 56 + i * 60
-        w = round(v * px)
+        w = max(2, round(v * px))
         fill = s["accent_tint"] if focal else f"rgba({s['ink_rgb']},0.06)"
         stroke = s["accent"] if focal else s["series1"]
         body += f'        <rect x="{x0}" y="{y}" width="{w}" height="32" fill="{s["paper"]}"/>\n'
         body += f'        <rect x="{x0}" y="{y}" width="{w}" height="32" fill="{fill}" stroke="{stroke}" stroke-width="1"/>\n'
         body += (f'        <text x="{x0 - 12}" y="{y + 20}" fill="{s["ink"]}" font-size="12" font-weight="600"'
                  f' font-family="{SANS}" text-anchor="end">{name}</text>\n')
-        val = f"{v:.2f} s" + (", 15× faster" if focal else "")
+        val = f"{v:.2f} s" + (f", {cleaner / v:.0f}× faster" if focal else "")
         body += (f'        <text x="{x0 + w + 10}" y="{y + 20}" fill="{s["accent"] if focal else s["muted"]}"'
                  f' font-size="9" font-family="{MONO}">{val}</text>\n')
-    body += (f'        <text x="584" y="336" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="middle"'
-             f' letter-spacing="0.04em">time for 1,652 ABAP files (426,831 lines), one thread, warm</text>\n')
+    n_abap = DATA["corpus"]["abap_files"]
+    n_all = DATA["corpus"]["files"]
+    body += (f'        <text x="584" y="276" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="middle"'
+             f' letter-spacing="0.04em">time for the test corpus: ABAP Cleaner {n_abap:,} ABAP files, origami all {n_all:,} files</text>\n')
     title = "Formatting the whole test corpus"
-    desc = ("Bar chart of the time to process 1,652 ABAP files: ABAP Cleaner takes 10.44 s with its "
-            "default profile, 6.69 s essential, 1.93 s parse only; origami takes 0.70 s on one thread.")
-    caption = ("Apple M4, 2026-11-21. ABAP Cleaner also changes code (about 100 rules); origami only "
-               "changes layout. With 10 threads origami takes 0.19 s. Method and numbers: "
-               "docs/benchmark-abap-cleaner.md.")
-    return page(slug, title, desc, 960, 352, body, s, caption)
+    desc = (f"Bar chart of the time to process the test corpus: ABAP Cleaner takes {cleaner:.2f} s with its "
+            f"default profile; origami takes {one:.2f} s on one thread and {ten:.2f} s on ten threads.")
+    caption = (f"{DATA['machine']['cpu']}, {DATA['date']}. ABAP Cleaner also changes code (about 100 rules); "
+               "origami only changes layout. Method and all numbers: docs/benchmark.md.")
+    return page(slug, title, desc, 960, 292, body, s, caption)
+
+
+LATENCY_ROWS = [
+    ("origami, in process", lambda d: d["per_file_in_process"]["format"]),
+    ("origami, MCP request", lambda d: d["mcp_per_request"]),
+    ("origami, WebAssembly", lambda d: d["wasm_per_file"]),
+    ("origami, new process", lambda d: d["one_file_cold_cli"][0]["time"]),
+    ("ABAP Cleaner, warm JVM", lambda d: d["abap_cleaner"]["per_file_warm"]),
+    ("ABAP Cleaner, new JVM", lambda d: d["abap_cleaner"]["one_file_cold"]),
+]
+
+
+def num(v):
+    """Milliseconds with sensible precision."""
+    return f"{v:.2f}" if v < 1 else f"{v:.1f}" if v < 10 else f"{v:.0f}"
+
+
+def latency(theme):
+    """Dumbbell on a log axis: p50 (hollow) to p99 (solid) per way of use."""
+    s = SKINS[theme]
+    slug = "latency" if theme == "light" else "latency-dark"
+    x0, x1, lo, hi = 280, 940, -2, 3          # 0.01 ms … 1000 ms
+    xs = lambda v: round(x0 + (math.log10(v) - lo) / (hi - lo) * (x1 - x0))
+    body = ""
+    for e in range(lo, hi + 1):
+        x = xs(10 ** e)
+        stroke = f"rgba({s['ink_rgb']},0.25)" if e == lo else f"rgba({s['ink_rgb']},0.08)"
+        body += f'        <line x1="{x}" y1="40" x2="{x}" y2="420" stroke="{stroke}" stroke-width="{1 if e == lo else 0.8}"/>\n'
+        label = f"{10 ** e:g} ms"
+        body += f'        <text x="{x}" y="440" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="middle">{label}</text>\n'
+    body += (f'        <text x="{(x0 + x1) // 2}" y="456" fill="{s["muted"]}" font-size="8" font-family="{MONO}" '
+             f'text-anchor="middle" letter-spacing="0.04em">milliseconds per call, log scale</text>\n')
+    connector = f"rgba({s['ink_rgb']},{0.55 if theme == 'light' else 0.40})"
+    for i, (name, get) in enumerate(LATENCY_ROWS):
+        st = get(DATA)
+        y = 76 + i * 64
+        a, b = xs(st["p50"]), xs(st["p99"])
+        body += f'        <line x1="{a}" y1="{y}" x2="{b}" y2="{y}" stroke="{connector}" stroke-width="1"/>\n'
+        body += f'        <circle cx="{a}" cy="{y}" r="6" fill="{s["paper"]}" stroke="{s["muted"]}" stroke-width="1.5"/>\n'
+        body += f'        <circle cx="{b}" cy="{y}" r="6" fill="{s["accent"]}" stroke="{s["ink"]}" stroke-width="1"/>\n'
+        body += (f'        <text x="{a - 12}" y="{y + 4}" fill="{s["muted"]}" font-size="8" font-family="{MONO}" '
+                 f'text-anchor="end">{num(st["p50"])}</text>\n')
+        body += (f'        <text x="{b + 12}" y="{y + 4}" fill="{s["muted"]}" font-size="8" font-family="{MONO}">{num(st["p99"])}</text>\n')
+        body += (f'        <text x="{x0 - 24}" y="{y + 4}" fill="{s["ink"]}" font-size="11" font-weight="600" '
+                 f'font-family="{SANS}" text-anchor="end">{name}</text>\n')
+    # Legend strip.
+    body += f'        <line x1="30" y1="476" x2="930" y2="476" stroke="rgba({s["ink_rgb"]},0.10)" stroke-width="0.8"/>\n'
+    body += f'        <circle cx="40" cy="493" r="5" fill="{s["paper"]}" stroke="{s["muted"]}" stroke-width="1.5"/>\n'
+    body += f'        <text x="52" y="497" fill="{s["muted"]}" font-size="9" font-family="{SANS}">median (p50)</text>\n'
+    body += f'        <circle cx="160" cy="493" r="5" fill="{s["accent"]}" stroke="{s["ink"]}" stroke-width="1"/>\n'
+    body += f'        <text x="172" y="497" fill="{s["muted"]}" font-size="9" font-family="{SANS}">p99: 99 % of calls are faster</text>\n'
+    body += (f'        <text x="930" y="497" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="end">'
+             f'new process: median-sized file, 91 lines</text>\n')
+    title = "How long one call takes"
+    desc = ("Dumbbell chart, log scale, of the median and 99th percentile time per call: origami in process, "
+            "through MCP, in WebAssembly and as a new process, and ABAP Cleaner with a warm and with a new JVM.")
+    caption = (f"{DATA['machine']['cpu']}, {DATA['date']}, every corpus file (in process) or every fourth "
+               "(MCP, WebAssembly); new process: 30 runs. All numbers: docs/benchmark.md.")
+    return page(slug, title, desc, 960, 512, body, s, caption)
+
+
+def scaling(theme):
+    s = SKINS[theme]
+    slug = "threads" if theme == "light" else "threads-dark"
+    rows = [(r["threads"], r["time"]["p50"]) for r in DATA["corpus_by_threads"]]
+    top = math.ceil(max(v for _, v in rows) / 200) * 200
+    y0, y1 = 360, 40
+    ys = lambda v: round(y0 - v / top * (y0 - y1))
+    body = ""
+    for t in range(0, top + 1, 200):
+        y = ys(t)
+        stroke = f"rgba({s['ink_rgb']},0.25)" if t == 0 else f"rgba({s['ink_rgb']},0.08)"
+        body += f'        <line x1="96" y1="{y}" x2="920" y2="{y}" stroke="{stroke}" stroke-width="{1 if t == 0 else 0.8}"/>\n'
+        body += f'        <text x="88" y="{y + 3}" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="end">{t} ms</text>\n'
+    pitch, w = 164, 88
+    for i, (j, v) in enumerate(rows):
+        x = 136 + i * pitch
+        focal = j == rows[-1][0]
+        fill = s["accent_tint"] if focal else f"rgba({s['ink_rgb']},0.06)"
+        stroke = s["accent"] if focal else s["series1"]
+        top_y = ys(v)
+        body += f'        <rect x="{x}" y="{top_y}" width="{w}" height="{y0 - top_y}" fill="{fill}" stroke="{stroke}" stroke-width="1"/>\n'
+        body += (f'        <text x="{x + w // 2}" y="{top_y - 8}" fill="{s["accent"] if focal else s["muted"]}" font-size="9" '
+                 f'font-family="{MONO}" text-anchor="middle">{v:.0f} ms</text>\n')
+        label = f"{j} thread" + ("" if j == 1 else "s")
+        body += (f'        <text x="{x + w // 2}" y="{y0 + 20}" fill="{s["ink"]}" font-size="11" font-weight="600" '
+                 f'font-family="{SANS}" text-anchor="middle">{label}</text>\n')
+    n = DATA["corpus"]["files"]
+    body += (f'        <text x="508" y="404" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="middle" '
+             f'letter-spacing="0.04em">origami --check over {n:,} files, median of 5 runs</text>\n')
+    title = "Checking the whole corpus"
+    desc = ("Bar chart of the time origami needs to check the whole test corpus with 1, 2, 4, 8 and 10 "
+            "threads: " + ", ".join(f"{v:.0f} ms" for _, v in rows) + ".")
+    caption = (f"{DATA['machine']['cpu']} ({DATA['machine']['cores']} cores), {DATA['date']}. "
+               "By default origami uses one thread per core.")
+    return page(slug, title, desc, 960, 420, body, s, caption)
 
 
 if __name__ == "__main__":
@@ -183,4 +287,6 @@ if __name__ == "__main__":
         suffix = "" if theme == "light" else "-dark"
         (HERE / f"pipeline{suffix}.html").write_text(pipeline(theme))
         (HERE / f"benchmark{suffix}.html").write_text(benchmark(theme))
+        (HERE / f"latency{suffix}.html").write_text(latency(theme))
+        (HERE / f"threads{suffix}.html").write_text(scaling(theme))
     print("written:", sorted(p.name for p in HERE.glob("*.html")))
