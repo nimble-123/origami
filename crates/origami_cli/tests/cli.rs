@@ -564,7 +564,8 @@ fn human_output_lists_files_with_a_code_frame_and_a_summary() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
-    let err = String::from_utf8(out.stderr).unwrap();
+    // Paths use the platform separator; compare with `/`.
+    let err = String::from_utf8(out.stderr).unwrap().replace('\\', "/");
     assert!(
         !err.contains('\x1b'),
         "no colors when stderr is not a terminal"
@@ -605,7 +606,7 @@ fn agent_output_is_compact_with_hints_and_next_step() {
         .args(["--no-config", "--check", "--diagnostics", "agent", "src"])
         .output()
         .unwrap();
-    let err = String::from_utf8(out.stderr).unwrap();
+    let err = String::from_utf8(out.stderr).unwrap().replace('\\', "/");
     let lines: Vec<&str> = err.lines().collect();
     assert_eq!(
         lines[0],
@@ -644,7 +645,7 @@ fn agent_output_is_the_default_for_claude_code_and_can_be_overridden() {
             .arg("src")
             .output()
             .unwrap();
-        String::from_utf8(out.stderr).unwrap()
+        String::from_utf8(out.stderr).unwrap().replace('\\', "/")
     };
     assert!(run(&[("CLAUDECODE", "1")], &[]).starts_with("origami: 3 files"));
     assert!(run(&[("ORIGAMI_DIAGNOSTICS", "agent")], &[]).starts_with("origami: 3 files"));
@@ -864,7 +865,14 @@ fn mcp_format_files_stays_below_the_working_directory() {
     let session = [
         r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}"#.to_string(),
         call(2, r#"{"paths":["../outside.prog.abap"],"write":true}"#),
-        call(3, &format!(r#"{{"paths":["{}"],"write":true}}"#, outer.path().join("outside.prog.abap").display())),
+        call(
+            3,
+            &serde_json::json!({
+                "paths": [outer.path().join("outside.prog.abap")],
+                "write": true
+            })
+            .to_string(),
+        ),
         call(4, r#"{"paths":["src/../../outside.prog.abap"],"write":true}"#),
         call(5, r#"{"paths":["src/link.prog.abap"],"write":true}"#),
         call(6, r#"{"paths":["src"],"write":true}"#),
