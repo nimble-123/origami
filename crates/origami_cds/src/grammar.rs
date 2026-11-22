@@ -39,7 +39,6 @@ impl G<'_> {
     }
 
     /// Appends `spans` (collected by a helper that succeeded).
-    #[allow(dead_code)] // first used by the rule spans (explain design, Stage 3)
     fn keep_spans(&self, spans: Vec<RuleSpan>) {
         if self.explain {
             self.spans.borrow_mut().extend(spans);
@@ -47,8 +46,7 @@ impl G<'_> {
     }
 
     /// A span for tokens `first..=last` laid out by `rule`.
-    #[allow(dead_code)] // first used by the rule spans (explain design, Stage 3)
-    fn span(first: usize, last: usize, rule: RuleId) -> RuleSpan {
+    pub fn span(first: usize, last: usize, rule: RuleId) -> RuleSpan {
         RuleSpan {
             first: TokenIndex(first as u32),
             last: TokenIndex(last as u32),
@@ -388,6 +386,7 @@ impl G<'_> {
         }
         let nest = |d: usize, doc: Doc| (0..d).fold(doc, |x, _| b::indent(vec![x]));
         let mut docs = vec![self.t(first)];
+        let mut spans = Vec::new();
         let mut cases: Vec<(usize, bool)> = Vec::new(); // (case index, multi-when)
         if self.word(first) == "case" {
             cases.push((first, whens.get(&first).copied().unwrap_or(0) > 1));
@@ -401,7 +400,8 @@ impl G<'_> {
                     docs.push(nest(cases.len(), b::concat(vec![brk, self.t(k)])));
                 }
                 "end" if !cases.is_empty() && !self.glued(k) => {
-                    let (_, multi) = cases.pop().unwrap();
+                    let (case, multi) = cases.pop().unwrap();
+                    spans.push(Self::span(case, k, "CDS-ELEM-001"));
                     let brk = if multi { self.hl(k) } else { self.ln(k) };
                     docs.push(nest(cases.len(), b::concat(vec![brk, self.t(k)])));
                 }
@@ -414,6 +414,7 @@ impl G<'_> {
                 }
             }
         }
+        self.keep_spans(spans);
         Some(b::group(docs))
     }
 

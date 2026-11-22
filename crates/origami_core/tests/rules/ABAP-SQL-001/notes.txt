@@ -1,0 +1,1 @@
+1: ABAP-SQL-001: each clause on its own line, because the statement would end at column 144 (limit 120)

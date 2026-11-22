@@ -1,0 +1,1 @@
+3: ABAP-METHODS-001: each section and parameter on its own line, because the method signature would end at column 137 (limit 120)

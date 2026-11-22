@@ -51,7 +51,6 @@ impl Ctx<'_> {
     }
 
     /// Records that tokens `first..=last` are laid out by `rule`.
-    #[allow(dead_code)] // first used by the rule spans (explain design, Stage 3)
     pub fn span(&mut self, first: usize, last: usize, rule: RuleId) {
         if self.explain {
             self.rule_spans.push(RuleSpan {
@@ -444,7 +443,7 @@ impl<'c, 'a> P<'c, 'a> {
         let parsed = if constructor {
             inner.ctor_body(lp, rp)
         } else {
-            inner.call_args(lp, rp)
+            inner.call_args(lp, rp, true)
         };
         match parsed {
             Some(d) => Some(d),
@@ -501,7 +500,9 @@ impl<'c, 'a> P<'c, 'a> {
     }
 
     /// Call arguments between `lp` and `rp` (exclusive). `self.end == rp`.
-    fn call_args(&mut self, lp: usize, rp: usize) -> Option<Doc> {
+    /// `call`: a method call (not a constructor); only calls record the
+    /// ABAP-CALL-001 / ABAP-CALL-002 spans.
+    fn call_args(&mut self, lp: usize, rp: usize, call: bool) -> Option<Doc> {
         let first = self.pos;
         if PARAM_KEYWORDS.contains(&self.upper(first).as_str()) {
             let mut groups: Vec<(usize, Vec<AlignItem>)> = Vec::new();
@@ -513,6 +514,15 @@ impl<'c, 'a> P<'c, 'a> {
                 self.c.keywords.push(k);
                 self.pos += 1;
                 groups.push((k, self.rows()?));
+            }
+            if call {
+                // Keywords: ABAP-CALL-002 for the list; the parameters of
+                // one keyword: ABAP-CALL-001.
+                self.c.span(lp, rp, "ABAP-CALL-002");
+                for (n, (k, _)) in groups.iter().enumerate() {
+                    let last = groups.get(n + 1).map_or(rp - 1, |g| g.0 - 1);
+                    self.c.span(*k, last, "ABAP-CALL-001");
+                }
             }
             let mut hang = Vec::new();
             let mut fall = Vec::new();
@@ -537,6 +547,9 @@ impl<'c, 'a> P<'c, 'a> {
             // rows without a leading keyword is not handled).
             if !self.at_end() {
                 return None;
+            }
+            if call {
+                self.c.span(lp, rp, "ABAP-CALL-001");
             }
             let a = b::align(rows);
             return Some(self.hanging(lp, rp, a.clone(), a));
@@ -604,6 +617,7 @@ impl<'c, 'a> P<'c, 'a> {
                 self.pos = close + 1;
             }
             let content = b::concat(items);
+            self.c.span(lp, rp, "ABAP-VALUE-001");
             return Some(self.hanging(lp, rp, content.clone(), content));
         }
         if self.is_named_row(first) {
@@ -611,10 +625,11 @@ impl<'c, 'a> P<'c, 'a> {
             if !self.at_end() {
                 return None;
             }
+            self.c.span(lp, rp, "ABAP-VALUE-001");
             let a = b::align(rows);
             return Some(self.hanging(lp, rp, a.clone(), a));
         }
-        self.call_args(lp, rp)
+        self.call_args(lp, rp, false)
     }
 
     /// Marks the keywords of a constructor body (`from..to`, bracket depth 0)
@@ -680,6 +695,7 @@ impl<'c, 'a> P<'c, 'a> {
     /// A logical expression: predicates joined by `AND`, `OR`, `EQUIV`. A
     /// broken expression breaks before each operator (ABAP-COND-001).
     pub fn logical(&mut self) -> Option<Doc> {
+        let start = self.pos;
         let first = self.predicate()?;
         let mut parts = vec![first];
         while !self.at_end()
@@ -695,6 +711,7 @@ impl<'c, 'a> P<'c, 'a> {
         Some(if parts.len() == 1 {
             parts.pop().unwrap()
         } else {
+            self.c.span(start, self.pos - 1, "ABAP-COND-001");
             b::group(parts)
         })
     }

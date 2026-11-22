@@ -48,6 +48,7 @@ pub fn parse(p: &mut P) -> Option<Doc> {
     if !call_like && !assign_like {
         if DECL_LEADS.contains(&w0.as_str()) {
             if let Some(d) = declaration(p) {
+                p.c.span(start, p.end, "ABAP-DECL-001");
                 return Some(d);
             }
             p.pos = start;
@@ -62,6 +63,7 @@ pub fn parse(p: &mut P) -> Option<Doc> {
         {
             let saved = p.c.mark();
             if let Some(d) = eml(p) {
+                p.c.span(start, p.end, "ABAP-EML-001");
                 return Some(d);
             }
             p.c.reset(saved);
@@ -75,6 +77,7 @@ pub fn parse(p: &mut P) -> Option<Doc> {
         {
             let saved = p.c.mark();
             if let Some(d) = call_with_groups(p) {
+                p.c.span(start, p.end, "ABAP-CALL-003");
                 return Some(d);
             }
             p.c.reset(saved);
@@ -2119,6 +2122,9 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
         p.c.reset(saved);
     }
     let body = spec_body(p, spec, true)?;
+    if spec.all_clauses {
+        p.c.span(start, p.end, "ABAP-SQL-001");
+    }
     Some(b::group(vec![b::concat(head), body, p.period()]))
 }
 
@@ -2322,6 +2328,7 @@ fn spec_chain(p: &mut P, spec: &Spec, head: Doc) -> Option<Doc> {
         docs.push(b::concat(d));
     }
     p.pos = end;
+    p.c.span(p.first, end, "ABAP-CHAIN-001");
     Some(b::group(vec![
         head,
         p.sp(colon),
@@ -2362,6 +2369,7 @@ fn subquery(p: &mut P, lp: usize, rp: usize) -> Option<Doc> {
     };
     // Flat: `( SELECT … )`. Broken: the query on its own lines, one level
     // deeper, and `)` on its own line.
+    p.c.span(lp, rp, "ABAP-SQL-002");
     Some(b::group(vec![
         p.t(lp),
         b::indent(vec![p.ln(lp + 1), body]),
@@ -2488,6 +2496,7 @@ fn with_select(p: &mut P) -> Option<Doc> {
     let first_cte = start + 1;
     p.pos = k;
     let main = keyword_statement(p, select_spec())?;
+    p.c.span(start, p.end, "ABAP-SQL-002");
     Some(b::concat(vec![
         lead,
         p.sp(first_cte),
@@ -3012,6 +3021,7 @@ fn methods(p: &mut P) -> Option<Doc> {
         docs.push(b::concat(d));
     }
     p.pos = p.end;
+    p.c.span(start, p.end, "ABAP-CHAIN-001");
     Some(b::group(vec![
         lead,
         p.sp(colon),
@@ -3033,6 +3043,14 @@ fn method_item(p: &mut P, from: usize, to: usize, sections: &[&str]) -> Option<D
     p.end = to;
     let result = method_item_inner(p, name, sections);
     p.end = saved_end;
+    if result.is_some() {
+        let rule = if sections == FORM_SECTIONS {
+            "ABAP-FORM-001"
+        } else {
+            "ABAP-METHODS-001"
+        };
+        p.c.span(from, to - 1, rule);
+    }
     result
 }
 

@@ -6,7 +6,9 @@ written and approved before its layout code is merged.
 ## How rules work
 
 * **Format.** Each rule has a heading `### <ID>: <title>`, followed by a
-  `Milestone: M<n>` line, a one-paragraph statement and a before/after example.
+  `Milestone: M<n>` line, for rules that introduce line breaks an
+  `Explanation: <phrase>` line (see "Line-break notes"), a one-paragraph
+  statement and a before/after example.
   The ID matches `^(GEN|ABAP|CDS|DDLS|DDLX|DCL|BDEF|SRVD)-[A-Z]+-\d{3}$`.
 * **Approval gate.** Each rule enters this file through its own pull request.
   The maintainer, Nils Lutz, approves it before any layout pull request that
@@ -21,6 +23,28 @@ written and approved before its layout code is merged.
 * **Stability.** Within a style edition, output changes only to fix bugs, and
   every such change is listed in `CHANGELOG.md` with its rule ID. New rules
   first appear behind `--preview`.
+
+## Line-break notes
+
+Approved by the maintainer, Nils Lutz, on 2026-11-22, together with the
+`Explanation:` lines of the rules.
+
+`origami --review` and `origami_core::explain` explain each line break that
+origami introduces, one note per broken construct and cause. A break that was
+already in the input gets no note. A note names its cause:
+
+* **Width:** the construct (or the line that holds its end) would end past
+  the line width; the note gives the column it would end at, measured with
+  the construct printed on one line.
+* **Rule:** the rule always breaks there (for example ABAP-STMT-001).
+* **Comment:** an end-of-line comment inside the construct forces the break.
+
+The note starts with the rule ID and the rule's `Explanation:` phrase when the
+construct belongs to a rule, for example "ABAP-CALL-001: one parameter per
+line, because the call would end at column 134 (limit 120)". Breaks that no
+rule covers name the cause only. Rule IDs are never renumbered or reused, so
+a note's rule ID always finds its rule here. The wording of notes is not a
+stable interface.
 
 ## General
 
@@ -117,6 +141,7 @@ after:  DATA(lv_count) = lines( mt_items ).
 
 ### ABAP-STMT-001: One statement per line
 Milestone: M1
+Explanation: each statement on its own line
 
 Statements that share a line are split onto separate lines. A chained
 statement (`DATA: a …, b ….`) is one statement.
@@ -225,6 +250,7 @@ ENDIF.
 
 ### ABAP-CALL-001: Method call parameters
 Milestone: M1
+Explanation: one parameter per line
 
 A call is printed flat when it fits. Otherwise the first parameter stays
 behind the opening `(`, every further parameter goes on its own line, aligned
@@ -242,6 +268,7 @@ DATA(lv_result) = lo_calculator->calculate( iv_amount   = lv_amount
 
 ### ABAP-CALL-002: Parameter keywords
 Milestone: M1
+Explanation: each parameter group on its own line
 
 When a broken call uses `EXPORTING`, `IMPORTING`, `CHANGING`, `RECEIVING` or
 `EXCEPTIONS`, the first keyword stays behind `(`, further keywords are aligned
@@ -277,6 +304,7 @@ rs_flight = VALUE #( carrier_id    = 'LH'
 
 ### ABAP-VALUE-001: Constructor expressions
 Milestone: M1
+Explanation: one row per line
 
 A constructor expression is printed flat when it fits. Otherwise it follows
 ABAP-CALL-001: the first component assignment or table row stays behind `#(`
@@ -291,6 +319,7 @@ mt_items = VALUE #( ( id = 1 name = `Alpha` )
 
 ### ABAP-DECL-001: Declarations and chains
 Milestone: M1
+Explanation: one declaration per line
 
 A declaration (`DATA`, `TYPES`, `CONSTANTS`, `CLASS-DATA`, `STATICS`,
 `FIELD-SYMBOLS`) that fits is printed on one line. In a chain that does not
@@ -308,6 +337,7 @@ TYPES: BEGIN OF ty_item,
 
 ### ABAP-CHAIN-001: Chains of other statements
 Milestone: M1
+Explanation: one item per line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-21. A chain of any other keyword
 statement (`CLEAR:`, `INTERFACES:`, `EVENTS:`, `SET HANDLER:`, …) follows the
@@ -363,6 +393,7 @@ DATA: END OF status_view.
 
 ### ABAP-FORM-001: FORM signatures
 Milestone: M4
+Explanation: each section and parameter on its own line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-21. A `FORM` signature follows
 ABAP-METHODS-001 with the sections `TABLES`, `USING`, `CHANGING` and
@@ -389,6 +420,7 @@ is a call.
 
 ### ABAP-METHODS-001: Method signatures
 Milestone: M1
+Explanation: each section and parameter on its own line
 
 A `METHODS` or `CLASS-METHODS` declaration that fits is printed on one line.
 Otherwise each section keyword (`IMPORTING`, `EXPORTING`, `CHANGING`,
@@ -408,6 +440,7 @@ METHODS calculate
 
 ### ABAP-COND-001: Logical expressions
 Milestone: M1
+Explanation: condition split before AND, OR
 
 A condition that does not fit breaks before `AND` and `OR` at the outermost
 level, at the continuation indent. Parenthesized sub-conditions stay flat when
@@ -415,6 +448,7 @@ they fit.
 
 ### ABAP-SQL-001: ABAP SQL
 Milestone: M1
+Explanation: each clause on its own line
 
 A `SELECT` (and `INSERT`, `UPDATE`, `MODIFY`, `DELETE` on database tables)
 that fits is printed on one line. Otherwise each clause (`FROM`, `FIELDS`,
@@ -431,6 +465,7 @@ SELECT carrid, connid, fldate
 
 ### ABAP-SQL-002: Common table expressions and subqueries
 Milestone: M4
+Explanation: each common table expression on its own line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-21. In `WITH +cte AS ( SELECT … ) …`
 each common table expression starts its own line, aligned after `WITH`, and
@@ -462,6 +497,7 @@ after:  lv_a = 1. " first
 
 ### ABAP-CALL-003: CALL FUNCTION and CALL METHOD
 Milestone: M1
+Explanation: each parameter group on its own line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-21. A `CALL FUNCTION` or
 `CALL METHOD` statement is printed on one line when it fits. Otherwise each
@@ -483,6 +519,7 @@ CALL FUNCTION 'Z_FLIGHT_TRAVEL_CREATE'
 
 ### ABAP-EML-001: Entity manipulation language
 Milestone: M1
+Explanation: each entity and operation on its own line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-21. `READ ENTITIES`, `READ ENTITY`,
 `MODIFY ENTITIES` and `MODIFY ENTITY` statements are printed on one line when
@@ -518,6 +555,7 @@ the full grammar of headers and expressions.
 
 ### CDS-UNIT-001: One unit per line
 Milestone: M2
+Explanation: each annotation and element on its own line
 
 Each annotation, each select-list element (DDLS, ended by `,`), each
 statement ended by `;` (DDLX, DCL, BDEF, SRVD), and each block brace `{` or `}`
@@ -597,6 +635,7 @@ after `{` and directly before `}` are removed.
 
 ### CDS-ANNO-001: Annotation values
 Milestone: M2
+Explanation: annotation values on their own lines
 
 Approved by the maintainer, Nils Lutz, on 2026-11-21. An annotation value is printed on
 one line when it fits. Otherwise each object `{ … }` or array `[ … ]` that does
@@ -622,6 +661,7 @@ added between them.
 
 ### CDS-HEAD-001: Definition headers
 Milestone: M2
+Explanation: each clause of the header on its own line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-21. In a DDLS header, `as select from`,
 `as projection on`, `provider contract`, `with parameters`, each `association`,
@@ -642,6 +682,7 @@ define root view entity ZI_Travel
 
 ### CDS-ELEM-001: Case expressions in select lists
 Milestone: M2
+Explanation: each WHEN on its own line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-21. A `case` expression with two or
 more `when` always breaks: each `when` and `else` starts a line one level
@@ -659,6 +700,7 @@ line when it fits. Elements without `case` keep the author's line breaks.
 
 ### DCL-GRANT-001: Access conditions
 Milestone: M2
+Explanation: condition split before AND, OR
 
 Approved by the maintainer, Nils Lutz, on 2026-11-21. `grant select on <entity> [where …];`
 is printed on one line when it fits, instead of one word per line as in the

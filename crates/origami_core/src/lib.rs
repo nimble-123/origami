@@ -9,7 +9,7 @@ pub mod options;
 pub mod result;
 
 pub use detect::LanguageHint;
-pub use explain::Explained;
+pub use explain::{Explained, RULE_PHRASES};
 #[cfg(feature = "fault-injection")]
 pub use options::Fault;
 pub use options::Options;

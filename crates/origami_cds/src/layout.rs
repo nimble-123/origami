@@ -271,17 +271,24 @@ pub fn layout(
             b::verbatim(first, last, blank)
         } else {
             let g = crate::grammar::G::new(text, stream, u.first, blank, explain);
+            // The parsed layout and the rule for the whole unit (a case
+            // expression records its own spans).
+            let with = |d: Option<Doc>, rule| d.map(|d| (d, rule));
             let parsed = match u.kind {
-                Kind::Annotation => g.annotation(u.first, u.last),
-                Kind::Element => g.header(u.first, u.last, lang).or_else(|| match lang {
-                    Language::Ddls if u.depth > 0 => g.element(u.first, u.last),
-                    Language::Dcl => g.grant(u.first, u.last),
-                    _ => None,
-                }),
+                Kind::Annotation => with(g.annotation(u.first, u.last), Some("CDS-ANNO-001")),
+                Kind::Element => with(g.header(u.first, u.last, lang), Some("CDS-HEAD-001"))
+                    .or_else(|| match lang {
+                        Language::Ddls if u.depth > 0 => with(g.element(u.first, u.last), None),
+                        Language::Dcl => with(g.grant(u.first, u.last), Some("DCL-GRANT-001")),
+                        _ => None,
+                    }),
                 _ => None,
             };
             match parsed {
-                Some(d) => {
+                Some((d, rule)) => {
+                    if let Some(rule) = rule.filter(|_| explain) {
+                        spans.push(crate::grammar::G::span(u.first, u.last, rule));
+                    }
                     spans.extend(g.spans.into_inner());
                     d
                 }

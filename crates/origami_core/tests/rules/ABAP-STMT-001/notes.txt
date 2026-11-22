@@ -1,0 +1,1 @@
+2: ABAP-STMT-001: each statement on its own line

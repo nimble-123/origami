@@ -1,0 +1,1 @@
+1: ABAP-EML-001: each entity and operation on its own line, because the statement would end at column 154 (limit 120)

@@ -1,0 +1,1 @@
+3: CDS-ANNO-001: annotation values on their own lines, because the annotation would end at column 239 (limit 120)

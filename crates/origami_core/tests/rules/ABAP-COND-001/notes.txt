@@ -1,0 +1,1 @@
+1: ABAP-COND-001: condition split before AND, OR, because the condition would end at column 132 (limit 120)

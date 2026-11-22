@@ -1,2 +1,2 @@
-2: split because the statement would end at column 139 (limit 120)
-6: line break required by the layout of this statement
+2: ABAP-SQL-001: each clause on its own line, because the statement would end at column 139 (limit 120)
+6: ABAP-SQL-002: each common table expression on its own line
