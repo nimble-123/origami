@@ -29,6 +29,18 @@ edition, every output change is listed with its STYLE rule ID.
   call arguments with an unhandled keyword group fall back instead of
   dropping tokens; `message = …` and other assignments to variables named
   like statements are assignments; `TYPE any` / `TYPE line` stay type names.
+- Fixes (spike for the explain design, Stage 0):
+  - ABAP-WIDTH-001: the last clause of a filled keyword statement is checked
+    together with the rest of its line (the period), so such lines no
+    longer end at column 121; 42 corpus lines were over the limit.
+  - ABAP-COMMENT-002: an end-of-line comment after the statement's period no
+    longer forces the statement to break (`TABLES: a, b. " c` stays on one
+    line).
+  - The human code frame escapes control and bidi characters from the
+    source.
+  - The rule tests now check all milestones (M3/M4 fixtures were skipped).
+  - `--changed` documents that it takes the next argument as the revision.
+  - `cargo xtask corpus run --hashes FILE` for byte-for-byte output checks.
 - Output: new human format (per-file blocks with symbols, code frames for
   errors, compact W003, summary with counts and run time, next-step hint;
   colors on terminals, `NO_COLOR` / `CLICOLOR_FORCE`) and a new

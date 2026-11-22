@@ -46,16 +46,6 @@ impl Style {
     }
 }
 
-fn color_enabled() -> bool {
-    if std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()) {
-        return false;
-    }
-    if std::env::var_os("CLICOLOR_FORCE").is_some_and(|v| v != "0") {
-        return true;
-    }
-    std::io::stderr().is_terminal()
-}
-
 fn plural(n: usize, one: &str, many: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { many })
 }
@@ -70,10 +60,10 @@ fn code_frame(st: &Style, source: &str, d: &Reported) -> Option<String> {
     } else {
         1
     };
-    // Keep tabs so the marker lines up under the text.
-    let pad: String = line
+    // Keep tabs so the marker lines up under the (escaped) text.
+    let prefix: String = line.chars().take(col - 1).collect();
+    let pad: String = super::escape_controls(&prefix)
         .chars()
-        .take(col - 1)
         .map(|c| if c == '\t' { '\t' } else { ' ' })
         .collect();
     let gutter = format!("{line_no:>6}");
@@ -82,7 +72,7 @@ fn code_frame(st: &Style, source: &str, d: &Reported) -> Option<String> {
         "{} {} {}\n{} {} {}{}\n",
         st.dim(&gutter),
         st.dim("│"),
-        line.trim_end(),
+        super::escape_controls(line.trim_end()),
         blank,
         st.dim("│"),
         pad,
@@ -169,7 +159,7 @@ fn write_file(
 
 pub fn write(run: &Run, out: &mut dyn Write) -> std::io::Result<()> {
     let st = Style {
-        on: color_enabled(),
+        on: super::color_enabled(super::Stream::Stderr),
     };
     let (files, truncated) = run.capped();
     let mut listed_changes = 0;

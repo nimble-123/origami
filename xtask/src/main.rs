@@ -25,6 +25,7 @@ fn main() -> ExitCode {
         ["corpus", "fetch"] => corpus::fetch(),
         ["corpus", "run"] => corpus::run(false),
         ["corpus", "bless"] => corpus::run(true),
+        ["corpus", "run", "--hashes", file] => corpus::run(false).and_then(|()| corpus::hashes(file)),
         ["freq"] => freq::run(40),
         ["freq", n] => freq::run(n.parse().unwrap_or(40)),
         ["oracle"] => oracle::run(),
@@ -32,7 +33,7 @@ fn main() -> ExitCode {
         ["release-diff", rest @ ..] => release_diff::run(rest),
         ["stress", rest @ ..] => stress::run(rest),
         _ => Err(
-            "usage: cargo xtask <corpus fetch|corpus run|corpus bless|freq [N]|oracle|bench-check [hyperfine.json...]|release-diff [tag]|stress [n] [seed]>"
+            "usage: cargo xtask <corpus fetch|corpus run [--hashes FILE]|corpus bless|freq [N]|oracle|bench-check [hyperfine.json...]|release-diff [tag]|stress [n] [seed]>"
                 .into(),
         ),
     };

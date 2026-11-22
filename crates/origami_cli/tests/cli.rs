@@ -650,3 +650,54 @@ fn agent_output_is_the_default_for_claude_code_and_can_be_overridden() {
     assert!(run(&[("ORIGAMI_DIAGNOSTICS", "agent")], &[]).starts_with("origami: 3 files"));
     assert!(run(&[("CLAUDECODE", "1")], &["--diagnostics", "human"]).contains("✎ src/zcl_a"));
 }
+
+#[test]
+fn code_frame_escapes_control_characters() {
+    let out = origami()
+        .args([
+            "--no-config",
+            "--stdin-filepath",
+            "z.prog.abap",
+            "--diagnostics",
+            "human",
+        ])
+        .write_stdin("lv_x = ( '\x1b[31mred' .\n")
+        .output()
+        .unwrap();
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(!err.contains('\x1b'), "{err}");
+    assert!(err.contains("\\x1b[31mred"), "{err}");
+}
+
+#[test]
+fn changed_takes_the_next_argument_as_revision() {
+    let d = dir();
+    let git = |args: &[&str]| {
+        assert!(
+            std::process::Command::new("git")
+                .args(["-c", "user.email=t@example.com", "-c", "user.name=t"])
+                .args(args)
+                .current_dir(d.path())
+                .output()
+                .unwrap()
+                .status
+                .success()
+        );
+    };
+    git(&["init", "-q"]);
+    write(d.path(), "src/z.prog.abap", "lv_a   =   1.\n");
+    git(&["add", "."]);
+    git(&["commit", "-qm", "init"]);
+    git(&["branch", "base"]);
+    write(d.path(), "src/z.prog.abap", "lv_a   =   2.\n");
+    // `base` is the revision, `src` the path.
+    origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--changed", "base", "src"])
+        .assert()
+        .code(0);
+    assert_eq!(
+        fs::read_to_string(d.path().join("src/z.prog.abap")).unwrap(),
+        "lv_a = 2.\n"
+    );
+}

@@ -46,6 +46,11 @@ self-check as a full run; if the selected changes cannot stand on their own,
 the file stays as written and W001 is reported. `--changed` runs
 `git diff -U0 --relative REF` and `git ls-files --others --exclude-standard`
 in the current directory; outside a git repository it is a usage error.
+`--changed` takes the next argument as the revision unless it starts with
+`-`: `origami --changed main src/` compares against `main`, and
+`origami --changed src/` would read `src/` as a revision. To pass paths,
+write `--changed=REF path…` or put the paths first (`origami src/
+--changed`).
 
 ## Diagnostics formats
 

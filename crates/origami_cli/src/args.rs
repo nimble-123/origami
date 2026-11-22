@@ -63,7 +63,9 @@ pub struct Args {
     pub lines: Vec<String>,
 
     /// Format only lines changed against a git revision (default HEAD), plus
-    /// untracked files in full.
+    /// untracked files in full. The next argument is taken as the revision
+    /// unless it starts with `-`; to pass paths, write `--changed=REF path…`
+    /// or put the paths first.
     #[arg(long, value_name = "REF", num_args = 0..=1, default_missing_value = "HEAD")]
     pub changed: Option<String>,
 

@@ -9,7 +9,7 @@ use origami_core::{Code, LanguageHint, Options, format};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-const CURRENT_MILESTONE: u8 = 2;
+const CURRENT_MILESTONE: u8 = 4;
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
