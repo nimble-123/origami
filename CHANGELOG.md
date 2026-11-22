@@ -59,6 +59,11 @@ edition, every output change is listed with its STYLE rule ID.
 - VS Code: "origami: Preview Changes" opens the built-in diff view (the
   document as it is, the formatted text); "origami: Apply Preview" applies
   it and reformats instead if the document was edited meanwhile.
+- `origami --review`: shows the changes origami would make, with old and new
+  line numbers, the changed characters highlighted and a note below each
+  construct whose line breaks origami introduced; writes nothing, exit codes
+  as `--check`; works on paths, stdin, `--lines` and `--changed`. `--diff`
+  is unchanged. The human summary now suggests `--review`.
 - Line-break explanations (core): `origami_core::explain` formats like
   `format_lines` and returns one note per construct and cause for the line
   breaks origami introduced (width with the measured column, a style rule,

@@ -27,6 +27,11 @@ only what you touched. In VS Code, *Format Selection* works, and
 `"editor.formatOnSaveMode": "modifications"` formats only changed lines on
 save.
 
+To see what origami would change before it changes anything, run
+`origami --review`: the changes with a note on each line break origami
+introduces and why. In VS Code, "origami: Preview Changes" shows the
+formatting of the open file in the diff view, with an Apply button.
+
 ## Install
 
 ```sh
@@ -50,7 +55,8 @@ code --install-extension abap-origami-darwin-arm64-0.1.0.vsix
 ```sh
 origami                       # format all supported files below .
 origami --check               # CI: exit 1 if anything would change
-origami --check --diff        # show what would change
+origami --review              # show what would change, and why lines break
+origami --check --diff        # the changes as a unified diff (for scripts)
 cat zcl_foo.clas.abap | origami --stdin-filepath zcl_foo.clas.abap
 origami --check --diagnostics json src/   # machine-readable, on stderr
 origami --changed             # only lines changed since HEAD (+ new files)

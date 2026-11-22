@@ -1,7 +1,7 @@
 # origami: line-break explanations and change review
 
 *   **Author:** Nils Lutz
-*   **Status:** Approved
+*   **Status:** Implemented (Stages 0–4, 2026-11-22)
 *   **Date:** 2026-11-21
 
 --------------------------------------------------------------------------------
@@ -136,6 +136,25 @@ explain` is the development tool; the wording of notes is human output and
 not a stable contract), Q5 (VS Code: title "origami: Preview Changes"; on a
 structural error no diff opens, the diagnostics go to the Problems panel and
 a message says why; timeout 5 seconds). See the Technical Plan.
+
+## Implementation Results
+
+*   **Stage 0:** both suspected printer defects were real and fixed
+    (ABAP-COMMENT-002: a comment after the period forced a break;
+    ABAP-WIDTH-001: the fill check ignored the period, lines ended at column
+    121). 78 corpus files changed; this output is the G3 baseline.
+*   **G3:** corpus hashes (default settings and width 80 / indent 4 / lower
+    case) identical to the baseline at the end of Stages 2, 3 and 4.
+*   **G9:** `origami --check -j 1` over the corpus: 737.7 ms at the
+    baseline, 740.7 ms after Stage 4 (within noise); one large class 17.4 ms
+    vs. 17.3 ms. `--review` over the corpus: 2.0 s on one thread.
+*   **Corpus notes:** 2,147 files, 572 with notes, 4,352 notes; 3,676 name a
+    rule. Causes: 3,027 width, 1,219 rule, 90 comment, 16 layout.
+*   **Deviations** (recorded where they apply): comment attribution for
+    breaks inside a construct; spans only rolled back at raw fallbacks;
+    ABAP-CALL-001 / ABAP-CALL-002 swapped in the keyword-group layout; rules
+    that break only for width are not named for breaks that survive the wide
+    print; the comment sentence reads "split because of the comment …".
 
 ## Critical User Journeys (CUJs)
 

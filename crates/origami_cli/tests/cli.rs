@@ -701,3 +701,144 @@ fn changed_takes_the_next_argument_as_revision() {
         "lv_a = 2.\n"
     );
 }
+
+#[test]
+fn review_shows_changes_with_line_numbers_and_notes() {
+    let d = dir();
+    let src = "lv_a = 1. lv_b   =   2.\n";
+    write(d.path(), "z.prog.abap", src);
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--review", "z.prog.abap"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let view = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        view.starts_with("z.prog.abap  (1 change, 1 note)\n"),
+        "{view}"
+    );
+    assert!(
+        view.contains("1   │-lv_a = 1.[- -]lv_b[-   -]=[-   -]2.\n"),
+        "{view}"
+    );
+    assert!(view.contains("  2 │+lv_b{+ +}={+ +}2.\n"), "{view}");
+    assert!(
+        view.contains("↳ ABAP-STMT-001: each statement on its own line"),
+        "{view}"
+    );
+    assert!(
+        !view.contains('\x1b'),
+        "escape sequences without a terminal"
+    );
+    assert_eq!(
+        fs::read_to_string(d.path().join("z.prog.abap")).unwrap(),
+        src
+    );
+}
+
+#[test]
+fn review_of_a_formatted_file_prints_nothing() {
+    let d = dir();
+    write(d.path(), "z.prog.abap", "lv_a = 1.\n");
+    origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--review", "z.prog.abap"])
+        .assert()
+        .code(0)
+        .stdout("");
+}
+
+#[test]
+fn review_with_a_structural_error_exits_2_without_a_view() {
+    let d = dir();
+    write(d.path(), "z.prog.abap", "lv_a   =   1\n");
+    origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--review", "z.prog.abap"])
+        .assert()
+        .code(2)
+        .stdout("");
+}
+
+#[test]
+fn review_conflicts_with_diff_and_write() {
+    for extra in ["--diff", "--write"] {
+        origami()
+            .args(["--review", extra, "x.prog.abap"])
+            .assert()
+            .code(3);
+    }
+}
+
+#[test]
+fn review_in_stdin_mode_prints_the_view_not_the_text() {
+    let out = origami()
+        .args(["--no-config", "--review", "--stdin-filepath", "z.prog.abap"])
+        .write_stdin("lv_a   =   1.\n")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let view = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        view.starts_with("z.prog.abap  (1 change, 0 notes)\n"),
+        "{view}"
+    );
+    assert!(!view.contains("\nlv_a = 1.\n"), "{view}");
+}
+
+#[test]
+fn review_escapes_control_characters() {
+    let d = dir();
+    write(d.path(), "z.prog.abap", "lv_x  =  `\x1b[31m\u{202e}`.\n");
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--review", "z.prog.abap"])
+        .output()
+        .unwrap();
+    let view = String::from_utf8(out.stdout).unwrap();
+    assert!(view.contains(r"`\x1b[31m\u{202e}`"), "{view}");
+    assert!(
+        !view.contains('\x1b') && !view.contains('\u{202e}'),
+        "{view}"
+    );
+}
+
+#[test]
+fn review_with_changed_shows_only_changed_lines() {
+    let d = dir();
+    let git = |args: &[&str]| {
+        let ok = std::process::Command::new("git")
+            .args(["-c", "user.email=t@example.com", "-c", "user.name=t"])
+            .args(args)
+            .current_dir(d.path())
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(ok, "git {args:?}");
+    };
+    git(&["init", "-q"]);
+    write(
+        d.path(),
+        "z.prog.abap",
+        "lv_a   =   1.\nlv_x = 0.\nlv_y = 0.\nlv_z = 0.\nlv_b   =   2.\n",
+    );
+    git(&["add", "."]);
+    git(&["commit", "-qm", "init"]);
+    write(
+        d.path(),
+        "z.prog.abap",
+        "lv_a   =   1.\nlv_x = 0.\nlv_y = 0.\nlv_z = 0.\nlv_b = 3. lv_c   =   4.\n",
+    );
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--review", "--changed=HEAD"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let view = String::from_utf8(out.stdout).unwrap();
+    assert!(!view.contains("lv_a"), "{view}");
+    assert!(view.contains("│+lv_c{+ +}={+ +}4.\n"), "{view}");
+    assert!(view.contains("↳ ABAP-STMT-001"), "{view}");
+}

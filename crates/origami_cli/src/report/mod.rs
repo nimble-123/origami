@@ -1,10 +1,12 @@
 //! Output: diagnostics in every format go to stderr; stdout carries only
-//! formatted text (stdin mode) or the diff (`--diff`).
+//! formatted text (stdin mode), the diff (`--diff`) or the review view
+//! (`--review`).
 
 pub mod agent;
 pub mod diff;
 pub mod human;
 pub mod json;
+pub mod review;
 pub mod sarif;
 
 use origami_core::{Language, Reported, Status};
@@ -49,8 +51,6 @@ impl Run<'_> {
 /// The stream a report is written to (for color detection).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Stream {
-    /// Used by the review view (`--review`).
-    #[allow(dead_code)]
     Stdout,
     Stderr,
 }
