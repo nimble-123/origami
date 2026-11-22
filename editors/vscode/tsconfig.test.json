@@ -4,5 +4,5 @@
     "outDir": "out-test",
     "noEmit": false
   },
-  "include": ["src/edits.ts", "src/diagnosticsModel.ts", "test/**/*.ts"]
+  "include": ["src/edits.ts", "src/diagnosticsModel.ts", "src/previewUri.ts", "test/**/*.ts"]
 }

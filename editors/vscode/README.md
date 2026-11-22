@@ -26,6 +26,20 @@ For code that lives in an SAP system, consider
 `"editor.formatOnSaveMode": "modifications"`, so saving one method does not
 reformat the whole class.
 
+## Preview Changes
+
+"origami: Preview Changes" (command palette) shows what formatting would
+change, in VS Code's diff view: the document as it is now on the left, the
+formatted text on the right. Nothing is changed yet.
+
+"origami: Apply Preview" (the check mark in the diff view's title bar)
+applies the result; the document stays unsaved. If you edited the document
+after opening the preview, Apply formats the current text instead, so your
+later edits are kept.
+
+If the document has a structural error, no diff opens and the problem is
+shown in the Problems panel.
+
 ## Binary
 
 The extension uses, in this order:

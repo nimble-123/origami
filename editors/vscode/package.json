@@ -56,8 +56,36 @@
       {
         "command": "origami.showOutput",
         "title": "origami: Show Output"
+      },
+      {
+        "command": "origami.previewChanges",
+        "title": "origami: Preview Changes"
+      },
+      {
+        "command": "origami.applyPreview",
+        "title": "origami: Apply Preview",
+        "icon": "$(check)"
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "origami.applyPreview",
+          "when": "resourceScheme == origami-preview",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "origami.previewChanges",
+          "when": "origami.formattable"
+        },
+        {
+          "command": "origami.applyPreview",
+          "when": "origami.previewActive"
+        }
+      ]
+    }
   },
   "scripts": {
     "build": "node esbuild.mjs",

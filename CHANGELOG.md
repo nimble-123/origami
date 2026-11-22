@@ -56,6 +56,9 @@ edition, every output change is listed with its STYLE rule ID.
   `format_lines`; VS Code *Format Selection* and format-on-save for modified
   lines only. The kept changes pass the self-check; otherwise the file stays
   as written (W001).
+- VS Code: "origami: Preview Changes" opens the built-in diff view (the
+  document as it is, the formatted text); "origami: Apply Preview" applies
+  it and reformats instead if the document was edited meanwhile.
 - Dynpro flow logic (`*.screen_<nr>.abap`) is formatted: `PROCESS` blocks
   indented like event blocks, `CHAIN … ENDCHAIN`, table-control loops,
   `MODULE` calls, `FIELD`.
