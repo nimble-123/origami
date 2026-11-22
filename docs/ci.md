@@ -1,8 +1,10 @@
 # origami in CI
 
+<!-- x-release-please-start-version -->
+
 All variants download a released binary and run `origami --check`: exit 0 if
 everything is formatted, 1 if a file would change, 2 for a structural error
-(see [CLI.md](CLI.md)). Replace `<origami repository URL>` and the version.
+(see [CLI.md](CLI.md)). The version below is the current release.
 Each release ships a `.sha256` file next to every binary.
 
 To introduce origami into an existing code base without reformatting
@@ -23,14 +25,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0       # only for --changed
-      - uses: <owner>/origami@v1.0.0
+      - uses: nimble-123/origami@v0.1.0
         with:
           args: --check --changed origin/${{ github.base_ref }}
           sarif: "true"        # findings as code-scanning annotations
 ```
 
 Without `version`, the action downloads the release that matches the tag it
-is used at (`@v1.0.0`), else the latest release.
+is used at (`@v0.1.0`), else the latest release.
 
 ## GitLab CI
 
@@ -38,12 +40,12 @@ is used at (`@v1.0.0`), else the latest release.
 origami:
   image: debian:stable-slim
   variables:
-    ORIGAMI_VERSION: "1.0.0"
+    ORIGAMI_VERSION: "0.1.0"
     GIT_DEPTH: 0
   before_script:
     - apt-get update -qq && apt-get install -y -qq curl ca-certificates git
-    - curl -fsSL -o origami "<origami repository URL>/releases/download/v${ORIGAMI_VERSION}/origami-${ORIGAMI_VERSION}-x86_64-unknown-linux-musl"
-    - curl -fsSL -o origami.sha256 "<origami repository URL>/releases/download/v${ORIGAMI_VERSION}/origami-${ORIGAMI_VERSION}-x86_64-unknown-linux-musl.sha256"
+    - curl -fsSL -o origami "https://github.com/nimble-123/origami/releases/download/v${ORIGAMI_VERSION}/origami-${ORIGAMI_VERSION}-x86_64-unknown-linux-musl"
+    - curl -fsSL -o origami.sha256 "https://github.com/nimble-123/origami/releases/download/v${ORIGAMI_VERSION}/origami-${ORIGAMI_VERSION}-x86_64-unknown-linux-musl.sha256"
     - echo "$(cut -d' ' -f1 origami.sha256)  origami" | sha256sum -c -
     - chmod +x origami
   script:
@@ -63,14 +65,14 @@ origami:
 
 ```yaml
 variables:
-  ORIGAMI_VERSION: "1.0.0"
+  ORIGAMI_VERSION: "0.1.0"
 
 steps:
   - checkout: self
     fetchDepth: 0
   - script: |
       set -e
-      base="<origami repository URL>/releases/download/v$(ORIGAMI_VERSION)"
+      base="https://github.com/nimble-123/origami/releases/download/v$(ORIGAMI_VERSION)"
       name="origami-$(ORIGAMI_VERSION)-x86_64-unknown-linux-musl"
       curl -fsSL -o origami "$base/$name"
       curl -fsSL -o origami.sha256 "$base/$name.sha256"
@@ -90,3 +92,5 @@ origami --check
 The JSON diagnostics (`--diagnostics json`, on stderr) follow
 [schemas/diagnostics.v1.json](../schemas/diagnostics.v1.json);
 `--diagnostics sarif` produces SARIF 2.1.0 for tools that read it.
+
+<!-- x-release-please-end -->

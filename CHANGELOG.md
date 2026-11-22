@@ -1,10 +1,14 @@
 # Changelog
 
-All notable changes to origami are documented here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Within a style
-edition, every output change is listed with its STYLE rule ID.
+All notable changes to origami are documented here. From 0.1.0 on,
+[release-please](https://github.com/googleapis/release-please) writes this file
+from [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+(see [CONTRIBUTING.md](CONTRIBUTING.md)). Within a style edition, every output
+change names its STYLE rule ID in the commit message.
 
-## [Unreleased]
+## Development before 0.1.0
+
+Everything below was built before the first release and ships with 0.1.0.
 
 ### Fixed
 
@@ -67,6 +71,13 @@ edition, every output change is listed with its STYLE rule ID.
 - VS Code: "origami: Preview Changes" opens the built-in diff view (the
   document as it is, the formatted text); "origami: Apply Preview" applies
   it and reformats instead if the document was edited meanwhile.
+- Website (`site/`, GitHub Pages) with a playground that runs origami in the
+  browser (`crates/origami_wasm`, WebAssembly, no upload); visual design in
+  `docs/brand.md`; logo, diagrams and an animated `--review` demo in
+  `docs/assets/`; new README.
+- Releases: a Homebrew formula is written to `nimble-123/homebrew-tap`
+  (`brew install nimble-123/tap/origami`, secret `HOMEBREW_TAP_TOKEN`), and
+  the VS Code extensions are attached to the GitHub release.
 - MCP `format_files` refuses paths outside the server's working directory
   (absolute, `..` or symbolic links), as its description always said;
   before, any path was accepted.

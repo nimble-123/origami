@@ -5,6 +5,11 @@ means and how it is enforced. Every rule names the test that covers it.
 
 ## 1. Equality checked on every run (self-check)
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/pipeline-dark.svg">
+  <img alt="Your file is lexed, parsed and laid out, and printed. The self-check compares the tokens with the input: same tokens, the file is written; different, the unit is kept as written and printed again; still different, the file stays unchanged with X001." src="assets/pipeline.svg" width="860">
+</picture>
+
 After formatting, origami lexes its own output again with the same lexer and
 compares it with the input (`origami_syntax::compare::equivalent`). The two are
 equal when all of these hold:

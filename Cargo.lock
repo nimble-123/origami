@@ -1285,6 +1285,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "origami_wasm"
+version = "0.1.0"
+dependencies = [
+ "origami_core",
+ "serde_json",
+]
+
+[[package]]
 name = "outref"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

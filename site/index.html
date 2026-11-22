@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>origami: a formatter for ABAP and CDS</title>
+  <meta name="description" content="origami formats ABAP and CDS: line breaks, indentation, spaces and keyword case, nothing else. It checks its own output token by token and says why it broke each line.">
+  <meta name="color-scheme" content="light dark">
+  <meta property="og:title" content="origami: a formatter for ABAP and CDS">
+  <meta property="og:description" content="Layout only, checked token by token, with a reason for every line break. Try it in your browser.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <a class="brand" href="./" aria-label="origami home">
+      <picture>
+        <source srcset="assets/logo-dark.svg" media="(prefers-color-scheme: dark)">
+        <img src="assets/logo.svg" alt="" width="32" height="32">
+      </picture>
+      <span>origami</span>
+    </a>
+    <nav aria-label="Sections">
+      <a href="#playground">Playground</a>
+      <a href="#safety">How it works</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/nimble-123/origami" data-repo>GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <h1 id="hero-title">A long line of ABAP, folded into shape.</h1>
+      <div class="hero-copy">
+        <p class="lede">origami formats ABAP and CDS. It changes line breaks, indentation, spaces and keyword case, nothing else, and it checks its own output token by token before it writes a file.</p>
+        <div class="install-line">
+          <code id="brew-cmd">brew install nimble-123/tap/origami</code>
+          <button class="copy" type="button" data-copy="#brew-cmd" aria-label="Copy install command">
+            <svg class="icon icon-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+            <svg class="icon icon-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+          </button>
+        </div>
+        <p class="hero-links"><a href="#playground">Format your own code in the browser</a></p>
+      </div>
+
+      <figure class="sheet fold hero-sheet" aria-labelledby="hero-caption">
+        <div class="hero-code" id="hero-code" aria-hidden="true"></div>
+        <pre class="sr-only" id="hero-static">DATA(ls_rule) = zcl_flight_rules=&gt;get( iv_carrier = is_flight-carrid
+                                       iv_date    = sy-datum
+                                       iv_mode    = 'A' ).</pre>
+        <p class="note hero-note" id="hero-note"><span class="note-mark" aria-hidden="true">↳</span> ABAP-CALL-001: one parameter per line, because the call would end at column 103 (limit 72)</p>
+        <figcaption id="hero-caption" class="sr-only">A method call that is 103 characters long, formatted at a line width of 72: one parameter per line, with the note that explains the break.</figcaption>
+      </figure>
+    </section>
+
+    <section id="playground" class="band" aria-labelledby="pg-title">
+      <div class="section-head">
+        <h2 id="pg-title">Try it on your code</h2>
+        <p>Paste ABAP or CDS. It runs in your browser: origami compiled to WebAssembly, nothing is uploaded.</p>
+      </div>
+
+      <div class="pg-controls" role="group" aria-label="Playground settings">
+        <label>Example
+          <select id="pg-example">
+            <option value="call">ABAP class</option>
+            <option value="sql">ABAP SQL</option>
+            <option value="cds">CDS view</option>
+          </select>
+        </label>
+        <label>Language
+          <select id="pg-lang">
+            <option value="abap">ABAP</option>
+            <option value="cds">CDS family</option>
+          </select>
+        </label>
+        <label>Line width
+          <select id="pg-width">
+            <option>80</option>
+            <option>100</option>
+            <option selected>120</option>
+          </select>
+        </label>
+        <label>Keywords
+          <select id="pg-case">
+            <option value="upper">UPPER</option>
+            <option value="lower">lower</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="pg">
+        <div class="pg-pane">
+          <label class="pane-label" for="pg-input">Your code</label>
+          <textarea id="pg-input" class="sheet code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+        </div>
+        <div class="pg-pane">
+          <div class="pane-label">
+            <span id="pg-out-label">Formatted</span>
+            <button class="copy text" type="button" data-copy="#pg-output-text" aria-label="Copy formatted code">Copy</button>
+          </div>
+          <div id="pg-output" class="sheet code output" tabindex="0" aria-labelledby="pg-out-label" aria-describedby="pg-status"></div>
+          <pre id="pg-output-text" hidden></pre>
+        </div>
+      </div>
+      <p id="pg-status" class="status" role="status" aria-live="polite">Loading origami…</p>
+    </section>
+
+    <section id="safety" class="band" aria-labelledby="safety-title">
+      <div class="section-head">
+        <h2 id="safety-title">It never changes what your code means</h2>
+        <p>After formatting, origami reads its own output back and compares every token and every comment with your file. Only whitespace, line breaks and keyword case may differ.</p>
+      </div>
+      <figure class="figure">
+        <picture>
+          <source srcset="assets/pipeline-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="assets/pipeline.svg" width="960" height="380" loading="lazy" alt="Your file is lexed, parsed and laid out, and printed. The self-check compares the tokens with the input: if they are the same, the file is written; if not, the unit is kept as written and printed again; if it still differs, the file stays unchanged with error X001.">
+        </picture>
+      </figure>
+      <ul class="facts">
+        <li><strong>A statement origami does not understand</strong> keeps its own line breaks. It is re-indented with its block and reported as W003.</li>
+        <li><strong>A file with a structural error</strong>, such as a missing period or an unclosed <code>IF</code>, is never touched. You get the line and column instead.</li>
+        <li><strong>Embedded languages</strong> (AMDP, native SQL, macros) are copied byte for byte.</li>
+      </ul>
+    </section>
+
+    <section id="review" class="band" aria-labelledby="review-title">
+      <div class="section-head">
+        <h2 id="review-title">Every fold has a reason</h2>
+        <p><code>origami --review</code> shows what would change before anything is written, and below each construct it broke, the rule and the column the line would have ended at. In VS Code, <em>origami: Preview Changes</em> opens the same changes in the diff view.</p>
+      </div>
+      <figure class="figure terminal">
+        <picture>
+          <source srcset="assets/review-demo-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="assets/review-demo.svg" loading="lazy" alt="Terminal: origami --review on an ABAP class at line width 80. The method signature, a method call and a SELECT are broken onto several lines; notes name ABAP-METHODS-001, ABAP-CALL-001 and ABAP-SQL-001 with the columns 88, 93 and 101.">
+        </picture>
+      </figure>
+    </section>
+
+    <section id="speed" class="band" aria-labelledby="speed-title">
+      <div class="section-head">
+        <h2 id="speed-title">Fast enough for every save</h2>
+        <p>One file takes about 2 ms, including process start. A whole repository takes a fraction of a second, so format-on-save and pre-commit hooks stay out of your way.</p>
+      </div>
+      <figure class="figure">
+        <picture>
+          <source srcset="assets/benchmark-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="assets/benchmark.svg" width="960" height="352" loading="lazy" alt="Time for 1,652 ABAP files on one thread: ABAP Cleaner default profile 10.44 s, essential profile 6.69 s, parse only 1.93 s; origami 0.70 s, 15 times faster.">
+        </picture>
+        <figcaption>Apple M4, one thread. ABAP Cleaner also changes code; origami only changes layout. <a data-repo-path="docs/benchmark-abap-cleaner.md" href="#">How this was measured</a>.</figcaption>
+      </figure>
+    </section>
+
+    <section id="install" class="band" aria-labelledby="install-title">
+      <div class="section-head">
+        <h2 id="install-title">Install</h2>
+        <p>origami is a single binary for macOS, Linux and Windows. It reads <code>origami.toml</code> for line width, indentation and keyword case.</p>
+      </div>
+      <dl class="install">
+        <dt>Homebrew</dt>
+        <dd><code>brew install nimble-123/tap/origami</code></dd>
+        <dt>Format a repository</dt>
+        <dd><code>origami</code> formats every ABAP and CDS file below the current folder; <code>origami --check</code> only reports.</dd>
+        <dt>Only what you changed</dt>
+        <dd><code>origami --changed main</code> formats the lines you touched since <code>main</code>.</dd>
+        <dt>VS Code</dt>
+        <dd>The extension in every release formats on save, works with ADT for VS Code and adds <em>Preview Changes</em>.</dd>
+        <dt>GitHub Actions</dt>
+        <dd><code>uses: nimble-123/origami@v0.1.0</code> with <code>args: --check</code>; GitLab, Azure Pipelines and pre-commit in <a data-repo-path="docs/ci.md" href="#">the CI guide</a>.</dd>
+        <dt>AI agents</dt>
+        <dd><code>origami --mcp</code> runs an MCP server; agents get compact diagnostics with a next step.</dd>
+      </dl>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>origami is free software under MIT or Apache-2.0. The style is written down rule by rule in <a data-repo-path="docs/STYLE.md" href="#">STYLE.md</a>.</p>
+    <p><a data-repo-path="docs/CLI.md" href="#">Command line</a> <a data-repo-path="CHANGELOG.md" href="#">Changelog</a> <a href="https://github.com/nimble-123/origami" data-repo>Source</a></p>
+  </footer>
+</body>
+</html>

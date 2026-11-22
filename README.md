@@ -1,121 +1,94 @@
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+  <img src="docs/assets/logo.svg" alt="" width="96" height="96">
+</picture>
+
 # origami
 
-A layout-only formatter for ABAP and the CDS family: ABAP, CDS data definitions
-(DDLS), metadata extensions (DDLX), access controls (DCL), RAP behavior
-definitions (BDEF) and service definitions (SRVD). It runs offline, in
-milliseconds, on abapGit repositories and on ADT for VS Code documents.
+**A long line of ABAP, folded into shape.**<br>
+A formatter for ABAP and CDS that changes layout and nothing else, checks its own output token by token, and tells you why it broke each line.
 
-origami changes layout only: whitespace, line breaks, indentation and the case
-of ABAP keywords. It never adds or removes a gap between two tokens, never
-re-cases identifiers and never rewrites statements. After every run it re-lexes
-its own output and refuses to write if anything but layout changed.
+[![Release](https://img.shields.io/github/v/release/nimble-123/origami?color=2456D6&include_prereleases)](https://github.com/nimble-123/origami/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/nimble-123/origami/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/nimble-123/origami/actions/workflows/ci.yml)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-2456D6)](#license)
+[![Rust 2024](https://img.shields.io/badge/Rust-2024-18214D?logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![ABAP and CDS](https://img.shields.io/badge/ABAP%20%2B%20CDS-up%20to%20SAP__BASIS%208.16-18214D)](#supported-files)
+[![Homebrew](https://img.shields.io/badge/brew-nimble--123%2Ftap-2456D6?logo=homebrew&logoColor=white)](#install)
 
-> **Status: feature-complete for v1.0, not yet released.** All six
-> languages are formatted by grammar: ABAP (modern and classic: classes,
-> interfaces, RAP handlers, EML, ABAP SQL, reports, selection screens, event
-> blocks, `FORM` routines, function modules) and the CDS family (annotations,
-> view headers, `case` expressions, DCL grants, BDEF and SRVD). Statements
-> without a parser keep their own line breaks and are re-indented (W003); on
-> the test corpus that is 0.2% of ABAP statements. Every corpus file (1,891
-> ABAP and 227 CDS-family files) passes the self-check and is idempotent, and
-> the independent abaplint lexer finds no token changes. Formatting is about
-> 15× faster than ABAP Cleaner ([comparison](docs/benchmark-abap-cleaner.md)).
-> See [the design](docs/designs/origami.md) and [the style guide](docs/STYLE.md).
+[Website](https://nimble-123.github.io/origami/) · [Playground](https://nimble-123.github.io/origami/#playground) · [Why origami](#why-origami) · [Install](#install) · [Use](#use) · [How it works](#how-it-works) · [Documentation](#documentation) · [License](#license)
 
-Existing code does not have to be reformatted in one go: `--changed` formats
-only what you touched. In VS Code, *Format Selection* works, and
-`"editor.formatOnSaveMode": "modifications"` formats only changed lines on
-save.
+</div>
 
-To see what origami would change before it changes anything, run
-`origami --review`: the changes with a note on each line break origami
-introduces and why. In VS Code, "origami: Preview Changes" shows the
-formatting of the open file in the diff view, with an Apply button.
+> [!NOTE]
+> origami is pre-release (0.1). All six languages are formatted by grammar,
+> every file of a 2,100-file test corpus passes the self-check and is
+> idempotent, and the abaplint lexer finds no token changes. Still open:
+> signed builds, the VS Code Marketplace listing and feedback from teams
+> using it daily. Please [open an issue](https://github.com/nimble-123/origami/issues)
+> with any line origami formats in a way you would not.
+
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/review-demo-dark.svg">
+  <img alt="origami --review on an ABAP class at line width 80: the method signature, a method call and a SELECT are broken onto several lines, and each change carries a note such as ABAP-CALL-001: one parameter per line, because the call would end at column 93 (limit 80)." src="docs/assets/review-demo.svg" width="860">
+</picture>
+
+</div>
+
+## Why origami
+
+- **Layout only.** Whitespace, line breaks, indentation and the case of ABAP keywords. origami never renames, reorders or rewrites a statement, so a formatted diff is easy to review.
+- **Checked, every time.** After formatting, origami lexes its own output and compares every token and comment with your file. If anything but layout differs, that statement is left as written. A file with a structural error is never touched.
+- **Explained.** `origami --review` shows the changes before anything is written, with a note on every line break origami adds: which rule, and at which column the line would have ended.
+- **Fast.** About 2 ms per file including start-up, 0.2 s for 1,650 files. Fast enough for format-on-save and pre-commit hooks ([benchmark](docs/benchmark-abap-cleaner.md)).
+- **Fits how SAP teams work.** abapGit repositories, ADT for VS Code documents, `--changed` for brownfield code, a GitHub Action, and an MCP server for AI agents.
+
+## Features
+
+| | |
+| --- | --- |
+| **ABAP** | Classes, interfaces, RAP handlers, EML, ABAP SQL (CTEs, subqueries, database DML), constructor expressions, reports, selection screens, event blocks, `FORM` routines, function modules, dynpro flow logic. Up to SAP_BASIS 8.16. |
+| **CDS family** | Data definitions (DDLS), metadata extensions (DDLX), access controls (DCL), behavior definitions (BDEF), service definitions (SRVD): annotations, headers, `case` expressions, grants. |
+| **Review** | `--review` prints changes with old and new line numbers, the changed characters highlighted and a note per broken construct. `--check --diff` stays a plain unified diff for scripts. |
+| **Partial formatting** | `--changed [REF]` formats only the lines you touched; `--lines 40:75` only those lines. In VS Code: *Format Selection* and format-on-save for modified lines. |
+| **VS Code** | Formatter for files and ADT documents, problems in the Problems panel, *origami: Preview Changes* in the diff view with *Apply*. |
+| **CI** | GitHub Action with code-scanning annotations (SARIF), templates for GitLab and Azure Pipelines, pre-commit hooks. |
+| **AI agents** | `origami --mcp` (tools `format` and `format_files`), and a compact agent output with a next step. |
+| **Configuration** | `origami.toml`: line width, indentation, keyword case, required version. Nothing else to tune: the style is written down rule by rule in [STYLE.md](docs/STYLE.md). |
 
 ## Install
 
 ```sh
-cargo install --path crates/origami_cli   # binary: origami
+brew install nimble-123/tap/origami        # macOS and Linux
+cargo install abap-origami                 # any platform with Rust
 ```
 
-VS Code: build the extension in `editors/vscode` (see below) and install the
-VSIX. Released binaries, `cargo install abap-origami` and Marketplace
-publishing follow with v1.0.
+Release binaries for macOS, Linux and Windows, each with a `.sha256` file, and
+the VS Code extension (`.vsix`) are on the
+[releases page](https://github.com/nimble-123/origami/releases).
 
-```sh
-cd editors/vscode
-npm ci && npm run build
-mkdir -p bin && cp ../../target/release/origami bin/
-npx vsce package --target darwin-arm64 --no-dependencies --allow-missing-repository
-code --install-extension abap-origami-darwin-arm64-0.1.0.vsix
-```
+Try it without installing: the [playground](https://nimble-123.github.io/origami/#playground)
+runs origami in your browser (WebAssembly, nothing is uploaded).
 
 ## Use
 
 ```sh
-origami                       # format all supported files below .
-origami --check               # CI: exit 1 if anything would change
-origami --review              # show what would change, and why lines break
-origami --check --diff        # the changes as a unified diff (for scripts)
+origami                        # format all ABAP and CDS files below .
+origami --review               # show what would change, and why lines break
+origami --check                # CI: exit 1 if anything would change
+origami --changed main         # only lines changed against main (+ new files)
+origami --lines 40:75 zcl_foo.clas.abap
 cat zcl_foo.clas.abap | origami --stdin-filepath zcl_foo.clas.abap
-origami --check --diagnostics json src/   # machine-readable, on stderr
-origami --changed             # only lines changed since HEAD (+ new files)
-origami --changed main        # only lines changed against main
-origami --lines 40:75 zcl_foo.clas.abap   # only these lines
 ```
 
-The full contract (flags, exit codes, diagnostic codes, JSON schema, config) is
-in [docs/CLI.md](docs/CLI.md).
-
-### CI
-
-GitHub Action, GitLab CI and Azure Pipelines templates: [docs/ci.md](docs/ci.md).
-
-### pre-commit
-
-```yaml
-repos:
-  - repo: <origami repository URL>
-    rev: <tag>
-    hooks:
-      - id: origami        # check only
-      # - id: origami-fix  # rewrite files
-```
-
-### AI agents
-
-origami is also an MCP server: `origami --mcp` offers the tools `format`
-(source text in, formatted text and diagnostics out) and `format_files`
-(check or rewrite files, optionally only lines changed against a git
-revision). For Claude Code:
-
-```sh
-claude mcp add origami -- origami --mcp
-```
-
-Without MCP, pipe source through stdin. On any error stdout stays empty, so an agent never
-writes an empty object back. `"changed": false` in the JSON diagnostics lets
-it skip a write-back through the ADT MCP server.
-
-## Supported files
-
-| abapGit file | Language | Status |
-|---|---|---|
-| `*.clas.abap` (incl. `locals_def`, `locals_imp`, `testclasses`, `macros`), `*.intf.abap` | ABAP | formatted |
-| `*.prog.abap`, `*.fugr.*.abap`, `*.type.abap` | ABAP | formatted, including reports, selection screens, event blocks, `FORM` routines and function modules |
-| `*.screen_<nr>.abap` | dynpro flow logic | formatted (`PROCESS` blocks, `MODULE`, `FIELD`, `CHAIN`, table-control loops) |
-| `*.ddls.asddls`, `*.drty.acds` | CDS DDL | formatted |
-| `*.ddlx.asddlxs` | DDLX | formatted |
-| `*.dcls.asdcls` | DCL | formatted |
-| `*.bdef.asbdef` | BDEF | formatted |
-| `*.srvd.srvdsrv` | SRVD | formatted |
-
-## Configuration
-
-`origami.toml`, found by walking up to the git root:
+Configuration, found by walking up to the repository root:
 
 ```toml
-required_version = ">=0.1"
+# origami.toml
+required_version = ">=0.1, <0.2"
 line_width = 120
 indent_width = 2
 
@@ -123,13 +96,124 @@ indent_width = 2
 keyword_case = "upper"
 ```
 
+Flags, exit codes, diagnostic codes and the JSON schema: [docs/CLI.md](docs/CLI.md).
+
+<details>
+<summary><strong>VS Code</strong></summary>
+
+Install the `.vsix` from the release, then make origami the formatter:
+
+```json
+"[abap]": { "editor.defaultFormatter": "origami-dev.abap-origami" },
+"[acds]": { "editor.defaultFormatter": "origami-dev.abap-origami" },
+"editor.formatOnSave": true,
+"editor.formatOnSaveMode": "modifications"
+```
+
+*origami: Preview Changes* shows the formatting of the open file in the diff
+view; *Apply* writes it into the document (unsaved). Details:
+[editors/vscode/README.md](editors/vscode/README.md).
+
+</details>
+
+<!-- x-release-please-start-version -->
+<details>
+<summary><strong>CI and pre-commit</strong></summary>
+
+```yaml
+# .github/workflows/origami.yml
+on: [pull_request]
+permissions: { contents: read, security-events: write }
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: nimble-123/origami@v0.1.0
+        with:
+          args: --check --changed origin/${{ github.base_ref }}
+          sarif: "true"
+```
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/nimble-123/origami
+    rev: v0.1.0
+    hooks:
+      - id: origami        # check only
+      # - id: origami-fix  # rewrite files
+```
+
+GitLab CI and Azure Pipelines: [docs/ci.md](docs/ci.md). Rolling origami out
+in a team: [docs/adoption.md](docs/adoption.md).
+
+</details>
+<!-- x-release-please-end -->
+
+<details>
+<summary><strong>AI agents</strong></summary>
+
+```sh
+claude mcp add origami -- origami --mcp
+```
+
+The MCP server offers `format` (source text in, formatted text and
+diagnostics out) and `format_files` (check or rewrite files below the working
+directory, optionally only changed lines). Without MCP, pipe source through
+stdin: on any error stdout stays empty, so an agent never writes an empty
+object back. When `CLAUDECODE` is set, diagnostics come in a compact agent
+format that ends with a `NEXT:` line.
+
+</details>
+
+## How it works
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pipeline-dark.svg">
+    <img alt="Your file is lexed into lossless tokens, parsed and laid out, and printed. The self-check compares the tokens with the input: if they are the same, the file is written; if not, the unit is kept as written and printed again; if it still differs, the file stays unchanged with error X001." src="docs/assets/pipeline.svg" width="860">
+  </picture>
+</div>
+
+- **Lossless lexer.** Every byte of the input is a token or trivia (space, line break, comment), so the output can be compared with the input exactly.
+- **Grammar, then layout.** Each statement is parsed and turned into a layout tree: groups that print flat when they fit and break by fixed rules when they do not, hanging indentation, aligned `=` in parameter lists.
+- **Self-check and quarantine.** A statement whose output tokens differ from its input tokens is printed as written (W001); a line over ABAP's 255-character limit is avoided the same way (W002).
+- **Line-break notes.** The final layout is printed a second time without a width limit. A break that disappears there was caused by the width, one that stays by a rule or a comment; the rule that laid out the construct gives the note its ID.
+
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/benchmark-dark.svg">
+    <img alt="Time for 1,652 ABAP files on one thread: ABAP Cleaner default profile 10.44 s, essential profile 6.69 s, parse only 1.93 s; origami 0.70 s, 15 times faster." src="docs/assets/benchmark.svg" width="860">
+  </picture>
+</div>
+
+ABAP Cleaner applies about 100 cleanup rules, several of which change code;
+origami only changes layout. The numbers compare the time to process the same
+files, not the same work ([method](docs/benchmark-abap-cleaner.md)).
+
+## Supported files
+
+| abapGit file | Language |
+|---|---|
+| `*.clas.abap` (incl. `locals_def`, `locals_imp`, `testclasses`, `macros`), `*.intf.abap` | ABAP |
+| `*.prog.abap`, `*.fugr.*.abap`, `*.type.abap` | ABAP (reports, selection screens, event blocks, `FORM` routines, function modules) |
+| `*.screen_<nr>.abap` | dynpro flow logic |
+| `*.ddls.asddls`, `*.drty.acds` | CDS data definitions |
+| `*.ddlx.asddlxs` | metadata extensions |
+| `*.dcls.asdcls` | access controls |
+| `*.bdef.asbdef` | behavior definitions |
+| `*.srvd.srvdsrv` | service definitions |
+
 ## Documentation
 
-* [Style](docs/STYLE.md): every output rule, with approval gate
-* [Invariants](docs/INVARIANTS.md): what "layout only" means and how it is checked
-* [CLI contract](docs/CLI.md)
-* [Adopting origami in a team](docs/adoption.md)
-* [Design](docs/designs/origami.md)
+- [Style](docs/STYLE.md): every output rule, with examples and line-break explanations
+- [Invariants](docs/INVARIANTS.md): what "layout only" means and how it is checked
+- [Command line](docs/CLI.md): flags, exit codes, diagnostics, configuration
+- [CI](docs/ci.md) and [adopting origami in a team](docs/adoption.md)
+- [Design](docs/designs/origami.md) and [line-break explanations](docs/designs/origami-explain-review.md)
+- [Visual design](docs/brand.md)
 
 ## Development
 
@@ -137,9 +221,15 @@ keyword_case = "upper"
 cargo test --workspace
 cargo test -p origami_core --features fault-injection
 cargo xtask corpus fetch && cargo xtask corpus run   # real-world corpus
-cargo xtask freq                                     # statement frequencies
+cargo xtask explain --corpus                         # line-break notes
+cargo xtask oracle                                   # abaplint lexer cross-check
+sh site/build.sh && python3 -m http.server -d site/dist   # website
 ```
+
+Contributions start with an issue. A change to the output needs a rule in
+[STYLE.md](docs/STYLE.md) first; see "How rules work" there.
 
 ## License
 
-MIT OR Apache-2.0.
+Licensed under either of [Apache License 2.0](LICENSE-APACHE) or
+[MIT](LICENSE-MIT), at your option.

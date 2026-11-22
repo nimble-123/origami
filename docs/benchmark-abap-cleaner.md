@@ -28,6 +28,11 @@ number for ABAP Cleaner is a lower bound. The harness runs on one thread.
 
 ## Results
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/benchmark-dark.svg">
+  <img alt="Time for 1,652 ABAP files on one thread: ABAP Cleaner default profile 10.44 s, essential profile 6.69 s, parse only 1.93 s; origami 0.70 s." src="assets/benchmark.svg" width="860">
+</picture>
+
 Whole corpus, warm (third of three passes; ABAP Cleaner after JIT warm-up):
 
 | Tool | Time | Per file | origami is faster by |

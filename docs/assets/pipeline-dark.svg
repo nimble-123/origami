@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="pipeline-dark-title pipeline-dark-desc" id="pipeline-dark-root">
+        <title id="pipeline-dark-title">How origami keeps your code intact</title>
+        <desc id="pipeline-dark-desc">origami lexes the file, lays it out and prints it, then re-lexes the output and compares the tokens with the input; only identical results are written, a unit that differs is kept as written, and if it still differs the file stays unchanged.</desc>
+        <defs>
+      <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');
+      #pipeline-dark-root { font-family: 'Schibsted Grotesk', system-ui, sans-serif; color: #e7ebf6; }
+      #pipeline-dark-root .diagram-container { width: 100%; overflow-x: auto; }
+      #pipeline-dark-root p.caption { color: #aeb6d3; font-size: 0.9rem; margin-top: 1rem; max-width: 68ch; }
+      @media print {
+#pipeline-dark-root .diagram-container { overflow-x: visible; }
+}</style>
+          <marker id="pipeline-dark-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#aeb6d3"/></marker>
+          <marker id="pipeline-dark-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#7fa2ff"/></marker>
+          <marker id="pipeline-dark-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#7fa2ff"/></marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#0e1430"/>
+        <g transform="translate(0,-100)">
+        <rect x="512" y="140" width="288" height="236" rx="4" fill="none" stroke="#2e3866" stroke-width="1" stroke-dasharray="6,4"/>
+        <text x="520" y="132" fill="#8e97ba" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" letter-spacing="0.04em">self-check, after every format</text>
+        <line x1="128" y1="204" x2="166" y2="204" stroke="#aeb6d3" stroke-width="1" marker-end="url(#pipeline-dark-arrow)"/>
+        <line x1="304" y1="204" x2="342" y2="204" stroke="#aeb6d3" stroke-width="1" marker-end="url(#pipeline-dark-arrow)"/>
+        <line x1="488" y1="204" x2="526" y2="204" stroke="#aeb6d3" stroke-width="1" marker-end="url(#pipeline-dark-arrow)"/>
+        <line x1="640" y1="204" x2="658" y2="204" stroke="#aeb6d3" stroke-width="1" marker-end="url(#pipeline-dark-arrow)"/>
+        <line x1="764" y1="204" x2="802" y2="204" stroke="#7fa2ff" stroke-width="1.2" marker-end="url(#pipeline-dark-arrow-accent)"/>
+        <line x1="712" y1="248" x2="712" y2="310" stroke="#aeb6d3" stroke-width="1" marker-end="url(#pipeline-dark-arrow)"/>
+        <path d="M644 340 H592 Q584 340 584 332 V234" fill="none" stroke="#aeb6d3" stroke-width="1" marker-end="url(#pipeline-dark-arrow)"/>
+        <line x1="712" y1="368" x2="712" y2="406" stroke="#aeb6d3" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#pipeline-dark-arrow)"/>
+        <rect x="768" y="183" width="32" height="12" rx="2" fill="#0e1430"/>
+        <text x="784" y="192" fill="#7fa2ff" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">yes</text>
+        <rect x="716" y="275" width="24" height="12" rx="2" fill="#0e1430"/>
+        <text x="722" y="284" fill="#8e97ba" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.04em">no</text>
+        <rect x="498" y="279" width="80" height="12" rx="2" fill="#0e1430"/>
+        <text x="572" y="288" fill="#8e97ba" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="end" letter-spacing="0.04em">print again</text>
+        <rect x="716" y="389" width="104" height="12" rx="2" fill="#0e1430"/>
+        <text x="722" y="398" fill="#8e97ba" font-size="8" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.04em">still different</text>
+        <rect x="24" y="176" width="104" height="56" rx="28" fill="#0e1430"/>
+        <rect x="24" y="176" width="104" height="56" rx="28" fill="#151d42" stroke="#e7ebf6" stroke-width="1"/>
+        <text x="76" y="202" fill="#e7ebf6" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">Your file</text>
+        <text x="76" y="218" fill="#aeb6d3" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">ABAP or CDS</text>
+        <rect x="168" y="176" width="136" height="56" rx="4" fill="#0e1430"/>
+        <rect x="168" y="176" width="136" height="56" rx="4" fill="#151d42" stroke="#e7ebf6" stroke-width="1"/>
+        <text x="236" y="202" fill="#e7ebf6" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">Lex</text>
+        <text x="236" y="218" fill="#aeb6d3" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">lossless tokens</text>
+        <rect x="344" y="176" width="144" height="56" rx="4" fill="#0e1430"/>
+        <rect x="344" y="176" width="144" height="56" rx="4" fill="#151d42" stroke="#e7ebf6" stroke-width="1"/>
+        <text x="416" y="202" fill="#e7ebf6" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">Parse and lay out</text>
+        <text x="416" y="218" fill="#aeb6d3" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">layout tree</text>
+        <rect x="528" y="176" width="112" height="56" rx="4" fill="#0e1430"/>
+        <rect x="528" y="176" width="112" height="56" rx="4" fill="#151d42" stroke="#e7ebf6" stroke-width="1"/>
+        <text x="584" y="202" fill="#e7ebf6" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">Print</text>
+        <text x="584" y="218" fill="#aeb6d3" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">line width 120</text>
+        <polygon points="660,204 712,160 764,204 712,248" fill="#0e1430"/>
+        <polygon points="660,204 712,160 764,204 712,248" fill="#7fa2ff" stroke="#7fa2ff" stroke-width="1.2" fill-opacity="0.10"/>
+        <text x="712" y="200" fill="#e7ebf6" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">Same</text>
+        <text x="712" y="216" fill="#e7ebf6" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">tokens?</text>
+        <rect x="804" y="176" width="132" height="56" rx="28" fill="#0e1430"/>
+        <rect x="804" y="176" width="132" height="56" rx="28" fill="#151d42" stroke="#e7ebf6" stroke-width="1"/>
+        <text x="870" y="202" fill="#e7ebf6" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">Formatted file</text>
+        <text x="870" y="218" fill="#aeb6d3" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">written</text>
+        <rect x="644" y="312" width="136" height="56" rx="4" fill="#0e1430"/>
+        <rect x="644" y="312" width="136" height="56" rx="4" fill="#151d42" stroke="#e7ebf6" stroke-width="1"/>
+        <text x="712" y="338" fill="#e7ebf6" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">Quarantine unit</text>
+        <text x="712" y="354" fill="#aeb6d3" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">keep as written</text>
+        <rect x="624" y="408" width="176" height="48" rx="24" fill="#0e1430"/>
+        <rect x="624" y="408" width="176" height="48" rx="24" fill="#151d42" stroke="#e7ebf6" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="712" y="430" fill="#e7ebf6" font-size="12" font-weight="600" font-family="'Schibsted Grotesk', system-ui, sans-serif" text-anchor="middle">File left unchanged</text>
+        <text x="712" y="446" fill="#aeb6d3" font-size="9" font-family="'Martian Mono', ui-monospace, monospace" text-anchor="middle">error X001</text>
+        </g>
+
+      </svg>
