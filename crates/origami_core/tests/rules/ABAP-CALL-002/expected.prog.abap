@@ -3,3 +3,7 @@ lo_service->read( EXPORTING iv_id         = lv_id
                             iv_with_texts = abap_true
                   IMPORTING es_data     = ls_data
                             et_messages = lt_messages ).
+lo_service->read( EXPORTING iv_id = lv_id
+                  IMPORTING es_data = ls_data ).
+lo_service->update( iv_id = lv_id ).
+lo_service->check( EXPORTING iv_id = lv_id ).

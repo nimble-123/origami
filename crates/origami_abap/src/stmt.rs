@@ -533,7 +533,9 @@ impl<'c, 'a> P<'c, 'a> {
                     b::hang(vec![b::align(rows)]),
                 ]);
                 if n > 0 {
-                    hang.push(self.ln(k));
+                    // ABAP-CALL-002: a call with two or more parameter
+                    // keywords always puts each keyword on its own line.
+                    hang.push(if call { self.hl(k) } else { self.ln(k) });
                     fall.push(self.hl(k));
                 }
                 hang.push(g.clone());
