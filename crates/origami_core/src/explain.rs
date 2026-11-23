@@ -162,6 +162,11 @@ pub const RULE_PHRASES: &[(RuleId, &str, &str)] = &[
         "case expression",
     ),
     (
+        "CDS-CLAUSE-001",
+        "each query clause on its own line",
+        "query",
+    ),
+    (
         "DCL-GRANT-001",
         "condition split before AND, OR",
         "access condition",
@@ -176,6 +181,7 @@ const ALWAYS_BREAKS: &[RuleId] = &[
     "CDS-UNIT-001",
     "CDS-HEAD-001",
     "CDS-ELEM-001",
+    "CDS-CLAUSE-001",
 ];
 
 /// Rule phrase and construct noun of `rule`.

@@ -776,6 +776,47 @@ line when it fits. Elements without `case` keep the author's line breaks.
       end as CurrencyGroup,
 ```
 
+### CDS-CLAUSE-001: Query clauses after the select list
+Milestone: M2
+Explanation: each query clause on its own line
+
+Approved by the maintainer, Nils Lutz, on 2026-11-23. Adopted from ABAP Cleaner
+1.29.2 ("Break before WHERE clause etc.", defaults). In a DDLS query, `where`,
+`group by`, `having`, `union`, `except` and `intersect` start a line at the
+level of the definition (the level of `define` and of the closing `}` of the
+select list), also in every branch of a `union`. A `group` and `by` that the
+author split over two lines are joined. Continuation lines of a clause keep
+their position relative to the clause keyword, and never start left of one
+indent level (CDS-CONT-001). Comments stay with the line they were written
+on; a comment line before a clause moves with it. Blank lines are neither
+added nor removed (CDS-BLANK-001). Not affected: clauses inside parentheses
+(sub-selects, `exists`), `order by`, `union all` / `union distinct` (the second
+word stays), the text after `union` (`select from …` stays on its line), and
+DCL, DDLX and BDEF, which have no such clauses. Where the author wrote the
+select list on one line (`{ key a, b }`), the clauses still go to their own
+lines.
+
+```cds
+define view entity ZI_Flights
+  as select from spfli { key carrid, key connid, cityfrom }
+where carrid = 'LH' group by carrid, connid, cityfrom
+having count(*) > 1
+```
+
+becomes
+
+```cds
+define view entity ZI_Flights
+  as select from spfli { key carrid, key connid, cityfrom }
+where carrid = 'LH'
+group by carrid, connid, cityfrom
+having count(*) > 1
+```
+
+Deviations from ABAP Cleaner: origami does not add the blank line that Cleaner
+puts before `union` and `intersect`, and a continuation line never starts left
+of one indent level, where Cleaner may put it in column 0.
+
 ### DCL-GRANT-001: Access conditions
 Milestone: M2
 Explanation: condition split before AND, OR

@@ -1,0 +1,3 @@
+9: CDS-CLAUSE-001: each query clause on its own line
+13: CDS-CLAUSE-001: each query clause on its own line
+16: CDS-CLAUSE-001: each query clause on its own line
