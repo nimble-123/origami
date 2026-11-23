@@ -192,6 +192,9 @@ format that ends with a `NEXT:` line.
 ABAP Cleaner applies about 100 cleanup rules, several of which change code;
 origami only changes layout. The numbers compare the time to process the same
 files, not the same work. Per-file latencies (p50, p95, p99), cold and warm starts, MCP, WebAssembly and thread scaling: [docs/benchmark.md](docs/benchmark.md).
+The layout itself, the same code formatted by ABAP Cleaner's layout rules and
+by origami, and every ABAP Cleaner rule next to origami's:
+[origami and ABAP Cleaner](https://nimble-123.github.io/origami/abap-cleaner.html).
 
 ## Supported files
 

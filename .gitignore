@@ -20,3 +20,4 @@ site/dist/
 
 # Local secrets (API keys)
 .env
+__pycache__/
