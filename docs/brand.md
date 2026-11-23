@@ -133,5 +133,5 @@ Numbers are measured and linked to their source. No exclamation marks.
 * **Website (`site/`):** a single page on GitHub Pages: hero with the fold
   animation, the playground (origami in WebAssembly), how the self-check
   works, line-break notes, speed, install.
-* **Diagrams:** pipeline and benchmark in the palette above (light and dark
+* **Diagrams:** pipeline and the benchmark charts in the palette above (light and dark
   SVG), crease-line frames, Schibsted Grotesk labels, Martian Mono for code.

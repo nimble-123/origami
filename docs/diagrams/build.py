@@ -10,6 +10,7 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 DATA = json.loads((HERE.parent / "benchmark-data.json").read_text())
+COMPARE = json.loads((HERE.parent / "benchmark-compare-data.json").read_text())
 
 SKINS = {
     # Tokyo Night Light by day, Tokyo Night by night (docs/brand.md).
@@ -139,52 +140,163 @@ def pipeline(theme):
             "compares the tokens with the input; only identical results are written, a unit that "
             "differs is kept as written, and if it still differs the file stays unchanged.")
     caption = ("After formatting, origami reads its own output back and compares every token and "
-               "comment with your file. Only whitespace, line breaks and keyword case may differ.")
+               "comment with your file. Only whitespace, line breaks and letter case may differ.")
     body = f'        <g transform="translate(0,-100)">\n{body}        </g>\n'
     return page(slug, title, desc, 960, 380, body, s, caption)
 
 
 def benchmark(theme):
+    """Whole project: the 1,920 ABAP files, both tools, from bench-compare."""
     s = SKINS[theme]
     slug = "benchmark" if theme == "light" else "benchmark-dark"
-    acb = DATA["abap_cleaner"]
-    threads = {r["threads"]: r["time"]["p50"] for r in DATA["corpus_by_threads"]}
-    one, ten = threads[1] / 1000, threads[10] / 1000
-    cleaner = acb["corpus_warm_ms"] / 1000
-    rows = [("ABAP Cleaner, default profile", cleaner, False),
-            ("origami, one thread", one, True),
-            ("origami, ten threads", ten, False)]
+    pr = COMPARE["project"]
+    default = pr["default"]["warm_ms"] / 1000
+    layout = pr["layout"]["warm_ms"] / 1000
+    one = pr["origami_j1"]["warm"]["p50"] / 1000
+    many = pr["origami"]["warm"]["p50"] / 1000
+    cores = COMPARE["machine"]["cores"]
+    rows = [("ABAP Cleaner, default profile", default, None),
+            ("ABAP Cleaner, layout profile", layout, None),
+            ("origami, one thread", one, "focal"),
+            (f"origami, {cores} threads", many, "ratio")]
     x0, x1 = 264, 904
-    ceil = math.ceil(cleaner / 2) * 2
+    ceil = math.ceil(default / 2) * 2
     px = (x1 - x0) / ceil
     body = ""
+    top, bottom = 40, 56 + len(rows) * 56 - 8
     for t in range(0, ceil + 1, 2):
         x = round(x0 + t * px)
         stroke = f"rgba({s['ink_rgb']},0.25)" if t == 0 else f"rgba({s['ink_rgb']},0.08)"
-        body += f'        <line x1="{x}" y1="40" x2="{x}" y2="232" stroke="{stroke}" stroke-width="{1 if t == 0 else 0.8}"/>\n'
-        body += f'        <text x="{x}" y="252" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="middle">{t} s</text>\n'
-    for i, (name, v, focal) in enumerate(rows):
-        y = 56 + i * 60
+        body += f'        <line x1="{x}" y1="{top}" x2="{x}" y2="{bottom}" stroke="{stroke}" stroke-width="{1 if t == 0 else 0.8}"/>\n'
+        body += f'        <text x="{x}" y="{bottom + 20}" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="middle">{t} s</text>\n'
+    for i, (name, v, kind) in enumerate(rows):
+        y = 56 + i * 56
         w = max(2, round(v * px))
+        focal = kind == "focal"
         fill = s["accent_tint"] if focal else f"rgba({s['ink_rgb']},0.06)"
         stroke = s["accent"] if focal else s["series1"]
         body += f'        <rect x="{x0}" y="{y}" width="{w}" height="32" fill="{s["paper"]}"/>\n'
         body += f'        <rect x="{x0}" y="{y}" width="{w}" height="32" fill="{fill}" stroke="{stroke}" stroke-width="1"/>\n'
         body += (f'        <text x="{x0 - 12}" y="{y + 20}" fill="{s["ink"]}" font-size="12" font-weight="600"'
                  f' font-family="{SANS}" text-anchor="end">{name}</text>\n')
-        val = f"{v:.2f} s" + (f", {cleaner / v:.0f}× faster" if focal else "")
+        val = f"{v:.2f} s"
+        if kind:
+            val += f", {layout / v:.0f}× faster than the layout profile"
         body += (f'        <text x="{x0 + w + 10}" y="{y + 20}" fill="{s["accent"] if focal else s["muted"]}"'
                  f' font-size="9" font-family="{MONO}">{val}</text>\n')
-    n_abap = DATA["corpus"]["abap_files"]
-    n_all = DATA["corpus"]["files"]
-    body += (f'        <text x="584" y="276" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="middle"'
-             f' letter-spacing="0.04em">time for the test corpus: ABAP Cleaner {n_abap:,} ABAP files, origami all {n_all:,} files</text>\n')
-    title = "Formatting the whole test corpus"
-    desc = (f"Bar chart of the time to process the test corpus: ABAP Cleaner takes {cleaner:.2f} s with its "
-            f"default profile; origami takes {one:.2f} s on one thread and {ten:.2f} s on ten threads.")
-    caption = (f"{DATA['machine']['cpu']}, {DATA['date']}. ABAP Cleaner also changes code (about 100 rules); "
-               "origami only changes layout. Method and all numbers: docs/benchmark.md.")
-    return page(slug, title, desc, 960, 292, body, s, caption)
+    n = COMPARE["inputs"]["project"]["count"]
+    body += (f'        <text x="584" y="{bottom + 44}" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="middle"'
+             f' letter-spacing="0.04em">time for all {n:,} ABAP files of the test corpus, warm, same files for both tools</text>\n')
+    title = "Formatting a whole project"
+    desc = (f"Bar chart of the time to format the {n:,} ABAP files of the test corpus: ABAP Cleaner takes "
+            f"{default:.2f} s with its default profile and {layout:.2f} s with its layout profile; origami takes "
+            f"{one:.2f} s on one thread and {many:.2f} s on {cores} threads.")
+    caption = (f"{COMPARE['machine']['cpu']}, {COMPARE['date']}. ABAP Cleaner runs on one thread; its layout "
+               "profile keeps only the rules that change layout, its default profile also changes code. "
+               "All numbers: docs/benchmark-abap-cleaner.md.")
+    return page(slug, title, desc, 960, bottom + 60, body, s, caption)
+
+
+def us_or_ms(v):
+    """A time in milliseconds, written in µs below 1 ms."""
+    if v < 1:
+        u = v * 1000
+        return f"{u:.1f} µs" if u < 10 else f"{u:.0f} µs"
+    return f"{v:.1f} ms" if v < 10 else f"{v:.0f} ms"
+
+
+def granularity(theme):
+    """Dot plot on a log axis: origami and both ABAP Cleaner profiles, warm and cold,
+    for one statement, one method and one file (from bench-compare)."""
+    s = SKINS[theme]
+    slug = "granularity" if theme == "light" else "granularity-dark"
+    x0, x1, lo, hi = 210, 800, -3, 3              # 1 µs … 1 s
+    xs = lambda v: round(x0 + (math.log10(v) - lo) / (hi - lo) * (x1 - x0))
+    inp = COMPARE["inputs"]
+    names = {"statement": "One statement", "method": "One method", "file": "One file"}
+
+    def lines(n):
+        return f"{n} line" + ("" if n == 1 else "s")
+
+    groups = [
+        ("Warm: one call in a running program, median of all inputs",
+         [(names[g], {t: COMPARE["warm"][g][t]["time_us"]["p50"] / 1000 for t in ("origami", "layout", "default")})
+          for g in ("statement", "method", "file")]),
+        ("Cold: a new process per call, median-sized input",
+         [(f"{names[g]}, {lines(inp[g]['lines_median'])}",
+           {t: COMPARE["cold"][g][t]["time"]["p50"] for t in ("origami", "layout", "default")})
+          for g in ("statement", "method", "file")]),
+    ]
+    body = ""
+    y = 40
+    row_ys = []
+    layout_rows = []
+    for header, rows in groups:
+        body += (f'        <text x="24" y="{y}" fill="{s["ink"]}" font-size="12" font-weight="700" '
+                 f'font-family="{SANS}">{header}</text>\n')
+        y += 34
+        for name, v in rows:
+            layout_rows.append((y, name, v))
+            row_ys.append(y)
+            y += 44
+        y += 8
+    top, bottom = 52, y - 26
+    for e in range(lo, hi + 1):
+        x = xs(10 ** e)
+        stroke = f"rgba({s['ink_rgb']},0.25)" if e == lo else f"rgba({s['ink_rgb']},0.08)"
+        body += f'        <line x1="{x}" y1="{top}" x2="{x}" y2="{bottom}" stroke="{stroke}" stroke-width="{1 if e == lo else 0.8}"/>\n'
+        tick = {-3: "1 µs", -2: "10 µs", -1: "100 µs", 0: "1 ms", 1: "10 ms", 2: "100 ms", 3: "1 s"}[e]
+        body += f'        <text x="{x}" y="{bottom + 16}" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="middle">{tick}</text>\n'
+    body += (f'        <text x="{(x0 + x1) // 2}" y="{bottom + 32}" fill="{s["muted"]}" font-size="8" font-family="{MONO}" '
+             f'text-anchor="middle" letter-spacing="0.04em">time per call, log scale</text>\n')
+    body += (f'        <text x="944" y="40" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="end" '
+             f'letter-spacing="0.04em">slower than origami</text>\n')
+    body += (f'        <text x="944" y="54" fill="{s["muted"]}" font-size="8" font-family="{MONO}" text-anchor="end" '
+             f'letter-spacing="0.04em">layout · default</text>\n')
+    connector = f"rgba({s['ink_rgb']},{0.55 if theme == 'light' else 0.40})"
+    for y, name, v in layout_rows:
+        a, b, c = xs(v["origami"]), xs(v["layout"]), xs(v["default"])
+        body += (f'        <text x="{x0 - 24}" y="{y + 4}" fill="{s["ink"]}" font-size="11" font-weight="600" '
+                 f'font-family="{SANS}" text-anchor="end">{name}</text>\n')
+        body += f'        <line x1="{a}" y1="{y}" x2="{c}" y2="{y}" stroke="{connector}" stroke-width="1"/>\n'
+        # ABAP Cleaner default profile: solid square; layout profile: hollow square; origami: accent dot.
+        body += f'        <rect x="{c - 5}" y="{y - 5}" width="10" height="10" fill="{s["series1"]}" stroke="{s["ink"]}" stroke-width="1"/>\n'
+        body += f'        <rect x="{b - 5}" y="{y - 5}" width="10" height="10" fill="{s["paper"]}" stroke="{s["series1"]}" stroke-width="1.5"/>\n'
+        body += f'        <circle cx="{a}" cy="{y}" r="6" fill="{s["accent"]}" stroke="{s["ink"]}" stroke-width="1"/>\n'
+        body += (f'        <text x="{a - 12}" y="{y + 4}" fill="{s["accent"]}" font-size="8" font-family="{MONO}" '
+                 f'text-anchor="end">{us_or_ms(v["origami"])}</text>\n')
+        body += (f'        <text x="{b}" y="{y - 11}" fill="{s["muted"]}" font-size="8" font-family="{MONO}" '
+                 f'text-anchor="middle">{us_or_ms(v["layout"])}</text>\n')
+        body += (f'        <text x="{c + 12}" y="{y + 4}" fill="{s["muted"]}" font-size="8" font-family="{MONO}">'
+                 f'{us_or_ms(v["default"])}</text>\n')
+        r1, r2 = v["layout"] / v["origami"], v["default"] / v["origami"]
+        body += (f'        <text x="944" y="{y + 4}" fill="{s["ink"]}" font-size="9" font-family="{MONO}" '
+                 f'text-anchor="end">{r1:.0f}× · {r2:.0f}×</text>\n')
+    ly = bottom + 52
+    body += f'        <line x1="24" y1="{ly - 16}" x2="944" y2="{ly - 16}" stroke="rgba({s["ink_rgb"]},0.10)" stroke-width="0.8"/>\n'
+    body += f'        <circle cx="34" cy="{ly}" r="5" fill="{s["accent"]}" stroke="{s["ink"]}" stroke-width="1"/>\n'
+    body += f'        <text x="46" y="{ly + 4}" fill="{s["muted"]}" font-size="9" font-family="{SANS}">origami</text>\n'
+    body += f'        <rect x="112" y="{ly - 5}" width="10" height="10" fill="{s["paper"]}" stroke="{s["series1"]}" stroke-width="1.5"/>\n'
+    body += f'        <text x="130" y="{ly + 4}" fill="{s["muted"]}" font-size="9" font-family="{SANS}">ABAP Cleaner, layout profile</text>\n'
+    body += f'        <rect x="280" y="{ly - 5}" width="10" height="10" fill="{s["series1"]}" stroke="{s["ink"]}" stroke-width="1"/>\n'
+    body += f'        <text x="298" y="{ly + 4}" fill="{s["muted"]}" font-size="9" font-family="{SANS}">ABAP Cleaner, default profile</text>\n'
+    title = "One statement, one method, one file"
+    def warm(g, t):
+        return us_or_ms(COMPARE["warm"][g][t]["time_us"]["p50"] / 1000)
+
+    def cold(g, t):
+        return us_or_ms(COMPARE["cold"][g][t]["time"]["p50"])
+
+    desc = ("Dot plot, log scale, of the median time per call for origami and ABAP Cleaner with its layout "
+            f"and its default profile. Warm, one statement: origami {warm('statement', 'origami')}, ABAP Cleaner "
+            f"{warm('statement', 'layout')} and {warm('statement', 'default')}; one file: origami "
+            f"{warm('file', 'origami')}, ABAP Cleaner {warm('file', 'layout')} and {warm('file', 'default')}. "
+            f"Cold, a new process per call, one file: origami {cold('file', 'origami')}, ABAP Cleaner "
+            f"{cold('file', 'layout')} and {cold('file', 'default')}.")
+    caption = (f"{COMPARE['machine']['cpu']}, {COMPARE['date']}. Warm: after the JIT compiler has warmed up. "
+               "Cold: ABAP Cleaner through its Java API without the Eclipse start, so a lower bound. "
+               "All numbers: docs/benchmark-abap-cleaner.md.")
+    return page(slug, title, desc, 960, ly + 20, body, s, caption)
 
 
 LATENCY_ROWS = [
@@ -288,6 +400,7 @@ if __name__ == "__main__":
         suffix = "" if theme == "light" else "-dark"
         (HERE / f"pipeline{suffix}.html").write_text(pipeline(theme))
         (HERE / f"benchmark{suffix}.html").write_text(benchmark(theme))
+        (HERE / f"granularity{suffix}.html").write_text(granularity(theme))
         (HERE / f"latency{suffix}.html").write_text(latency(theme))
         (HERE / f"threads{suffix}.html").write_text(scaling(theme))
     print("written:", sorted(p.name for p in HERE.glob("*.html")))

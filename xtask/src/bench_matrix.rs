@@ -342,7 +342,7 @@ fn abap_cleaner(src: &[Source], median: &Source) -> Result<Option<Value>, String
     let per_file = root().join("target/bench/abap-cleaner-per-file.txt");
     let t = Instant::now();
     Command::new("java")
-        .args(["-Xmx4g", "-cp", &cp, "Bench", "default"])
+        .args(["-Xmx2g", "-cp", &cp, "Bench", "default"])
         .arg(&list)
         .arg("3")
         .arg(&per_file)
@@ -606,7 +606,7 @@ fn report(d: &Value) -> String {
     }
     if !a.is_null() {
         s.push_str(&format!(
-            "\n## ABAP Cleaner\n\nABAP Cleaner {} with its {} profile processes the ABAP files of the corpus in {} ms (sum of the per-file times, warm JVM, one thread). It applies about 100 cleanup rules, several of which change code; origami only changes layout, so the numbers compare the time to process the same files, not the same work. How it was run: [benchmark-abap-cleaner.md](benchmark-abap-cleaner.md).\n",
+            "\n## ABAP Cleaner\n\nABAP Cleaner {} with its {} profile processes the ABAP files of the corpus in {} ms (sum of the per-file times, warm JVM, one thread). It applies about 100 cleanup rules, several of which change code; origami only changes layout, so the numbers compare the time to process the same files, not the same work. How it was run: [benchmark-abap-cleaner.md](benchmark-abap-cleaner.md).\n\nThe comparison with ABAP Cleaner's layout and default profile, cold and warm, for one statement, one method, one file and the whole project (`cargo xtask bench-compare`, all numbers in [benchmark-abap-cleaner.md](benchmark-abap-cleaner.md)):\n\n<picture>\n  <source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/granularity-dark.svg\">\n  <img alt=\"Median time per call for one statement, one method and one file, warm and cold, for origami and ABAP Cleaner with its layout and default profile, on a log scale.\" src=\"assets/granularity.svg\" width=\"860\">\n</picture>\n\n<picture>\n  <source media=\"(prefers-color-scheme: dark)\" srcset=\"assets/benchmark-dark.svg\">\n  <img alt=\"Time to format all ABAP files of the test corpus: ABAP Cleaner with its default and its layout profile, origami on one thread and on one thread per core.\" src=\"assets/benchmark.svg\" width=\"860\">\n</picture>\n",
             a["version"].as_str().unwrap_or(""),
             a["profile"].as_str().unwrap_or(""),
             f(&a["corpus_warm_ms"]),
