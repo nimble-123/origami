@@ -19,18 +19,49 @@ const HERO_AFTER = [
   "                                       iv_mode    = 'A' ).",
 ].join("\n");
 
-/** Tokyo Night syntax colors for one line of ABAP or CDS: comments, strings,
- * numbers and upper-case keywords. Returns text nodes and spans. */
-const SYNTAX =
-  /(^\*.*|".*|\/\/.*)|('(?:[^']|'')*'?|`(?:[^`]|``)*`?|\|(?:[^|\\]|\\.)*\|?)|\b(\d+)\b|\b([A-Z][A-Z-]*[A-Z])\b/g;
+/** Tokyo Night syntax colors for ABAP or CDS: comments, strings, numbers
+ * and keywords. Groups: 1 comment, 2 string, 3 number, 4 word. */
+const ABAP_SYNTAX =
+  /(^\*.*|".*)|('(?:[^'\n]|'')*'?|`(?:[^`\n]|``)*`?|\|(?:[^|\\\n]|\\.)*\|?)|\b(\d+)\b|(?<![-~>\w/%$])([A-Za-z_/%$][\w/%$]*(?:-[A-Za-z_][\w]*)*)/gm;
+const CDS_SYNTAX =
+  /(\/\/.*|--.*|\/\*[\s\S]*?(?:\*\/|$(?![\s\S])))|('(?:[^'\n]|'')*'?)|\b(\d+)\b|(?<![.@#$\w])([A-Za-z_][\w$#]*)/gm;
 
-function paint(text) {
+// Keywords, in upper case: the words origami's parsers know (keywords.js,
+// written by site/build.sh), and for CDS the words its grammar matches by
+// token kind.
+const KEYWORDS = {
+  abap: new Set((self.KEYWORDS?.abap ?? "").split(" ").filter(Boolean)),
+  cds: new Set(
+    [
+      ...(self.KEYWORDS?.cds ?? "").split(" "),
+      ..."abstract action all annotate annotation aspect between cast child custom default delete determination distinct entity enum exists expose false field from function in is like managed mandatory not null of parent readonly redirected returns role root service strict table then to true type unmanaged update use validation view virtual".split(
+        " ",
+      ),
+    ]
+      .filter(Boolean)
+      .map((w) => w.toUpperCase()),
+  ),
+};
+
+/** Text nodes and spans for `text`. `upper`: in ABAP, a word is a keyword
+ * when it is in upper case (origami's output with keywords in upper case);
+ * otherwise it is a keyword when it is in the keyword list. */
+function paint(text, { cds = false, upper = false } = {}) {
   const out = [];
   let pos = 0;
-  for (const m of text.matchAll(SYNTAX)) {
+  const words = cds ? KEYWORDS.cds : KEYWORDS.abap;
+  for (const m of text.matchAll(cds ? CDS_SYNTAX : ABAP_SYNTAX)) {
+    let cls = m[1] ? "com" : m[2] ? "str" : m[3] ? "num-lit" : null;
+    if (!cls) {
+      const w = m[4];
+      const kw =
+        upper && !cds ? /^[A-Z][A-Z-]*[A-Z]$/.test(w) : words.has(w.toUpperCase());
+      if (!kw) continue;
+      cls = "kw";
+    }
     if (m.index > pos) out.push(text.slice(pos, m.index));
     const s = document.createElement("span");
-    s.className = m[1] ? "com" : m[2] ? "str" : m[3] ? "num-lit" : "kw";
+    s.className = cls;
     s.textContent = m[0];
     out.push(s);
     pos = m.index + m[0].length;
@@ -58,7 +89,7 @@ function hero() {
   const spans = before.map((t, i) => {
     const s = document.createElement("span");
     s.className = "tok";
-    s.append(...paint(t.text));
+    s.append(...paint(t.text, { upper: true }));
     s.style.setProperty("--x", t.x);
     s.style.setProperty("--y", t.y);
     box.append(s);
@@ -157,6 +188,7 @@ _Carrier
 
 const $ = (id) => document.getElementById(id);
 const input = $("pg-input");
+const highlight = $("pg-highlight");
 const output = $("pg-output");
 const outputText = $("pg-output-text");
 const status = $("pg-status");
@@ -219,7 +251,7 @@ function render(r) {
     row.className = broken.has(n) ? "ln broken" : "ln";
     row.dataset.n = n;
     const code = document.createElement("span");
-    code.append(...(text ? paint(text) : [" "]));
+    code.append(...(text ? paint(text, { cds: options().cds, upper: !options().lower }) : [" "]));
     row.append(code);
     frag.append(row);
     for (const note of after.get(n) ?? []) {
@@ -241,6 +273,25 @@ function render(r) {
   parts.push(`${num(r.notes.length)} ${r.notes.length === 1 ? "note" : "notes"} on line breaks`);
   if (warnings) parts.push(`${num(warnings)} ${warnings === 1 ? "warning" : "warnings"}`);
   status.innerHTML = `${parts.join(", ")}. Took ${num(r.ms)} ms in your browser.`;
+}
+
+// Inputs larger than this are shown without colors, so typing stays fast.
+const HIGHLIGHT_MAX = 200_000;
+
+/** Colors the copy of the input behind the textarea. */
+function paintInput() {
+  const text = input.value;
+  // The trailing line keeps the last line reachable when the textarea scrolls.
+  highlight.replaceChildren(
+    ...(text.length > HIGHLIGHT_MAX ? [text] : paint(text, { cds: options().cds })),
+    "\n",
+  );
+  syncScroll();
+}
+
+function syncScroll() {
+  highlight.scrollTop = input.scrollTop;
+  highlight.scrollLeft = input.scrollLeft;
 }
 
 function options() {
@@ -306,6 +357,7 @@ function dispatch() {
 }
 
 function run() {
+  paintInput();
   if (!ready) return;
   queued = { source: input.value, opts: options() };
   if (!inflight) dispatch();
@@ -323,11 +375,16 @@ async function playground() {
   input.value = EXAMPLES.call.text;
   $("pg-example").addEventListener("change", (e) => loadExample(e.target.value));
   for (const id of ["pg-lang", "pg-width", "pg-case"]) $(id).addEventListener("change", run);
-  input.addEventListener("input", schedule);
+  input.addEventListener("input", () => {
+    paintInput();
+    schedule();
+  });
+  input.addEventListener("scroll", syncScroll);
   input.addEventListener("keydown", (e) => {
     if (e.key === "Tab" && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
       e.preventDefault();
       input.setRangeText("  ", input.selectionStart, input.selectionEnd, "end");
+      paintInput();
       schedule();
     }
   });

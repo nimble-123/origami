@@ -295,6 +295,20 @@ select {
 textarea.code { resize: vertical; tab-size: 2; white-space: pre; }
 textarea.code:focus-visible { outline-offset: 0; }
 
+/* The input: a transparent textarea over a highlighted copy of its text.
+   Both have the same font, padding, border and scroll position. */
+.editor { position: relative; }
+.editor pre {
+  position: absolute; inset: 0; height: auto;
+  overflow: hidden; tab-size: 2; white-space: pre; pointer-events: none;
+}
+.editor textarea {
+  position: relative; display: block;
+  background: transparent; color: transparent; caret-color: var(--ink);
+  border: 1px solid transparent; border-radius: 4px;
+}
+.editor textarea::selection { background: color-mix(in oklab, var(--valley) 30%, transparent); color: transparent; }
+
 .output { padding: 0.9rem 0; }
 .output .ln {
   display: grid; grid-template-columns: 3.2ch 1fr; column-gap: 1ch;
