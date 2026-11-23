@@ -266,10 +266,11 @@ jobs:
             fi
           fi
 
-          # Format a fixture (keywords to upper case, blanks collapsed), then
+          # Format a fixture (keywords to upper case, blanks collapsed, no blank
+          # before the period: ABAP-SPACE-001), then
           # check that formatting changes nothing more.
           input=$'REPORT  zdemo.\nif  a=1 .\n  write:/ `x`.\nendif.\n'
-          expected=$'REPORT zdemo.\nIF a=1 .\n  write:/ `x`.\nENDIF.'
+          expected=$'REPORT zdemo.\nIF a=1.\n  write:/ `x`.\nENDIF.'
           actual=$(printf '%s' "$input" | "${run[@]}" --stdin --language abap --no-config | tr -d '\r')
           if [ "$actual" != "$expected" ]; then
             echo "::error::unexpected output for the ABAP fixture:"
