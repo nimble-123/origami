@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.2](https://github.com/nimble-123/origami/compare/v0.2.1...v0.2.2) (2026-11-23)
+
+
+### Fixes
+
+* **abap:** upper-case NULLS FIRST and NULLS LAST in ORDER BY ([#40](https://github.com/nimble-123/origami/issues/40)) ([65651bc](https://github.com/nimble-123/origami/commit/65651bc6887a25f45131fdad68a679f0c7da16d4))
+
+
+### Formatting output
+
+* **abap:** align COND/SWITCH expressions and SELECT field lists (ABAP-COND-002, ABAP-SQL-003) ([#37](https://github.com/nimble-123/origami/issues/37)) ([84f0095](https://github.com/nimble-123/origami/commit/84f0095307a5768d78ca3631cb00e11392b41bb9))
+* **abap:** align consecutive assignments, test methods, redefinitions and aliases (ABAP-ALIGN-004..007) ([#38](https://github.com/nimble-123/origami/issues/38)) ([7d27bfd](https://github.com/nimble-123/origami/commit/7d27bfdadb047c7ca3d87f79d29b14f419262473))
+* **abap:** no space before a period or comma, and aligned ABAP Doc parameters (ABAP-SPACE-001, ABAP-DOC-001) ([#36](https://github.com/nimble-123/origami/issues/36)) ([8ef522f](https://github.com/nimble-123/origami/commit/8ef522f7f736c51373c7f68f0b47a9e4142a18ea))
+* **cds:** break before WHERE, GROUP BY, HAVING and UNION in queries (CDS-CLAUSE-001) ([#34](https://github.com/nimble-123/origami/issues/34)) ([8e046ac](https://github.com/nimble-123/origami/commit/8e046ac21ca6aad969baa8f9bad3a285859cf3cf))
+
 ## [0.2.1](https://github.com/nimble-123/origami/compare/v0.2.0...v0.2.1) (2026-11-23)
 
 
