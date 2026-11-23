@@ -29,7 +29,8 @@ public class Compare {
 
   /** The default profile reduced to layout rules, with their default options,
    * except that generated "do not include other source files here" comments
-   * are kept. */
+   * are kept. Also used by ../abap-cleaner-bench/Bench.java (mode "layout",
+   * `cargo xtask bench-compare`). */
   static Profile layoutProfile() {
     Profile p = Profile.createDefault();
     for (Rule r : p.getAllRules()) {
