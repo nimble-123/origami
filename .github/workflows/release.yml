@@ -365,6 +365,11 @@ jobs:
             echo "::notice::No earlier release with binaries; no release diff."
           else
             cargo xtask release-diff "$previous"
+            # GitHub rejects an empty asset (HTTP 400, Bad Content-Length):
+            # when no corpus output changed, the file says so.
+            if [ ! -s target/release-diff.patch ]; then
+              echo "No output changes on the test corpus between $previous and $GITHUB_REF_NAME." > target/release-diff.patch
+            fi
             cp target/release-diff.patch extras/
           fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
