@@ -3225,6 +3225,10 @@ fn mark_sql_keywords(p: &mut P, from: usize, to: usize) {
                 "CURRENT" => p.is(k + 1, "ROW"),
                 "ROW" => k > from && p.is(k - 1, "CURRENT"),
                 "ALL" => k > from && p.is(k - 1, "UNION"),
+                // `ORDER BY col DESCENDING NULLS FIRST`; a column may be
+                // called `first`.
+                "NULLS" => p.is(k + 1, "FIRST") || p.is(k + 1, "LAST"),
+                "FIRST" | "LAST" => k > from && p.is(k - 1, "NULLS"),
                 _ => SQL_WORDS.contains(&w.as_str()),
             }
         };
