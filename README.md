@@ -47,7 +47,7 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 - **Layout only.** Whitespace, line breaks, indentation and letter case in ABAP: keywords in upper case, identifiers without a lower-case letter in lower case, and aligned assignments, test methods, aliases, ABAP Doc, `COND` branches and `SELECT` lists, as ABAP Cleaner does. origami never renames, reorders or rewrites a statement, so a formatted diff is easy to review.
 - **Checked, every time.** After formatting, origami lexes its own output and compares every token and comment with your file. If anything but layout differs, that statement is left as written. A file with a structural error is never touched, and very deep nesting (over 100 levels) or a file over 8 MB is left as written too (W004), so time and memory stay bounded.
 - **Explained.** `origami --review` shows the changes before anything is written, with a note on every line break origami adds: which rule, and at which column the line would have ended.
-- **Fast.** A median file takes 0.07 ms in process and 1.8 ms as a new process, start-up included; 99 % of files take under 4 ms. The whole 2,100-file test corpus takes 0.2 s. Fast enough for format-on-save, pre-commit hooks and agents ([benchmark](docs/benchmark.md)).
+- **Fast.** A median file takes 0.08 ms in process and 2.2 ms as a new process, start-up included; 99 % of files take under 5 ms. The whole 2,100-file test corpus takes 0.2 s. Fast enough for format-on-save, pre-commit hooks and agents ([benchmark](docs/benchmark.md)).
 - **Fits how SAP teams work.** abapGit repositories, ADT for VS Code documents, `--changed` for brownfield code, a GitHub Action, and an MCP server for AI agents.
 
 ## Features
@@ -189,11 +189,18 @@ format that ends with a `NEXT:` line.
 <div align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/benchmark-dark.svg">
-    <img alt="Time to process the test corpus: ABAP Cleaner, default profile, 11.41 s for 1,920 ABAP files; origami 0.74 s on one thread and 0.21 s on ten threads for all 2,147 files, 15 times faster." src="docs/assets/benchmark.svg" width="860">
+    <img alt="Time to format all 1,920 ABAP files of the test corpus: ABAP Cleaner 11.49 s with its default profile and 7.56 s with its layout profile; origami 0.94 s on one thread, 8 times faster than the layout profile, and 0.20 s on ten threads." src="docs/assets/benchmark.svg" width="860">
   </picture>
 </div>
 
-Measured again on 2026-11-23 on the 1,920 ABAP files alone: ABAP Cleaner 11.31 s with its default profile and 7.45 s with only its layout rules; origami 0.93 s on one thread (12 times faster than the default profile) and 0.20 s on ten. Cold and warm, per statement, method, file and project: [docs/benchmark-abap-cleaner.md](docs/benchmark-abap-cleaner.md).
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/granularity-dark.svg">
+    <img alt="Median time per call, log scale. Warm, in a running program: one statement 3.8 µs with origami against 82 and 141 µs with ABAP Cleaner's layout and default profile; one method 20 µs against 249 and 378 µs; one file 113 µs against 1.3 and 2.0 ms. Cold, a new process per call: origami 1.6 to 1.9 ms, ABAP Cleaner 248 to 349 ms." src="docs/assets/granularity.svg" width="860">
+  </picture>
+</div>
+
+Measured on 2026-11-23 on the 1,920 ABAP files of the test corpus. In a running program (an editor, a server) origami formats a statement, a method or a file 12 to 37 times faster than ABAP Cleaner; as a new process per call (a pre-commit hook, an agent) 140 to 180 times faster, because a JVM needs a quarter of a second to start. Cold and warm, per statement, method, file and project: [docs/benchmark-abap-cleaner.md](docs/benchmark-abap-cleaner.md).
 
 ABAP Cleaner applies about 100 cleanup rules, several of which change code;
 origami only changes layout. The numbers compare the time to process the same

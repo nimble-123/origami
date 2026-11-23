@@ -154,12 +154,12 @@
     <section id="speed" class="band" aria-labelledby="speed-title">
       <div class="section-head">
         <h2 id="speed-title">Fast enough for every save</h2>
-        <p>A median file takes 0.07 ms in a running editor or agent and 1.8 ms as a new process, start included; 99 % of files take under 4 ms. The 2,100-file test corpus takes 0.2 s, so format-on-save and pre-commit hooks stay out of your way.</p>
+        <p>A median file takes 0.08 ms in a running editor or agent and 2.2 ms as a new process, start included; 99 % of files take under 5 ms. The 2,100-file test corpus takes 0.2 s, so format-on-save and pre-commit hooks stay out of your way.</p>
       </div>
       <figure class="figure">
         <picture>
           <source srcset="assets/latency-dark.svg" media="(prefers-color-scheme: dark)">
-          <img src="assets/latency.svg" width="960" height="512" loading="lazy" alt="Time per call, median and 99th percentile: origami in process 0.07 and 3.9 ms, through MCP 0.19 and 5.5 ms, in WebAssembly 0.23 and 11 ms, as a new process 1.8 and 2.0 ms; ABAP Cleaner with a warm JVM 2.0 and 59 ms, with a new JVM 314 and 340 ms.">
+          <img src="assets/latency.svg" width="960" height="512" loading="lazy" alt="Time per call, median and 99th percentile: origami in process 0.08 and 4.5 ms, through MCP 0.22 and 7.6 ms, in WebAssembly 0.26 and 14 ms, as a new process 2.2 and 3.1 ms; ABAP Cleaner with a warm JVM 2.0 and 59 ms, with a new JVM 315 and 355 ms.">
         </picture>
         <figcaption>Apple M4. ABAP Cleaner also changes code; origami only changes layout (<a href="abap-cleaner.html">layout compared side by side</a>). <a data-repo-path="docs/benchmark.md" href="#">All measurements</a>, including the whole corpus and thread scaling.</figcaption>
       </figure>
