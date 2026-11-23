@@ -97,8 +97,8 @@ pub type UnitId = u32;
 
 /// Deepest nesting that is laid out (W004): blocks and brackets combined. A
 /// unit with a token nested deeper is left as written. Real code stays far
-/// below (the corpus maximum is 19); the limit bounds recursion, the size of
-/// the layout and the indentation.
+/// below (the corpus has at most 12 block levels and 7 bracket levels); the
+/// limit bounds recursion, the size of the layout and the indentation.
 pub const MAX_NESTING: u32 = 100;
 
 /// Longest output, in bytes, for an input of `len` bytes: 16 times the input

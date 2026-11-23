@@ -203,10 +203,20 @@ for the path `<internal>`.
 | W001 | warning | unit quarantined by the self-check | 0 / 5 | file | yes |
 | W002 | warning | unit left as written because of the 255-character limit | 0 / 5 | file | yes |
 | W003 | warning | unknown statement formatted generically | 0 / 5 | file | yes |
-| W004 | warning | nesting-depth limit reached | 0 / 5 | file | yes |
+| W004 | warning | nesting-depth or size limit reached; the affected units, or the whole file, are left as written | 0 / 5 | file | yes |
 | W101 | warning | unknown config key | 0 / 5 | run | yes |
 | X001 | internal | self-check failed after quarantine | 70 | file | yes |
 | X002 | internal | panic caught | 70 | file | yes |
+
+W004 limits (reported once per file):
+
+* **Nesting depth:** a unit (ABAP statement, CDS-family element) with a token
+  nested deeper than 100 levels of blocks and brackets combined is printed
+  byte for byte. Real code stays far below 100.
+* **Input size:** a file larger than 8 MiB is not formatted: status
+  `unchanged`, output equal to the input.
+* **Output size:** a layout that would make the output more than 16 times the
+  input plus 1 MiB leaves the whole file as written.
 
 Codes are stable once released. `I`-codes are reserved.
 
