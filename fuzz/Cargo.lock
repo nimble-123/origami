@@ -9,6 +9,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bc62ac97cc33321f50863d514c3bc38a453947a8f9e781137e47c7401020aed"
 
 [[package]]
+name = "bstr"
+version = "1.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a680398c10c7bc0488067c4612226ea905a85f607134b69f3068d505d58c4214"
+dependencies = [
+ "memchr",
+ "serde_core",
+]
+
+[[package]]
 name = "cc"
 version = "1.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -70,6 +80,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "memchr"
+version = "2.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
 name = "origami-fuzz"
 version = "0.0.0"
 dependencies = [
@@ -79,7 +95,7 @@ dependencies = [
 
 [[package]]
 name = "origami_abap"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "origami_layout",
  "origami_syntax",
@@ -87,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "origami_cds"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "origami_layout",
  "origami_syntax",
@@ -95,24 +111,25 @@ dependencies = [
 
 [[package]]
 name = "origami_core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "origami_abap",
  "origami_cds",
  "origami_syntax",
  "serde",
+ "similar",
 ]
 
 [[package]]
 name = "origami_layout"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "origami_syntax",
 ]
 
 [[package]]
 name = "origami_syntax"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
 ]
@@ -176,6 +193,15 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+
+[[package]]
+name = "similar"
+version = "3.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2f8bec09ae8fae0f4f265a4559a9334be3929d8504e9b536df0a41302bd1733"
+dependencies = [
+ "bstr",
+]
 
 [[package]]
 name = "syn"

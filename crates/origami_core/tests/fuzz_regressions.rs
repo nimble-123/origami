@@ -1,8 +1,9 @@
 //! Inputs found by `cargo fuzz` (fuzz/found/), checked with the fuzz targets'
-//! invariants: no X001/X002, and formatted output formats to itself. Files
+//! invariants (at the default setting and at a second one derived from the
+//! input length): no X001/X002, and formatted output formats to itself. Files
 //! named `open-*` are known open findings and are skipped.
 
-use origami_core::{Code, Language, LanguageHint, Options, format};
+use origami_core::{Case, Code, Language, LanguageHint, Options, format};
 use std::path::Path;
 
 const CDS: [Language; 5] = [
@@ -13,22 +14,32 @@ const CDS: [Language; 5] = [
     Language::Srvd,
 ];
 
+/// Same as `variant` in the fuzz targets.
+fn variant(n: usize) -> Options {
+    let mut o = Options::default();
+    o.lang.line_width = 40 + (n * 7 % 216) as u16;
+    o.lang.indent_width = 1 + (n % 8) as u8;
+    o.lang.abap_keyword_case = if n % 2 == 1 { Case::Lower } else { Case::Upper };
+    o
+}
+
 fn check(name: &str, lang: Language, data: &[u8]) {
     let hint = LanguageHint::Explicit(lang);
-    let opts = Options::default();
-    let r = format(data, &hint, &opts);
-    assert!(
-        !r.has(Code::X001) && !r.has(Code::X002),
-        "{name}: {:?}",
-        r.diagnostics
-    );
-    if let Some(out) = r.output {
-        let again = format(&out, &hint, &opts);
-        assert_eq!(
-            again.output.as_deref(),
-            Some(&out[..]),
-            "{name}: not idempotent"
+    for opts in [Options::default(), variant(data.len())] {
+        let r = format(data, &hint, &opts);
+        assert!(
+            !r.has(Code::X001) && !r.has(Code::X002),
+            "{name}: {:?}",
+            r.diagnostics
         );
+        if let Some(out) = r.output {
+            let again = format(&out, &hint, &opts);
+            assert_eq!(
+                again.output.as_deref(),
+                Some(&out[..]),
+                "{name}: not idempotent"
+            );
+        }
     }
 }
 
