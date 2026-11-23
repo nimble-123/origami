@@ -422,6 +422,134 @@ In a broken `DATA:`, `TYPES:`, `CONSTANTS:` or `CLASS-DATA:` chain, the
 ABAP-DECL-001). A blank line or comment line ends the group; nested
 `BEGIN OF` levels align separately.
 
+### ABAP-ALIGN-004: Align assignments to the same object
+Milestone: M1
+
+Approved by the maintainer, Nils Lutz, on 2026-11-23, as ABAP Cleaner's
+"Align assignments to the same object" with its default options.
+Consecutive assignments whose targets are components of the same object
+align their assignment operators. The object is the target's name up to
+its last `-`: `ls_struc` for `ls_struc-comp` and `ls_struc-date+6(2)`,
+`<ls_fs>` for `<ls_fs>-comp`, `ro_obj` for `ro_obj->mv_attr`,
+`ro_obj->ms_s` for `ro_obj->ms_s-comp`; names are compared regardless of
+case. Operators of different widths are right-aligned in a column as wide as
+the widest (`=`, `?=`, `+=`, `-=`, `*=`, `/=`, `&&=`). Blank lines and comment
+lines do not end a group; any other statement does, including an assignment
+to a plain variable, to another object, or to a target with a table
+expression or call (`lt_tab[ 1 ]-comp`), which are never aligned.
+
+Width: when aligning a group would push one of its statements past the line
+width (a statement that fits on one line would no longer fit, or the first
+line of a longer statement would end past the width), the whole group keeps
+single spaces. Statements that are too wide anyway do not count, and
+continuation lines of a broken statement move with it. This also applies to
+ABAP-ALIGN-005 to ABAP-ALIGN-007. Groups and the decision depend only on
+the statements, blank lines and comments, which formatting keeps, so a
+second run aligns the same way.
+
+Deviations from ABAP Cleaner: it aligns regardless of the line width, and
+compares object names case-sensitively.
+
+```abap
+before: ls_struc-component += 1.
+        "comment
+        ls_struc-comp2 = 'a'.
+
+        ls_struc-comp4 -= 1.
+        lv_other = 2.
+        ro_instance->mv_name = iv_name.
+        ro_instance->mv_id = iv_id.
+after:  ls_struc-component += 1.
+        "comment
+        ls_struc-comp2      = 'a'.
+
+        ls_struc-comp4     -= 1.
+        lv_other = 2.
+        ro_instance->mv_name = iv_name.
+        ro_instance->mv_id   = iv_id.
+```
+
+### ABAP-ALIGN-005: Align `METHODS … FOR TESTING`
+Milestone: M1
+Explanation: one test method per line
+
+Approved by the maintainer, Nils Lutz, on 2026-11-23, as ABAP Cleaner's
+"Align METHODS … FOR TESTING" with its default options. Consecutive
+`METHODS name [ABSTRACT] FOR TESTING [RAISING …].` declarations are padded
+after the method name, so that the words after it start in one column. A
+declaration that fits stays on one line (ABAP-METHODS-001), so
+`METHODS name` and `FOR TESTING` on two lines are joined. Blank lines and
+comment lines do not end a group; any other statement does, including a
+chain. A `METHODS:` chain with two or more test methods always has one item
+per line, aligned after the colon, and its test methods are aligned
+separately from the statements around it; its other items keep their own
+lines and are not aligned. The width rule of ABAP-ALIGN-004 applies.
+
+Deviations from ABAP Cleaner: it aligns `ABSTRACT` and `FOR TESTING` in two
+columns (origami aligns the first word after the name), aligns end-of-line
+comments of the group (origami keeps one space, ABAP-COMMENT-002), and
+ignores the line width. In chains it also breaks a chain with only one test
+method, widens the column for the names of the other items, and leaves a
+chain unaligned when its first item has parameters or a comment line before
+it.
+
+```abap
+before: METHODS test_setup
+          FOR TESTING.
+        METHODS any_test_method_name FOR TESTING RAISING cx_static_check.
+        METHODS: first_test_method FOR TESTING, second_test_method FOR TESTING RAISING cx_message.
+after:  METHODS test_setup           FOR TESTING.
+        METHODS any_test_method_name FOR TESTING RAISING cx_static_check.
+        METHODS: first_test_method  FOR TESTING,
+                 second_test_method FOR TESTING RAISING cx_message.
+```
+
+### ABAP-ALIGN-006: Align `METHODS … REDEFINITION`
+Milestone: M1
+Explanation: one redefinition per line
+
+Approved by the maintainer, Nils Lutz, on 2026-11-23, as ABAP Cleaner's
+"Align METHODS … REDEFINITION" with its default options. Consecutive
+`METHODS name [FINAL] REDEFINITION.` declarations are aligned like the test
+methods of ABAP-ALIGN-005, with the same group, line and width rules. A
+`METHODS:` chain of two or more redefinitions and nothing else always has
+one item per line, aligned; other chains follow ABAP-CHAIN-001.
+
+Deviations from ABAP Cleaner: it ignores the line width.
+
+```abap
+before: METHODS if_any_interface~medium_method_name REDEFINITION.
+        METHODS if_any_interface~short_name
+          REDEFINITION.
+        METHODS if_other_interface~other_method_name FINAL REDEFINITION.
+after:  METHODS if_any_interface~medium_method_name  REDEFINITION.
+        METHODS if_any_interface~short_name          REDEFINITION.
+        METHODS if_other_interface~other_method_name FINAL REDEFINITION.
+```
+
+### ABAP-ALIGN-007: Align `ALIASES … FOR`
+Milestone: M1
+Explanation: one alias per line
+
+Approved by the maintainer, Nils Lutz, on 2026-11-23, as ABAP Cleaner's
+"Align ALIASES … FOR" with its default options. Consecutive
+`ALIASES name FOR intf~comp.` statements align `FOR`, with the same group,
+line and width rules as ABAP-ALIGN-005. An `ALIASES:` chain of two or more
+items always has one item per line, aligned after the colon.
+
+Deviations from ABAP Cleaner: it ignores the line width.
+
+```abap
+before: ALIASES medium_method_name
+          FOR if_any_interface~medium_method_name.
+        ALIASES create FOR if_any_interface~create.
+        ALIASES: first FOR if_other~first, second FOR if_other~second.
+after:  ALIASES medium_method_name FOR if_any_interface~medium_method_name.
+        ALIASES create             FOR if_any_interface~create.
+        ALIASES: first  FOR if_other~first,
+                 second FOR if_other~second.
+```
+
 ### ABAP-EVENT-001: Event blocks
 Milestone: M4
 

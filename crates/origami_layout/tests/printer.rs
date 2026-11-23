@@ -255,6 +255,103 @@ fn alignment_falls_back_to_single_spaces_on_overflow() {
     assert_eq!(out, "a = 1\nbbbbbbbbbbbb = 2\n");
 }
 
+/// Rows `(name, op, value)` as whole lines: anchors right-aligned by their
+/// width, `KeepLines` fallback.
+fn statement_rows(ts: &TokenStream, src: &str, pairs: &[(u32, u32, u32)]) -> Doc {
+    let words: Vec<&str> = src.split_whitespace().collect();
+    let items = pairs
+        .iter()
+        .map(|&(n, op, v)| {
+            b::row_right(
+                vec![t(n)],
+                words[op as usize].len(),
+                vec![
+                    b::sep(ts, TokenIndex(op)),
+                    b::group(vec![t(op), b::sep(ts, TokenIndex(v)), t(v)]),
+                ],
+            )
+        })
+        .collect();
+    b::align_lines(items)
+}
+
+#[test]
+fn right_aligned_anchors_share_their_last_column() {
+    let src = "aaaa += 1 b = 2 cc -= 3";
+    let out = render(src, 80, |ts| {
+        statement_rows(ts, src, &[(0, 1, 2), (3, 4, 5), (6, 7, 8)])
+    });
+    assert_eq!(
+        out,
+        "aaaa += 1
+b     = 2
+cc   -= 3
+"
+    );
+}
+
+#[test]
+fn unaligned_lines_keep_their_own_line_inside_a_group() {
+    let src = "a = 1 other bbb = 2";
+    let out = render(src, 80, |ts| {
+        b::align_lines(vec![
+            b::row(
+                vec![t(0)],
+                vec![
+                    b::sep(ts, TokenIndex(1)),
+                    t(1),
+                    b::sep(ts, TokenIndex(2)),
+                    t(2),
+                ],
+            ),
+            b::line(vec![t(3)]),
+            b::row(
+                vec![t(4)],
+                vec![
+                    b::sep(ts, TokenIndex(5)),
+                    t(5),
+                    b::sep(ts, TokenIndex(6)),
+                    t(6),
+                ],
+            ),
+        ])
+    });
+    assert_eq!(
+        out,
+        "a   = 1
+other
+bbb = 2
+"
+    );
+}
+
+#[test]
+fn keep_lines_alignment_never_pushes_a_fitting_row_past_the_width() {
+    // `a = 1234567` fits into 12 columns, padded to `a      = 1234567` it
+    // would not: the group keeps single spaces.
+    let src = "a = 1234567 bbbbbb = 2";
+    let out = render(src, 12, |ts| {
+        statement_rows(ts, src, &[(0, 1, 2), (3, 4, 5)])
+    });
+    assert_eq!(
+        out,
+        "a = 1234567
+bbbbbb = 2
+"
+    );
+    // A row that is too wide anyway does not prevent alignment.
+    let src = "a = 1234567890123 bbbbbb = 2";
+    let out = render(src, 12, |ts| {
+        statement_rows(ts, src, &[(0, 1, 2), (3, 4, 5)])
+    });
+    assert_eq!(
+        out,
+        "a      = 1234567890123
+bbbbbb = 2
+"
+    );
+}
+
 #[test]
 fn end_of_line_comment_forces_a_break() {
     let out = render("aa \"c\nbb", 80, words_group);

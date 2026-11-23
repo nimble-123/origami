@@ -120,6 +120,9 @@ pub const RULE_PHRASES: &[(RuleId, &str, &str)] = &[
     ),
     ("ABAP-DECL-001", "one declaration per line", "declaration"),
     ("ABAP-CHAIN-001", "one item per line", "chain"),
+    ("ABAP-ALIGN-005", "one test method per line", "chain"),
+    ("ABAP-ALIGN-006", "one redefinition per line", "chain"),
+    ("ABAP-ALIGN-007", "one alias per line", "chain"),
     (
         "ABAP-METHODS-001",
         "each section and parameter on its own line",
@@ -177,6 +180,9 @@ pub const RULE_PHRASES: &[(RuleId, &str, &str)] = &[
 /// only when it does not fit.
 const ALWAYS_BREAKS: &[RuleId] = &[
     "ABAP-STMT-001",
+    "ABAP-ALIGN-005",
+    "ABAP-ALIGN-006",
+    "ABAP-ALIGN-007",
     "ABAP-SQL-002",
     "CDS-UNIT-001",
     "CDS-HEAD-001",

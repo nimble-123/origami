@@ -10,5 +10,5 @@ pub mod builder;
 mod ir;
 mod printer;
 
-pub use ir::{AlignItem, AlignRow, Doc};
+pub use ir::{AlignFit, AlignItem, AlignRow, Doc};
 pub use printer::{PrintOptions, print, print_bounded};

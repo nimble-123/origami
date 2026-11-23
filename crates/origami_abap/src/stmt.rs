@@ -62,6 +62,64 @@ impl Ctx<'_> {
     }
 }
 
+/// What a statement is aligned with its neighbors by (ABAP-ALIGN-004 to
+/// ABAP-ALIGN-007): consecutive statements with the same key at the same
+/// level form an alignment group.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AlignKey {
+    /// An assignment to a component of this object (upper case: ABAP names
+    /// are case-insensitive, and ABAP-CASE-002 may change their case).
+    Assign(String),
+    /// `METHODS name [ABSTRACT] FOR TESTING …`
+    ForTesting,
+    /// `METHODS name [FINAL] REDEFINITION`
+    Redefinition,
+    /// `ALIASES name FOR intf~comp`
+    Aliases,
+}
+
+/// A statement that can be aligned with its neighbors: the part before the
+/// anchor, the gap before the anchor, and the rest from the anchor to the
+/// period.
+pub struct Row {
+    pub key: AlignKey,
+    pub head: Vec<Doc>,
+    pub gap: Doc,
+    pub rest: Vec<Doc>,
+    /// Width of the anchor for right alignment (assignment operators), else 0.
+    pub anchor: usize,
+}
+
+impl Row {
+    /// The statement on its own, laid out as without alignment.
+    pub fn alone(self) -> Doc {
+        let mut docs = self.head;
+        docs.push(self.gap);
+        docs.extend(self.rest);
+        b::group(docs)
+    }
+
+    /// The statement as a row of an alignment group.
+    pub fn aligned(self) -> AlignItem {
+        b::row_right(self.head, self.anchor, vec![self.gap, b::group(self.rest)])
+    }
+}
+
+/// A parsed statement.
+pub enum Stmt {
+    Doc(Doc),
+    Row(Row),
+}
+
+impl Stmt {
+    pub fn into_doc(self) -> Doc {
+        match self {
+            Stmt::Doc(d) => d,
+            Stmt::Row(r) => r.alone(),
+        }
+    }
+}
+
 pub const PARAM_KEYWORDS: &[&str] = &[
     "EXPORTING",
     "IMPORTING",
@@ -1167,8 +1225,43 @@ impl<'c, 'a> P<'c, 'a> {
         b::concat(docs)
     }
 
+    /// ABAP-ALIGN-004: the object whose component the target `start..op`
+    /// is (`ls_struc` for `ls_struc-comp`, `lo_obj` for `lo_obj->mv_attr`,
+    /// `lo_obj->ms_s` for `lo_obj->ms_s-comp`), as ABAP Cleaner finds it:
+    /// the name up to its last `-`. Only a plain name qualifies, optionally
+    /// with offset and length (`ls_s-date+6(2)`); table expressions and
+    /// calls do not.
+    fn assign_key(&self, start: usize, op: usize) -> Option<AlignKey> {
+        if start != self.first || self.kind(start) != WORD {
+            return None;
+        }
+        let mut name = String::new();
+        let mut k = start;
+        while k < op && matches!(self.kind(k), WORD | SELECTOR) {
+            if k > start && !self.glued(k) {
+                return None;
+            }
+            name.push_str(self.text(k));
+            k += 1;
+        }
+        // Length `(len)`.
+        if k < op
+            && !(k + 3 == op
+                && self.kind(k) == LPAREN
+                && self.kind(k + 1) == WORD
+                && self.kind(k + 2) == RPAREN
+                && (k..op).all(|j| self.glued(j)))
+        {
+            return None;
+        }
+        // Offset `+off`.
+        let name = name.split('+').next().unwrap_or("");
+        let cut = name.rfind('-').filter(|&c| c > 0)?;
+        Some(AlignKey::Assign(name[..cut].to_ascii_uppercase()))
+    }
+
     /// Assignment `target op expr.` or standalone call `operand( … ).`.
-    pub fn assignment_or_call(&mut self) -> Option<Doc> {
+    pub fn assignment_or_call(&mut self) -> Option<Stmt> {
         let start = self.pos;
         let saved_kw = self.c.mark();
         if let Some(target) = self.operand() {
@@ -1195,7 +1288,7 @@ impl<'c, 'a> P<'c, 'a> {
                 if !self.at_end() {
                     return None;
                 }
-                let mut docs = vec![target];
+                let mut docs = Vec::new();
                 for (o, r) in ops.into_iter().zip(rhs) {
                     docs.push(self.sp(o));
                     docs.push(self.t(o));
@@ -1203,10 +1296,21 @@ impl<'c, 'a> P<'c, 'a> {
                     docs.push(b::cont(vec![r]));
                 }
                 docs.push(self.period());
-                return Some(b::group(docs));
+                if let Some(key) = self.assign_key(start, op) {
+                    let gap = docs.remove(0);
+                    return Some(Stmt::Row(Row {
+                        key,
+                        head: vec![target],
+                        gap,
+                        rest: docs,
+                        anchor: self.text(op).chars().count(),
+                    }));
+                }
+                docs.insert(0, target);
+                return Some(Stmt::Doc(b::group(docs)));
             }
             if self.at_end() && self.last_call {
-                return Some(b::concat(vec![target, self.period()]));
+                return Some(Stmt::Doc(b::concat(vec![target, self.period()])));
             }
         }
         self.pos = start;

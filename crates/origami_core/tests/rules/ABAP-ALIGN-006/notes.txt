@@ -1,0 +1,1 @@
+19: ABAP-ALIGN-006: one redefinition per line
