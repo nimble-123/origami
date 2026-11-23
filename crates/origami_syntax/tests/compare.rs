@@ -53,6 +53,7 @@ fn lex(src: &str) -> TokenStream {
                     end: i as u32,
                     glued: !gap && !tokens.is_empty(),
                     keyword: false,
+                    ident: false,
                 });
                 gap = false;
                 token_on_line = true;
@@ -88,6 +89,19 @@ fn keyword_case_is_exempt_only_for_keywords() {
     assert!(equivalent(&input, a, &lex(b), b).is_err());
     input.tokens[0].keyword = true;
     assert!(equivalent(&input, a, &lex(b), b).is_ok());
+}
+
+#[test]
+fn identifier_case_is_exempt_only_for_identifiers() {
+    let a = "DATA LV_X";
+    let b = "DATA lv_x";
+    let mut input = lex(a);
+    assert!(equivalent(&input, a, &lex(b), b).is_err());
+    input.tokens[1].ident = true;
+    assert!(equivalent(&input, a, &lex(b), b).is_ok());
+    // Any other text change is still a mismatch.
+    let c = "DATA lv_y";
+    assert!(equivalent(&input, a, &lex(c), c).is_err());
 }
 
 #[test]

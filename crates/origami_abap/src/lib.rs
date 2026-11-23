@@ -16,7 +16,9 @@ pub mod structure;
 pub mod verbatim;
 
 use origami_layout::{PrintOptions, print};
-use origami_syntax::{LangOptions, LangResult, SourceText, Stats, TokenIndex, Unit, UnitId};
+use origami_syntax::{
+    LangOptions, LangResult, SourceText, Stats, TokenIndex, TokenStream, Unit, UnitId,
+};
 use std::collections::BTreeSet;
 
 pub use lexer::lex;
@@ -43,6 +45,25 @@ pub fn format_explained(
     identity: bool,
 ) -> LangResult {
     format_with(src, opts, quarantine, opaque, identity, true)
+}
+
+/// Operators that cannot be names, and constructor operators before their
+/// type (`VALUE #(`, `CONV string(`).
+fn always_keyword(src: &str, stream: &TokenStream, k: usize) -> bool {
+    const OPERATORS: &[&str] = &[
+        "AND", "OR", "NOT", "EQUIV", "EQ", "NE", "LT", "GT", "LE", "GE", "CO", "CN", "CA", "NA",
+        "CS", "NS", "CP", "NP", "BETWEEN", "DIV", "MOD", "BIT-AND", "BIT-OR", "BIT-XOR", "BIT-NOT",
+    ];
+    let t = &stream.tokens;
+    let w = t[k].text(src).to_ascii_uppercase();
+    if OPERATORS.contains(&w.as_str()) {
+        return true;
+    }
+    stmt::CTOR_OPS.contains(&w.as_str())
+        && t.get(k + 2)
+            .is_some_and(|p| p.kind == kinds::LPAREN && p.glued)
+        && t.get(k + 1)
+            .is_some_and(|ty| ty.kind == kinds::WORD && !ty.glued)
 }
 
 fn format_with(
@@ -81,6 +102,17 @@ fn format_with(
     if !identity {
         for &k in &laid.keywords {
             stream.tokens[k].keyword = true;
+        }
+        // ABAP-CASE-002: the other words of a recognized statement are
+        // identifiers, except words that are keywords wherever they stand
+        // (a parser that missed one leaves it as written).
+        for r in &laid.parsed {
+            for k in r.clone() {
+                let ident = stream.tokens[k].kind == kinds::WORD
+                    && !stream.tokens[k].keyword
+                    && !always_keyword(src.text(), &stream, k);
+                stream.tokens[k].ident = ident;
+            }
         }
     }
     let print_opts = PrintOptions {

@@ -134,6 +134,11 @@ impl<'a> Ctx<'a> {
         match (t.keyword, self.opts.keyword_case) {
             (true, Some(Case::Upper)) => text.to_ascii_uppercase(),
             (true, Some(Case::Lower)) => text.to_ascii_lowercase(),
+            // An identifier without lower-case letters is written in lower
+            // case; one with lower-case letters (`lv_a`, `lvMixed`) is kept.
+            _ if t.ident && !text.bytes().any(|b| b.is_ascii_lowercase()) => {
+                text.to_ascii_lowercase()
+            }
             _ => text.to_string(),
         }
     }

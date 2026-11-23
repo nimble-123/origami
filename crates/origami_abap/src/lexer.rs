@@ -95,6 +95,7 @@ impl<'a> Lexer<'a> {
             end: end as u32,
             glued,
             keyword: false,
+            ident: false,
         });
         self.i = end;
         self.gap = false;

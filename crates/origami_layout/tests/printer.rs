@@ -65,6 +65,7 @@ fn lex(src: &str) -> TokenStream {
                 end: i as u32,
                 glued: !gap && !tokens.is_empty(),
                 keyword: false,
+                ident: false,
             });
             gap = false;
             on_line = true;

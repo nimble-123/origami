@@ -32,7 +32,7 @@ git commit -am "Format with origami"
 
 Review the diff by sampling, not line by line: origami re-lexes its output
 and refuses to write a file if anything but whitespace, line breaks or
-keyword case changed, and the corpus tests check the same on 1,800 public
+letter case changed, and the corpus tests check the same on 1,800 public
 files.
 
 Then hide this commit from `git blame`:
