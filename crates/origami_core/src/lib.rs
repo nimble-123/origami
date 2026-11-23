@@ -21,6 +21,11 @@ pub use result::{FormatResult, Reported, ReportedRange, Status};
 use origami_syntax::{Diagnostic, LineIndex, SourceText};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
+/// Largest input that is formatted, in bytes: 8 MiB, 25 times the largest
+/// file of the corpus. A larger file is left as written (W004), which bounds
+/// the time and memory one file can take.
+pub const MAX_INPUT_LEN: usize = 8 << 20;
+
 /// Languages whose printer still runs in identity mode (output equals input).
 /// None since all six languages format (the CDS family structurally).
 pub fn identity_mode(_lang: Language) -> bool {
@@ -88,6 +93,23 @@ fn format_inner(
         Ok(l) => l,
         Err(d) => return plain(error_result(None, &d, src.text())),
     };
+    if input.len() > MAX_INPUT_LEN {
+        let d = Reported::at_start(
+            Code::W004,
+            format!(
+                "File larger than {} MiB; left as written",
+                MAX_INPUT_LEN >> 20
+            ),
+        );
+        return plain(FormatResult {
+            output: Some(input.to_vec()),
+            changed: false,
+            language: Some(lang),
+            status: Status::Unchanged,
+            diagnostics: vec![d],
+            stats: Stats::default(),
+        });
+    }
     let identity = identity_mode(lang);
     let checked = check::run(&src, lang, opts, identity, explain);
     // The final pass before line selection, for the explain pass.

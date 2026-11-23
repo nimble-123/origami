@@ -74,8 +74,9 @@ line break after it.
 
 ## 5. Structural errors
 
-Only these leave a file untouched. Everything else is formatted, generically
-if the grammar does not know a statement.
+Only these, and the size limits of section 7, leave a file untouched.
+Everything else is formatted, generically if the grammar does not know a
+statement.
 
 | Code | Trigger | Test |
 |---|---|---|
@@ -97,3 +98,18 @@ it (so `\r\r\n` is one line break). The printer never writes a CR directly
 before a line break. Both rules keep the line-break style stable from one run
 to the next. Positions and offsets refer to that normalized text. Test:
 `crates/origami_syntax/tests/source.rs`.
+
+## 7. Resource limits (W004)
+
+Every input is formatted in time and memory roughly linear in its size.
+Three limits leave pathological input as written, so the output is still
+token-equivalent and stable from one run to the next:
+
+| Limit | Effect | Test |
+|---|---|---|
+| A unit nested deeper than 100 levels of blocks and brackets combined (`origami_syntax::MAX_NESTING`) | the unit is printed byte for byte; its indent is capped at 100 levels | `crates/origami_core/tests/limits.rs` |
+| An input larger than 8 MiB (`origami_core::MAX_INPUT_LEN`) | the file is not formatted (status `unchanged`) | `limits.rs` |
+| An output larger than 16 times the input plus 1 MiB (`origami_syntax::max_output_len`) | the printer stops, and the file stays as written | `limits.rs` |
+
+W004 is reported once per file. The nesting limit also keeps the recursive
+parsers from overflowing the stack.

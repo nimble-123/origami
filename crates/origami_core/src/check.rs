@@ -220,19 +220,33 @@ fn problems(
     if lang == Language::Abap && bad.is_empty() {
         let out_index = LineIndex::new(output);
         let in_index = LineIndex::new(src.text());
+        // Whether an input line is over 255; tokens come in input order, so
+        // remembering the last line measures each line once.
+        let mut last_in: Option<(usize, bool)> = None;
+        let mut long_in = |line: usize| match last_in {
+            Some((l, long)) if l == line => long,
+            _ => {
+                let range = in_index.line_range(line);
+                let long = src.text()[range].chars().count() > ABAP_MAX_LINE;
+                last_in = Some((line, long));
+                long
+            }
+        };
         for line in 0..out_index.line_count() {
             let range = out_index.line_range(line);
             if output[range.clone()].chars().count() <= ABAP_MAX_LINE {
                 continue;
             }
             // Token streams are equivalent, so output token k is input token k.
-            for (k, t) in out_stream.tokens.iter().enumerate() {
-                if (t.start as usize) < range.start || (t.start as usize) >= range.end {
-                    continue;
+            let from = out_stream
+                .tokens
+                .partition_point(|t| (t.start as usize) < range.start);
+            for (k, t) in out_stream.tokens.iter().enumerate().skip(from) {
+                if (t.start as usize) >= range.end {
+                    break;
                 }
                 let input_tok = &r.input_tokens.tokens[k];
-                let in_line = in_index.line_range(in_index.line_of(input_tok.start));
-                if src.text()[in_line].chars().count() > ABAP_MAX_LINE {
+                if long_in(in_index.line_of(input_tok.start)) {
                     continue;
                 }
                 if let Some(u) = r.unit_of(TokenIndex(k as u32)) {
@@ -247,8 +261,7 @@ fn problems(
 fn unit_diagnostic(r: &LangResult, unit: UnitId, code: Code, msg: &str) -> Diagnostic {
     let range = r
         .units
-        .iter()
-        .find(|u| u.id == unit)
+        .get(unit as usize)
         .and_then(|u| {
             let a = r.input_tokens.tokens.get(u.tokens.start.0 as usize)?;
             let b = r.input_tokens.tokens.get(u.tokens.end.0 as usize - 1)?;

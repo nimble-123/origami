@@ -95,6 +95,28 @@ impl Default for LangOptions {
 
 pub type UnitId = u32;
 
+/// Deepest nesting that is laid out (W004): blocks and brackets combined. A
+/// unit with a token nested deeper is left as written. Real code stays far
+/// below (the corpus has at most 12 block levels and 7 bracket levels); the
+/// limit bounds recursion, the size of the layout and the indentation.
+pub const MAX_NESTING: u32 = 100;
+
+/// Longest output, in bytes, for an input of `len` bytes: 16 times the input
+/// plus 1 MiB. Formatting real code grows it by less than 2 times; a layout
+/// that would grow it beyond the limit leaves the file as written (W004).
+pub fn max_output_len(len: usize) -> usize {
+    len.saturating_mul(16).saturating_add(1 << 20)
+}
+
+/// The diagnostic for an output over [`max_output_len`].
+pub fn output_limit_diagnostic() -> Diagnostic {
+    Diagnostic::new(
+        crate::Code::W004,
+        "Formatting would make the file more than 16 times as large; left as written",
+        0..0,
+    )
+}
+
 /// The smallest piece of a source that the self-check can quarantine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Unit {
@@ -106,6 +128,7 @@ pub struct Unit {
 pub struct Stats {
     pub statements: u32,
     pub unknown: u32,
+    /// Units left as written because they nest deeper than [`MAX_NESTING`].
     pub depth_limited: u32,
     pub quarantined: u32,
 }
@@ -117,6 +140,7 @@ pub struct LangResult {
     pub output: String,
     /// Input tokens, with keyword flags set by the parser.
     pub input_tokens: TokenStream,
+    /// In source order, each id its index.
     pub units: Vec<Unit>,
     pub diagnostics: Vec<Diagnostic>,
     pub stats: Stats,
@@ -143,12 +167,16 @@ impl LangResult {
             .any(|d| d.severity() >= crate::Severity::Error)
     }
 
-    /// The unit that contains the given input token.
+    /// The unit that contains the given input token, if any.
+    pub fn unit_containing(&self, index: TokenIndex) -> Option<&Unit> {
+        let k = self.units.partition_point(|u| u.tokens.end <= index);
+        self.units.get(k).filter(|u| u.tokens.start <= index)
+    }
+
+    /// The unit that contains the given input token, else the last unit.
     pub fn unit_of(&self, index: TokenIndex) -> Option<UnitId> {
-        self.units
-            .iter()
-            .find(|u| u.tokens.start <= index && index < u.tokens.end)
+        self.unit_containing(index)
+            .or_else(|| self.units.last())
             .map(|u| u.id)
-            .or_else(|| self.units.last().map(|u| u.id))
     }
 }

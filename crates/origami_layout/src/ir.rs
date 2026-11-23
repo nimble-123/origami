@@ -2,6 +2,7 @@
 //! through [`crate::builder`].
 
 use origami_syntax::TokenIndex;
+use std::sync::Arc;
 
 /// A layout document.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,6 +70,10 @@ pub(crate) enum Inner {
         blank: bool,
     },
     Concat(Vec<Doc>),
+    /// A doc that appears in several places (both branches of a `Choice`)
+    /// without being copied: nested choices would otherwise double the doc
+    /// at every level.
+    Shared(Arc<Doc>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

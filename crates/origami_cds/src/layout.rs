@@ -2,11 +2,14 @@
 //! element per line, indentation by `{ }` blocks, short inline blocks kept on
 //! one line, non-key select-list elements aligned under the names of key
 //! elements. Letter case is never changed. Inside a unit, the author's line
-//! breaks are kept and re-indented, and runs of spaces shrink to one.
+//! breaks are kept and re-indented, and runs of spaces shrink to one. Units
+//! nested deeper than `MAX_NESTING` are printed byte for byte (W004).
 
 use crate::kinds::*;
 use origami_layout::{Doc, builder as b};
-use origami_syntax::{Language, RuleSpan, TokenIndex, TokenStream, UnitId};
+use origami_syntax::{
+    Code, Diagnostic, Language, LineIndex, MAX_NESTING, RuleSpan, TokenIndex, TokenStream, UnitId,
+};
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,10 +29,6 @@ pub struct CdsUnit {
     /// Extra indent (in indent steps) for non-key elements in a block with
     /// key elements.
     extra: u32,
-}
-
-fn line_of(text: &str, offset: u32) -> usize {
-    text[..offset as usize].matches('\n').count()
 }
 
 /// Index after the annotation value starting at `k` (after the colon).
@@ -69,22 +68,42 @@ fn skip_value(toks: &[origami_syntax::Token], mut k: usize) -> usize {
     }
 }
 
-/// Matching `}` for the `{` at `open`.
-fn matching_brace(toks: &[origami_syntax::Token], open: usize) -> Option<usize> {
-    let mut depth = 0i32;
-    for (k, t) in toks.iter().enumerate().skip(open) {
+/// For every `{`, the index of its matching `}` (`None` for other tokens and
+/// for a `{` that is never closed).
+fn matching_braces(toks: &[origami_syntax::Token]) -> Vec<Option<usize>> {
+    let mut close = vec![None; toks.len()];
+    let mut open = Vec::new();
+    for (k, t) in toks.iter().enumerate() {
         match t.kind {
-            LBRACE => depth += 1,
+            LBRACE => open.push(k),
             RBRACE => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(k);
+                if let Some(o) = open.pop() {
+                    close[o] = Some(k);
                 }
             }
             _ => {}
         }
     }
-    None
+    close
+}
+
+/// Nesting of every token in brackets of any kind: tokens inside one pair
+/// are at 1; a bracket is at the level of the tokens around it.
+fn nesting(toks: &[origami_syntax::Token]) -> Vec<u32> {
+    let mut depth = 0u32;
+    toks.iter()
+        .map(|t| match t.kind {
+            LBRACE | LPAREN | LBRACKET => {
+                depth += 1;
+                depth - 1
+            }
+            RBRACE | RPAREN | RBRACKET => {
+                depth = depth.saturating_sub(1);
+                depth
+            }
+            _ => depth,
+        })
+        .collect()
 }
 
 /// Splits the token stream into layout units. A `;` ends a unit in every
@@ -92,6 +111,9 @@ fn matching_brace(toks: &[origami_syntax::Token], open: usize) -> Option<usize> 
 pub fn units(text: &str, stream: &TokenStream, lang: Language) -> Vec<CdsUnit> {
     let toks = &stream.tokens;
     let n = toks.len();
+    let lines = LineIndex::new(text);
+    let line_of = |k: usize| lines.line_of(toks[k].start);
+    let close_of = matching_braces(toks);
     let mut out = Vec::new();
     let mut depth = 0u32;
     let mut i = 0;
@@ -159,12 +181,10 @@ pub fn units(text: &str, stream: &TokenStream, lang: Language) -> Vec<CdsUnit> {
                             // right after the previous token, stays part of
                             // this unit. (Both conditions survive formatting,
                             // so a second run makes the same choice.)
-                            match matching_brace(toks, j) {
+                            match close_of[j] {
                                 Some(close)
-                                    if line_of(text, toks[j - 1].start)
-                                        == line_of(text, toks[j].start)
-                                        && line_of(text, toks[j].start)
-                                            == line_of(text, toks[close].start) =>
+                                    if line_of(j - 1) == line_of(j)
+                                        && line_of(j) == line_of(close) =>
                                 {
                                     // The block ends the unit
                                     // (`use association _x { with draft; }`).
@@ -217,20 +237,29 @@ fn mark_key_blocks(text: &str, stream: &TokenStream, units: &mut [CdsUnit]) {
                 .text(text)
                 .eq_ignore_ascii_case("key")
     };
-    let mut k = 0;
-    while k < units.len() {
-        if units[k].kind != Kind::Open {
-            k += 1;
-            continue;
-        }
-        let inner = units[k].depth + 1;
-        let mut end = k + 1;
-        while end < units.len()
-            && !(units[end].kind == Kind::Close && units[end].depth == units[k].depth)
+    // The members of every block (the units one level inside it), found in
+    // one pass, so nested blocks cost no repeated scans.
+    let mut open: Vec<(usize, Vec<usize>)> = Vec::new();
+    let mut blocks = Vec::new();
+    for m in 0..units.len() {
+        if units[m].kind == Kind::Close
+            && open
+                .last()
+                .is_some_and(|(k, _)| units[*k].depth == units[m].depth)
         {
-            end += 1;
+            blocks.extend(open.pop().map(|(_, members)| members));
         }
-        let members: Vec<usize> = (k + 1..end).filter(|&m| units[m].depth == inner).collect();
+        if let Some((k, members)) = open.last_mut()
+            && units[m].depth == units[*k].depth + 1
+        {
+            members.push(m);
+        }
+        if units[m].kind == Kind::Open {
+            open.push((m, Vec::new()));
+        }
+    }
+    blocks.extend(open.into_iter().map(|(_, members)| members));
+    for members in blocks {
         if members.iter().any(|&m| is_key(&units[m])) {
             // Walk backwards so annotations take the indent of their element.
             let mut next_is_key = true;
@@ -247,8 +276,15 @@ fn mark_key_blocks(text: &str, stream: &TokenStream, units: &mut [CdsUnit]) {
                 }
             }
         }
-        k += 1;
     }
+}
+
+pub struct Laid {
+    pub doc: Doc,
+    pub rule_spans: Vec<RuleSpan>,
+    pub diagnostics: Vec<Diagnostic>,
+    /// Units left as written because they nest too deep (W004).
+    pub depth_limited: u32,
 }
 
 pub fn layout(
@@ -259,16 +295,34 @@ pub fn layout(
     quarantine: &BTreeSet<UnitId>,
     opaque: &BTreeSet<UnitId>,
     explain: bool,
-) -> (Doc, Vec<RuleSpan>) {
+) -> Laid {
     let mut docs = Vec::with_capacity(units.len());
     let mut spans = Vec::new();
+    let mut diagnostics = Vec::new();
+    let mut depth_limited = 0;
+    let nest = nesting(&stream.tokens);
     for (id, u) in units.iter().enumerate() {
         let first = TokenIndex(u.first as u32);
         let last = TokenIndex(u.last as u32);
         let prev = id.checked_sub(1).map(|p| units[p].kind);
         let blank = id > 0 && prev != Some(Kind::Open) && u.kind != Kind::Close;
         let uid = id as UnitId;
-        let body = if opaque.contains(&uid) {
+        // Nested too deep: left as written, so neither the grammar's
+        // recursion nor the layout grows with the nesting.
+        let too_deep = nest[u.first..=u.last].iter().any(|&d| d > MAX_NESTING);
+        if too_deep {
+            if depth_limited == 0 {
+                diagnostics.push(Diagnostic::new(
+                    Code::W004,
+                    format!(
+                        "Nesting deeper than {MAX_NESTING} levels; the deeper elements are left as written"
+                    ),
+                    stream.tokens[u.first].start..stream.tokens[u.last].end,
+                ));
+            }
+            depth_limited += 1;
+        }
+        let body = if opaque.contains(&uid) || too_deep {
             b::opaque(first, last, blank)
         } else if quarantine.contains(&uid) {
             b::verbatim(first, last, blank)
@@ -304,8 +358,17 @@ pub fn layout(
         } else {
             b::hard(stream, first)
         };
-        let level = u.depth + u.extra;
+        let level = if too_deep {
+            (u.depth + u.extra).min(MAX_NESTING)
+        } else {
+            u.depth + u.extra
+        };
         docs.push((0..level).fold(b::concat(vec![start, body]), |d, _| b::indent(vec![d])));
     }
-    (b::concat(docs), spans)
+    Laid {
+        doc: b::concat(docs),
+        rule_spans: spans,
+        diagnostics,
+        depth_limited,
+    }
 }

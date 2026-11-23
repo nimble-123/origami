@@ -335,11 +335,7 @@ fn notes(parts: &Parts, opts: &Options) -> Vec<Located> {
             continue;
         }
         let ti = TokenIndex(k as u32);
-        let Some(unit) = r
-            .units
-            .iter()
-            .find(|u| u.tokens.start <= ti && ti < u.tokens.end)
-        else {
+        let Some(unit) = r.unit_containing(ti) else {
             continue;
         };
         if skipped.contains(&unit.id) {

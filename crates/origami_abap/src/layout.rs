@@ -3,14 +3,18 @@
 //!
 //! Every statement starts on its own line at its block indent. Statements
 //! without a parser are printed as unknown statements (W003). Quarantined
-//! units are printed verbatim, opaque units byte for byte.
+//! units are printed verbatim, opaque units byte for byte, and so are
+//! statements nested deeper than `MAX_NESTING` (W004).
 
 use crate::block_pairs::Role;
+use crate::kinds::*;
 use crate::statements;
 use crate::stmt::{Ctx, P};
 use crate::structure::Statement;
 use origami_layout::{Doc, builder as b};
-use origami_syntax::{Code, Diagnostic, RuleSpan, TokenIndex, TokenStream, TriviaPosition, UnitId};
+use origami_syntax::{
+    Code, Diagnostic, MAX_NESTING, RuleSpan, TokenIndex, TokenStream, TriviaPosition, UnitId,
+};
 use std::collections::BTreeSet;
 
 pub struct Laid {
@@ -23,6 +27,8 @@ pub struct Laid {
     pub parsed: Vec<std::ops::Range<usize>>,
     /// Rule spans (only when `explain`).
     pub rule_spans: Vec<RuleSpan>,
+    /// Statements left as written because they nest too deep (W004).
+    pub depth_limited: u32,
 }
 
 fn nest(level: u32, doc: Doc) -> Doc {
@@ -35,6 +41,21 @@ fn opens(role: Option<Role>) -> bool {
 
 fn closes(role: Option<Role>) -> bool {
     matches!(role, Some(Role::Closer) | Some(Role::Intermediate))
+}
+
+/// Deepest bracket nesting in a statement: tokens inside one pair of
+/// brackets (or one embedded template expression) are at 1.
+fn bracket_nesting(stream: &TokenStream, st: &Statement) -> u32 {
+    let mut depth = 0u32;
+    let mut max = 0;
+    for t in &stream.tokens[st.tokens.clone()] {
+        match t.kind {
+            LPAREN | LBRACKET | LBRACE | TEMPLATE_HEAD => depth += 1,
+            RPAREN | RBRACKET | RBRACE | TEMPLATE_TAIL => depth = depth.saturating_sub(1),
+            _ => max = max.max(depth),
+        }
+    }
+    max
 }
 
 pub fn layout(
@@ -63,6 +84,7 @@ pub fn layout(
     let mut parsed_ranges = Vec::new();
     let mut diagnostics = Vec::new();
     let mut unknown = 0;
+    let mut depth_limited = 0;
     let mut prev_role = None;
     for (id, st) in statements.iter().enumerate() {
         let id = id as UnitId;
@@ -76,7 +98,25 @@ pub fn layout(
         // its position depends on the previous statement's layout, so any
         // re-indentation would not be stable.
         let glued_start = id > 0 && stream.tokens[first.0 as usize].glued;
+        // Nested too deep: left as written, so neither the parsers' recursion
+        // nor the layout grows with the nesting.
+        let too_deep = st.depth + bracket_nesting(stream, st) > MAX_NESTING;
+        if too_deep {
+            if depth_limited == 0 {
+                let range =
+                    stream.tokens[first.0 as usize].start..stream.tokens[last.0 as usize].end;
+                diagnostics.push(Diagnostic::new(
+                    Code::W004,
+                    format!(
+                        "Nesting deeper than {MAX_NESTING} levels; the deeper statements are left as written"
+                    ),
+                    range,
+                ));
+            }
+            depth_limited += 1;
+        }
         let body = if opaque.contains(&id)
+            || too_deep
             || (glued_start && stream.tokens[first.0 as usize].kind != crate::kinds::OPAQUE)
         {
             b::opaque(first, last, blank)
@@ -123,7 +163,10 @@ pub fn layout(
         } else {
             b::hard(stream, first)
         };
-        docs.push(nest(st.depth, b::concat(vec![start, body])));
+        docs.push(nest(
+            st.depth.min(MAX_NESTING),
+            b::concat(vec![start, body]),
+        ));
         prev_role = st.role;
     }
     Laid {
@@ -133,5 +176,6 @@ pub fn layout(
         keywords: ctx.keywords,
         parsed: parsed_ranges,
         rule_spans: ctx.rule_spans,
+        depth_limited,
     }
 }

@@ -738,11 +738,13 @@ impl<'c, 'a> P<'c, 'a> {
             let mut hang = Vec::new();
             let mut fall = Vec::new();
             for (n, (k, rows)) in groups.into_iter().enumerate() {
-                let g = b::concat(vec![
+                // Shared: both layouts hold it (a copy would double the doc
+                // at every nesting level).
+                let g = b::shared(b::concat(vec![
                     self.t(k),
                     self.sp(k + 1),
                     b::hang(vec![b::align(rows)]),
-                ]);
+                ]));
                 if n > 0 {
                     // ABAP-CALL-002: a call with two or more parameter
                     // keywords always puts each keyword on its own line.
@@ -764,7 +766,7 @@ impl<'c, 'a> P<'c, 'a> {
             if call {
                 self.c.span(lp, rp, "ABAP-CALL-001");
             }
-            let a = b::align(rows);
+            let a = b::shared(b::align(rows));
             return Some(self.hanging(lp, rp, a.clone(), a));
         }
         // Single positional argument: an expression, or a logical
@@ -841,7 +843,7 @@ impl<'c, 'a> P<'c, 'a> {
                 items.push(row_doc);
                 self.pos = close + 1;
             }
-            let content = b::concat(items);
+            let content = b::shared(b::concat(items));
             self.c.span(lp, rp, "ABAP-VALUE-001");
             return Some(self.hanging(lp, rp, content.clone(), content));
         }
@@ -851,7 +853,7 @@ impl<'c, 'a> P<'c, 'a> {
                 return None;
             }
             self.c.span(lp, rp, "ABAP-VALUE-001");
-            let a = b::align(rows);
+            let a = b::shared(b::align(rows));
             return Some(self.hanging(lp, rp, a.clone(), a));
         }
         self.call_args(lp, rp, false)
