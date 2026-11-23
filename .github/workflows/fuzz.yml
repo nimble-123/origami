@@ -34,19 +34,34 @@ jobs:
           else
             find corpus/repos \( -name '*.asddls' -o -name '*.asbdef' -o -name '*.srvdsrv' \) | head -300 | xargs -I{} cp {} fuzz/corpus/format_cds/ || true
           fi
+      # cargo-binstall fetches a musl build of cargo-fuzz, which would
+      # otherwise compile for its own musl target (no sanitizer support).
+      - name: Build
+        run: cargo +nightly fuzz build --target x86_64-unknown-linux-gnu ${{ matrix.target }}
       - name: Fuzz for one hour
-        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=3600
+        id: fuzz
+        run: cargo +nightly fuzz run --target x86_64-unknown-linux-gnu ${{ matrix.target }} -- -max_total_time=3600
       - name: Upload crash
-        if: failure()
+        if: failure() && steps.fuzz.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: fuzz-${{ matrix.target }}
           path: fuzz/artifacts/
       - name: Open issue
-        if: failure()
+        if: failure() && steps.fuzz.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh issue create \
             --title "Fuzz crash in ${{ matrix.target }}" \
             --body "Nightly fuzzing found a crash. Artifact: run ${{ github.run_id }}."
+
+  # Every corpus file at 80 combinations of width, indent and keyword case;
+  # too slow for every pull request.
+  idempotency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo xtask corpus fetch
+      - run: cargo xtask idempotency

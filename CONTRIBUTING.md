@@ -42,6 +42,7 @@ cargo xtask corpus run        # every file formats, is idempotent, no regression
 cargo xtask explain --corpus  # line-break notes are consistent
 cargo xtask oracle            # abaplint's lexer sees the same tokens
 cargo xtask stress 20000 1    # mutated inputs never crash or corrupt
+cargo xtask idempotency       # idempotent at every width, indent and case (minutes)
 ```
 
 The VS Code extension (`editors/vscode`): `npm ci`, `npm test`,

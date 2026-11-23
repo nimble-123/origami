@@ -506,6 +506,18 @@ impl<'c, 'a> Printer<'c, 'a> {
         let src = ctx.src;
         if kind == RawKind::Opaque {
             let (a, b) = ctx.raw_range(first, last);
+            // A unit that starts its line in the input and in the output also
+            // keeps its indentation. Its other lines keep theirs, so moving
+            // only the first line would change what the next run sees, and so
+            // the next run's layout (idempotency).
+            let line_start = src[..a].rfind('\n').map_or(0, |p| p + 1);
+            let prefix = &src[line_start..a];
+            if self.line_empty && !self.pending_eol && prefix.chars().all(|c| BLANKS.contains(&c)) {
+                self.pending_indent = Some(0);
+                self.write(&src[line_start..b], indent);
+                self.trailing_comments(last, indent);
+                return;
+            }
             // Opaque text keeps its bytes, but a leading `*` never lands in
             // column 1 (INVARIANTS 4), where it would start a comment.
             if src[a..b].starts_with('*') && self.column() == 0 && self.line_empty {
@@ -533,7 +545,15 @@ impl<'c, 'a> Printer<'c, 'a> {
         };
         let target = if star && here == 0 { 1 } else { here };
         let shift = target as isize - orig as isize;
-        let min_indent = ctx.opts.indent as usize;
+        // Unknown units indent continuation lines at least one step. A unit
+        // left as written keeps its relative indentation exactly: raising
+        // some of its lines would change what the next run sees, and so the
+        // next run's layout (idempotency).
+        let min_indent = if kind == RawKind::Verbatim {
+            0
+        } else {
+            ctx.opts.indent as usize
+        };
 
         for k in first.0..=last.0 {
             let k = k as usize;

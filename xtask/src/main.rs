@@ -6,6 +6,7 @@ mod bench_matrix;
 mod corpus;
 mod explain;
 mod freq;
+mod idempotency;
 mod oracle;
 mod release_diff;
 mod stress;
@@ -38,8 +39,9 @@ fn main() -> ExitCode {
         ["bench-matrix", "--report"] => bench_matrix::report_only(),
         ["release-diff", rest @ ..] => release_diff::run(rest),
         ["stress", rest @ ..] => stress::run(rest),
+        ["idempotency"] => idempotency::run(),
         _ => Err(
-            "usage: cargo xtask <corpus fetch|corpus run [--hashes FILE]|corpus bless|explain FILE|explain --corpus|freq [N]|oracle|bench-check [hyperfine.json...]|bench-matrix [--report]|release-diff [tag]|stress [n] [seed]>"
+            "usage: cargo xtask <corpus fetch|corpus run [--hashes FILE]|corpus bless|explain FILE|explain --corpus|freq [N]|oracle|bench-check [hyperfine.json...]|bench-matrix [--report]|release-diff [tag]|stress [n] [seed]|idempotency>"
                 .into(),
         ),
     };

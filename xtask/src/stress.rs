@@ -7,11 +7,14 @@
 //! * when formatting succeeds, formatting the output again gives the same
 //!   output (idempotency).
 //!
+//! Each input is formatted at a random combination of line width, indent
+//! width and keyword case from `idempotency::options`.
+//!
 //! Failing inputs are written to target/stress/ for reproduction.
 
 use crate::corpus::{files, manifest};
 use crate::root;
-use origami_core::{Code, LanguageHint, Options, format};
+use origami_core::{Code, LanguageHint, format};
 
 /// xorshift64*: deterministic, no dependency.
 struct Rng(u64);
@@ -161,7 +164,8 @@ pub fn run(args: &[&str]) -> Result<(), String> {
     }
     let out_dir = root().join("target/stress");
     std::fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
-    let opts = Options::default();
+    // Each input gets a random line width, indent and keyword case.
+    let settings = crate::idempotency::options();
     let mut rng = Rng(seed | 1);
     let mut failures = 0;
     let mut formatted = 0;
@@ -170,7 +174,8 @@ pub fn run(args: &[&str]) -> Result<(), String> {
         let (name, src) = &inputs[rng.below(inputs.len())];
         let mutated = mutate(&mut rng, src);
         let hint = LanguageHint::Path(name.clone());
-        let r = format(&mutated, &hint, &opts);
+        let opts = &settings[rng.below(settings.len())];
+        let r = format(&mutated, &hint, opts);
         let mut problem = None;
         if r.has(Code::X001) || r.has(Code::X002) {
             let d = r
@@ -181,7 +186,7 @@ pub fn run(args: &[&str]) -> Result<(), String> {
             problem = Some(format!("{} {}", d.code.as_str(), d.message));
         } else if let Some(out) = &r.output {
             formatted += 1;
-            let again = format(out, &hint, &opts);
+            let again = format(out, &hint, opts);
             if again.output.as_deref() != Some(&out[..]) {
                 problem = Some("not idempotent".into());
             }
@@ -200,7 +205,11 @@ pub fn run(args: &[&str]) -> Result<(), String> {
             let file = out_dir.join(format!("case{it}.{ext}"));
             std::fs::write(&file, &mutated).map_err(|e| e.to_string())?;
             if failures <= 20 {
-                eprintln!("FAIL {} ({p}) from {name}", file.display());
+                eprintln!(
+                    "FAIL {} ({p}, {}) from {name}",
+                    file.display(),
+                    crate::idempotency::label(opts)
+                );
             }
         }
     }

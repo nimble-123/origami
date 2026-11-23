@@ -38,7 +38,7 @@ fn skip_value(toks: &[origami_syntax::Token], mut k: usize) -> usize {
         return k;
     }
     match toks[k].kind {
-        LBRACE | LBRACKET => {
+        LBRACE | LBRACKET | LPAREN => {
             let mut depth = 0i32;
             while k < toks.len() {
                 match toks[k].kind {
@@ -55,6 +55,9 @@ fn skip_value(toks: &[origami_syntax::Token], mut k: usize) -> usize {
             }
             k
         }
+        // No value (`@a:` before a closing bracket or separator): the token
+        // belongs to the enclosing structure, not to the annotation.
+        RBRACE | RBRACKET | RPAREN | COMMA | SEMICOLON => k,
         _ => {
             k += 1;
             // Dotted or glued continuation (`#X`, `a.b`, `'x'`, negative numbers).

@@ -30,7 +30,10 @@ equal when all of these hold:
    W002 (length), and checks again. A unit still over 255 characters is
    printed byte for byte. If a new line over 255 characters remains even
    then (the joins between units can lengthen a line), the whole file is
-   left as written.
+   left as written. A unit left as written keeps the indentation of its
+   lines relative to each other, and a unit printed byte for byte that
+   starts a line keeps its indentation too, so a second run sees the same
+   unit and makes the same choice (idempotency).
 3. If the check still fails, the result is X001: no output is written, exit 70.
 
 Tests: `crates/origami_core/tests/safety.rs` (run with

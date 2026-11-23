@@ -203,7 +203,8 @@ impl G<'_> {
                     docs.push(self.t(k));
                     k += 1;
                 }
-                if k >= close {
+                // A key is required (`{ : x }` is not an annotation value).
+                if k >= close || k == item_first {
                     return None;
                 }
                 docs.push(self.sp(k));
