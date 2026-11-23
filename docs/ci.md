@@ -25,14 +25,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0       # only for --changed
-      - uses: nimble-123/origami@v0.2.1
+      - uses: nimble-123/origami@v0.2.2
         with:
           args: --check --changed origin/${{ github.base_ref }}
           sarif: "true"        # findings as code-scanning annotations
 ```
 
 Without `version`, the action downloads the release that matches the tag it
-is used at (`@v0.2.1`), else the latest release.
+is used at (`@v0.2.2`), else the latest release.
 
 ## GitLab CI
 
@@ -40,7 +40,7 @@ is used at (`@v0.2.1`), else the latest release.
 origami:
   image: debian:stable-slim
   variables:
-    ORIGAMI_VERSION: "0.2.1"
+    ORIGAMI_VERSION: "0.2.2"
     GIT_DEPTH: 0
   before_script:
     - apt-get update -qq && apt-get install -y -qq curl ca-certificates git
@@ -65,7 +65,7 @@ origami:
 
 ```yaml
 variables:
-  ORIGAMI_VERSION: "0.2.1"
+  ORIGAMI_VERSION: "0.2.2"
 
 steps:
   - checkout: self
