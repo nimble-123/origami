@@ -68,7 +68,7 @@ jobs:
   # The compiler channels a user might build with, next to the pinned
   # toolchain of the `test` job. Beta is an early warning, not a gate.
   toolchains:
-    name: test (${{ matrix.toolchain }})
+    name: toolchain (${{ matrix.toolchain }})
     strategy:
       fail-fast: false
       matrix:
@@ -97,7 +97,8 @@ jobs:
       - run: sh site/build.sh
       - run: node crates/origami_wasm/tests/smoke.mjs site/dist/origami.wasm
 
-  extension:
+  extension-os:
+    name: extension (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -141,3 +142,12 @@ jobs:
         if: runner.os == 'Linux'
         working-directory: editors/vscode
         run: npx vsce package --target linux-x64 --no-dependencies --allow-missing-repository
+
+  # The required check `extension`: passes when the extension passed on every
+  # operating system.
+  extension:
+    needs: extension-os
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.extension-os.result }}" = success
