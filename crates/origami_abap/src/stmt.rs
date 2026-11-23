@@ -101,6 +101,20 @@ pub struct P<'c, 'a> {
     period_at: usize,
 }
 
+/// Format options of embedded expressions in string templates.
+const TEMPLATE_OPTIONS: &[&str] = &[
+    "WIDTH", "ALIGN", "PAD", "CASE", "SIGN", "EXPONENT", "DECIMALS", "ZERO", "XSD", "STYLE",
+    "CURRENCY", "NUMBER", "ALPHA", "DATE", "TIME", "TIMESTAMP", "TIMEZONE", "COUNTRY",
+];
+
+/// Predefined values of those options (`ALIGN = RIGHT`, `DATE = ISO`).
+const TEMPLATE_VALUES: &[&str] = &[
+    "LEFT", "RIGHT", "CENTER", "RAW", "UPPER", "LOWER", "ISO", "USER", "ENVIRONMENT", "YES", "NO",
+    "IN", "OUT", "LEFTPLUS", "LEFTSPACE", "RIGHTPLUS", "RIGHTSPACE", "SIMPLE", "SIGN_AS_POSTFIX",
+    "SCALE_PRESERVING", "SCIENTIFIC", "SCIENTIFIC_WITH_LEADING_ZERO",
+    "SCALE_PRESERVING_SCIENTIFIC", "ENGINEERING", "SPACE",
+];
+
 impl<'c, 'a> P<'c, 'a> {
     pub fn new(c: &'c mut Ctx<'a>, start: usize, end: usize, blank: bool) -> P<'c, 'a> {
         // Pragmas right before the period (`##NO_TEXT.`) belong to the
@@ -209,6 +223,49 @@ impl<'c, 'a> P<'c, 'a> {
         None
     }
 
+    /// Format options of the embedded expressions of a string template
+    /// `from..=to` (`{ d DATE = ISO }`, `{ n WIDTH = 10 ALIGN = RIGHT }`).
+    fn mark_template_options(&mut self, from: usize, to: usize) {
+        let part = |k: u16| matches!(k, TEMPLATE_HEAD | TEMPLATE_MIDDLE | TEMPLATE_TAIL);
+        let mut depth = 0i32;
+        for k in from + 1..to {
+            match self.kind(k) {
+                LPAREN | LBRACKET => depth += 1,
+                RPAREN | RBRACKET => depth -= 1,
+                _ => {}
+            }
+            let starts_expr = part(self.kind(k - 1));
+            // Options follow the expression, outside its brackets.
+            if depth != 0
+                || starts_expr
+                || self.kind(k) != WORD
+                || !TEMPLATE_OPTIONS.contains(&self.upper(k).as_str())
+                || !self.is(k + 1, "=")
+                || self.glued(k + 1)
+            {
+                continue;
+            }
+            self.c.keywords.push(k);
+            let v = k + 2;
+            let option_ends = part(self.kind(v + 1)) || self.is(v + 2, "=");
+            if self.kind(v) == WORD && option_ends && TEMPLATE_VALUES.contains(&self.upper(v).as_str()) {
+                self.c.keywords.push(v);
+            }
+        }
+    }
+
+    /// Keywords of a table expression `[ KEY name COMPONENTS … ]` or
+    /// `[ KEY name INDEX … ]` between `open` and `close`.
+    fn mark_table_expr(&mut self, open: usize, close: usize) {
+        let k = open + 1;
+        if k + 2 < close && self.is(k, "KEY") && self.kind(k + 1) == WORD && !self.glued(k + 1) {
+            self.c.keywords.push(k);
+            if self.is(k + 2, "COMPONENTS") || self.is(k + 2, "INDEX") {
+                self.c.keywords.push(k + 2);
+            }
+        }
+    }
+
     /// Tokens `from..=to` with their original gaps reduced to one space.
     pub fn flat(&self, from: usize, to: usize) -> Doc {
         let mut docs = vec![self.t(from)];
@@ -292,6 +349,7 @@ impl<'c, 'a> P<'c, 'a> {
                     }
                     j += 1;
                 }
+                self.mark_template_options(i, j);
                 docs.push(self.flat(i, j));
                 self.pos = j + 1;
             }
@@ -369,8 +427,17 @@ impl<'c, 'a> P<'c, 'a> {
                     }
                     docs.push(self.t(i));
                     self.pos += 1;
-                    // Inline declaration DATA( … ) / FINAL( … ).
-                    if (w == "DATA" || w == "FINAL")
+                    // Text symbol `TEXT-001` (an ID with letters keeps its case).
+                    let t = self.text(i).as_bytes();
+                    if t.len() == 8
+                        && t[..5].eq_ignore_ascii_case(b"text-")
+                        && t[5..].iter().all(|b| b.is_ascii_digit())
+                    {
+                        self.c.keywords.push(i);
+                    }
+                    // Inline declaration DATA( … ) / FINAL( … ) /
+                    // FIELD-SYMBOL( … ).
+                    if (w == "DATA" || w == "FINAL" || w == "FIELD-SYMBOL")
                         && self.kind(self.pos) == LPAREN
                         && self.glued(self.pos)
                     {
@@ -401,6 +468,7 @@ impl<'c, 'a> P<'c, 'a> {
                 }
                 LBRACKET => {
                     let close = self.matching(j)?;
+                    self.mark_table_expr(j, close);
                     docs.push(self.flat(j, close));
                     self.pos = close + 1;
                     self.last_call = false;
@@ -513,7 +581,16 @@ impl<'c, 'a> P<'c, 'a> {
                 }
                 self.c.keywords.push(k);
                 self.pos += 1;
+                let rows_from = self.pos;
                 groups.push((k, self.rows()?));
+                // `EXCEPTIONS … OTHERS = n`
+                if self.is(k, "EXCEPTIONS") {
+                    for j in rows_from..self.pos {
+                        if self.is(j, "OTHERS") && self.is(j + 1, "=") && !self.glued(j + 1) {
+                            self.c.keywords.push(j);
+                        }
+                    }
+                }
             }
             if call {
                 // Keywords: ABAP-CALL-002 for the list; the parameters of
@@ -554,11 +631,21 @@ impl<'c, 'a> P<'c, 'a> {
             let a = b::align(rows);
             return Some(self.hanging(lp, rp, a.clone(), a));
         }
-        // Single positional argument.
-        let e = self.expr()?;
-        if !self.at_end() {
-            return None;
-        }
+        // Single positional argument: an expression, or a logical
+        // expression (`xsdbool( a IS INITIAL )`).
+        let mark = self.c.mark();
+        let e = match self.expr().filter(|_| self.at_end()) {
+            Some(e) => e,
+            None => {
+                self.c.reset(mark);
+                self.pos = first;
+                let l = self.logical()?;
+                if !self.at_end() {
+                    return None;
+                }
+                l
+            }
+        };
         Some(b::group(vec![
             self.t(lp),
             self.sp(first),
@@ -654,12 +741,18 @@ impl<'c, 'a> P<'c, 'a> {
                     && !self.glued(i - 1)
                     && self.kind(i - 2) == WORD
                     && CTOR_OPS.contains(&self.upper(i - 2).as_str());
+                if ctor && words {
+                    self.c.keywords.push(i - 2);
+                }
                 if !ctor && words && k == LPAREN && self.is(i + 1, "LINES") && self.is(i + 2, "OF")
                 {
                     self.c.keywords.push(i + 1);
                     self.c.keywords.push(i + 2);
                 }
-                self.mark_ctor_keywords(i + 1, close, ctor);
+                // A plain bracket (not a call) inside a constructor body:
+                // a sub-condition or term, same keywords.
+                let call = i > from && self.glued(i) && self.kind(i - 1) == WORD;
+                self.mark_ctor_keywords(i + 1, close, ctor || (words && k == LPAREN && !call));
                 prev = None;
                 i = close + 1;
                 continue;
@@ -670,17 +763,39 @@ impl<'c, 'a> P<'c, 'a> {
                 let next_call = i + 1 < to
                     && self.glued(i + 1)
                     && matches!(self.kind(i + 1), LPAREN | LBRACKET | SELECTOR);
-                let operand = prev.as_deref().is_some_and(|p| {
+                // A word equal to the keyword before it is a name
+                // (`IN GROUP group`).
+                let repeated = prev.as_deref() == Some(w.as_str());
+                let operand = repeated || prev.as_deref().is_some_and(|p| {
                     CTOR_TAKES_OPERAND.contains(&p)
                         && !matches!(
                             (p, w.as_str()),
                             (_, "NOT" | "THROW")
                                 | ("IN", "GROUP" | "FOR")
+                                | ("MAPPING", "FROM" | "TO")
                                 | ("EXCEPT", "IN")
                                 | ("FOR", "GROUPS")
                         )
                 });
-                if CTOR_WORDS.contains(&w.as_str()) && !next_eq && !next_call && !operand {
+                // A word right after an operator is an operand (`name = key`).
+                let after_op = i > from
+                    && self.kind(i - 1) == WORD
+                    && matches!(
+                        self.text(i - 1),
+                        "=" | "<>" | "<" | ">" | "<=" | ">=" | "+" | "-" | "*" | "/" | "&&" | "?="
+                    );
+                // `MAPPING FROM ENTITY`, `MAPPING TO ENTITY`, `USING CONTROL`
+                let paired = match w.as_str() {
+                    "ENTITY" => matches!(prev.as_deref(), Some("FROM" | "TO")),
+                    "CONTROL" => prev.as_deref() == Some("USING"),
+                    _ => false,
+                };
+                if (paired || CTOR_WORDS.contains(&w.as_str()))
+                    && !next_eq
+                    && !next_call
+                    && !operand
+                    && !after_op
+                {
                     self.c.keywords.push(i);
                     prev = Some(w);
                     i += 1;
@@ -937,6 +1052,8 @@ const CTOR_WORDS: &[&str] = &[
     "BASE",
     "FOR",
     "IN",
+    "FROM",
+    "TO",
     "INTO",
     "INDEX",
     "WHERE",

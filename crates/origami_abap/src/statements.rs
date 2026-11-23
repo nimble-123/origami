@@ -207,7 +207,10 @@ static SPECS: &[Spec] = &[
     spec(&["ENDWHILE"]),
     spec(&["ENDSELECT"]),
     spec(&["ENDAT"]),
-    spec(&["CLEANUP"]),
+    Spec {
+        words: &["INTO"],
+        ..spec(&["CLEANUP"])
+    },
     spec(&["CONTINUE"]),
     spec(&["EXIT"]),
     spec(&["PUBLIC", "SECTION"]),
@@ -219,7 +222,19 @@ static SPECS: &[Spec] = &[
         ..spec(&["CATCH"])
     },
     Spec {
-        words: &[],
+        // AMDP: `METHOD m BY DATABASE PROCEDURE FOR HDB LANGUAGE SQLSCRIPT …`
+        words: &[
+            "BY DATABASE PROCEDURE",
+            "BY DATABASE FUNCTION",
+            "BY DATABASE GRAPH WORKSPACE",
+            "FOR",
+            "LANGUAGE",
+            "OPTIONS",
+            "READ-ONLY",
+            "DETERMINISTIC",
+            "SUPPRESS SYNTAX ERRORS",
+            "USING",
+        ],
         ..spec(&["METHOD"])
     },
     spec(&["RETURN"]),
@@ -288,6 +303,8 @@ static SPECS: &[Spec] = &[
             // Table controls in dynpro flow logic.
             "WITH CONTROL",
             "CURSOR",
+            // `LOOP AT SCREEN`
+            "SCREEN",
         ],
         logical_clauses: LOGIC_WHERE,
         bare: false,
@@ -317,7 +334,15 @@ static SPECS: &[Spec] = &[
             "TO",
         ],
         words: &[
-            "INITIAL", "LINE", "LINES", "OF", "CASTING", "ELSE", "UNASSIGN",
+            "INITIAL",
+            "LINE",
+            "LINES",
+            "OF",
+            "CASTING",
+            "ELSE",
+            "UNASSIGN",
+            "TABLE",
+            "ACCEPTING DUPLICATE KEYS",
         ],
         bare: false,
         ..spec(&["INSERT"])
@@ -335,6 +360,7 @@ static SPECS: &[Spec] = &[
             "FROM",
             "USING KEY",
             "BINARY SEARCH",
+            "WHERE",
         ],
         words: &[
             "COMPARING",
@@ -345,6 +371,7 @@ static SPECS: &[Spec] = &[
             "UNASSIGN",
             "COMPONENTS",
         ],
+        logical_clauses: LOGIC_WHERE,
         bare: false,
         ..spec(&["READ", "TABLE"])
     },
@@ -354,13 +381,13 @@ static SPECS: &[Spec] = &[
         ..spec(&["CLEAR"])
     },
     Spec {
-        words: &[],
+        words: &["MEMORY ID", "MEMORY", "OBJECT"],
         bare: false,
         ..spec(&["FREE"])
     },
     Spec {
         clauses: &["TYPE", "EXPORTING", "MESSAGE"],
-        words: &["WITH", "NEW"],
+        words: &["WITH", "NEW", "ID", "NUMBER"],
         bare: false,
         ..spec(&["RAISE", "SHORTDUMP"])
     },
@@ -469,7 +496,7 @@ static SPECS: &[Spec] = &[
     },
     Spec {
         clauses: &["SOURCE", "RESULT", "OPTIONS", "PARAMETERS", "OBJECTS"],
-        words: &["XML"],
+        words: &["XML", "JSON"],
         bare: false,
         ..spec(&["CALL", "TRANSFORMATION"])
     },
@@ -489,19 +516,19 @@ static SPECS: &[Spec] = &[
     },
     Spec {
         clauses: &["TYPE", "EXPORTING", "MESSAGE"],
-        words: &["RESUMABLE", "WITH", "NEW"],
+        words: &["RESUMABLE", "WITH", "NEW", "ID", "NUMBER"],
         bare: false,
         ..spec(&["RAISE", "EXCEPTION"])
     },
     Spec {
         clauses: &["TYPE", "EXPORTING", "MESSAGE"],
-        words: &["WITH", "NEW"],
+        words: &["WITH", "NEW", "ID", "NUMBER"],
         bare: false,
         ..spec(&["RAISE", "RESUMABLE", "EXCEPTION"])
     },
     Spec {
         clauses: &["TYPE", "EXPORTING", "EXCEPTIONS"],
-        words: &["AREA", "HANDLE"],
+        words: &["AREA", "HANDLE", "FOR TESTING"],
         bare: false,
         ..spec(&["CREATE", "OBJECT"])
     },
@@ -566,7 +593,7 @@ static SPECS: &[Spec] = &[
     },
     Spec {
         clauses: &["FROM", "TRANSPORTING", "WHERE", "INDEX", "USING KEY"],
-        words: &["TABLE"],
+        words: &["TABLE", "SCREEN"],
         logical_clauses: LOGIC_WHERE,
         bare: false,
         ..spec(&["MODIFY"])
@@ -611,6 +638,7 @@ static SPECS: &[Spec] = &[
             "SHARED",
             "MEMORY",
             "ENABLED",
+            "FOR BEHAVIOR OF",
         ],
         bare: false,
         ..spec(&["CLASS"])
@@ -621,12 +649,14 @@ static SPECS: &[Spec] = &[
         ..spec(&["INTERFACE"])
     },
     Spec {
-        words: &["OF", "TO", "DEFAULT"],
+        words: &[
+            "OF", "TO", "DEFAULT", "ID", "TYPE", "NUMBER", "WITH", "INTO", "RAISING", "DISPLAY LIKE",
+        ],
         bare: false,
         ..spec(&["MESSAGE"])
     },
     Spec {
-        words: &[],
+        words: &["NO-GAPS"],
         bare: false,
         ..spec(&["CONDENSE"])
     },
@@ -657,7 +687,20 @@ static SPECS: &[Spec] = &[
         ..spec(&["SPLIT"])
     },
     Spec {
-        words: &["FOR", "ABSTRACT", "FINAL", "REDEFINITION", "TESTING"],
+        words: &[
+            "FOR",
+            "ABSTRACT",
+            "FINAL",
+            "REDEFINITION",
+            "TESTING",
+            "EXPORTING",
+            "VALUE",
+            "TYPE",
+            "LIKE",
+            "REF TO",
+            "OPTIONAL",
+            "DEFAULT",
+        ],
         bare: false,
         ..spec(&["EVENTS"])
     },
@@ -742,7 +785,7 @@ static SPECS: &[Spec] = &[
         ..spec(&["ROLLBACK", "WORK"])
     },
     Spec {
-        words: &[],
+        words: &["TYPE", "STRUCTURE", "AS", "RENAMING WITH SUFFIX", "IF FOUND"],
         bare: false,
         ..spec(&["INCLUDE"])
     },
@@ -1070,6 +1113,14 @@ static SPECS: &[Spec] = &[
             "ON",
             "OFF",
             "RESET",
+            "COL_BACKGROUND",
+            "COL_HEADING",
+            "COL_NORMAL",
+            "COL_TOTAL",
+            "COL_KEY",
+            "COL_POSITIVE",
+            "COL_NEGATIVE",
+            "COL_GROUP",
         ],
         ..spec(&["FORMAT"])
     },
@@ -2020,6 +2071,15 @@ const FORM_WORDS: &[&str] = &[
 const WRITE_WORDS: &[&str] = &[
     // Line feed (`WRITE / text.`).
     "/",
+    // Colors (`COLOR COL_HEADING`).
+    "COL_BACKGROUND",
+    "COL_HEADING",
+    "COL_NORMAL",
+    "COL_TOTAL",
+    "COL_KEY",
+    "COL_POSITIVE",
+    "COL_NEGATIVE",
+    "COL_GROUP",
     "AT",
     "NO-GAP",
     "COLOR",
@@ -2213,6 +2273,9 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
     if spec.all_clauses {
         p.c.span(start, p.end, "ABAP-SQL-001");
     }
+    if spec.all_clauses || spec.lead.first() == Some(&"SELECT") {
+        mark_sql_keywords(p, start, p.end);
+    }
     Some(b::group(vec![b::concat(head), body, p.period()]))
 }
 
@@ -2231,8 +2294,20 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
     let mut current: Vec<Doc> = Vec::new();
     let mut mode = spec.after_lead;
     let mut prev_kw: Option<String> = None;
+    let mut in_exceptions = false;
     while !p.at_end() {
         let i = p.pos;
+        // `EXCEPTIONS … OTHERS = n`; `EVENTS e EXPORTING VALUE(p) …`
+        let event_value = spec.lead == ["EVENTS"]
+            && p.is(i, "VALUE")
+            && p.glued(i + 1)
+            && p.kind(i + 1) == LPAREN;
+        if event_value || (in_exceptions && p.is(i, "OTHERS") && p.is(i + 1, "=") && !p.glued(i + 1)) {
+            current.push(gap(p, i, skip));
+            current.push(p.kw(i));
+            p.pos = i + 1;
+            continue;
+        }
         // A word equal to the keyword just before it is a name
         // (`MATCH COUNT count`, `REPORTED reported`).
         let repeated = prev_kw.as_deref() == Some(p.upper(i).as_str());
@@ -2250,9 +2325,13 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
         // statement follows it (`ASSIGN structure TO <fs>`).
         // `SELECT SINGLE FROM …` / `SELECT DISTINCT FROM …` (strict syntax,
         // field list in FIELDS): these words are never names.
-        let select_modifier =
-            spec.lead == ["SELECT"] && matches!(p.upper(i).as_str(), "SINGLE" | "DISTINCT");
-        if n_word > 0
+        let select_modifier = (spec.lead == ["SELECT"]
+            && matches!(p.upper(i).as_str(), "SINGLE" | "DISTINCT"))
+            || (spec.lead == ["WHEN"] && p.is(i, "OTHERS"))
+            || (spec.lead == ["LOOP", "AT"] && p.is(i, "SCREEN"))
+            || (spec.lead == ["MODIFY"] && p.is(i, "SCREEN"))
+            || (spec.lead == ["AT", "SELECTION-SCREEN"] && p.is(i, "OUTPUT"));
+        if n_word == 1
             && Some(i) == first_operand
             && !select_modifier
             && p.text(i)
@@ -2275,6 +2354,7 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
                 c.split(' ').count() == n_clause
                     && matches_words(p, i, &c.split(' ').collect::<Vec<_>>())
             });
+            in_exceptions = phrase == Some(&"EXCEPTIONS");
             mode = if phrase.is_some_and(|c| spec.logical_clauses.contains(c)) {
                 Operands::Logical
             } else {
@@ -2607,6 +2687,75 @@ fn with_select(p: &mut P) -> Option<Doc> {
     ]))
 }
 
+/// SQL words that are keywords wherever they stand in an ABAP SQL statement.
+const SQL_WORDS: &[&str] = &[
+    "AS", "AND", "OR", "NOT", "LIKE", "IN", "BETWEEN", "IS", "NULL", "EXISTS", "SELECT", "FROM",
+    "WHERE", "INNER", "OUTER", "JOIN", "ON", "DISTINCT", "ESCAPE", "ASCENDING",
+    "DESCENDING", "HAVING", "SINGLE", "INTO", "UNION", "INTERSECT",
+];
+
+/// SQL functions written as keywords when a bracket follows (`COUNT( * )`,
+/// `CAST( … )`); other SQL functions are written like built-in functions.
+const SQL_FUNCTIONS: &[&str] = &["COUNT", "SUM", "MIN", "MAX", "AVG", "CAST"];
+
+/// Dictionary types in `CAST( … AS CHAR( 6 ) )`.
+const SQL_TYPES: &[&str] = &[
+    "CHAR", "NUMC", "DEC", "CURR", "QUAN", "INT1", "INT2", "INT4", "INT8", "FLTP", "DATS", "TIMS",
+    "DATN", "TIMN", "CLNT", "LANG", "UNIT", "CUKY", "SSTRING", "RAW", "D16N", "D34N", "UTCLONG",
+];
+
+/// Marks the SQL keywords of an ABAP SQL statement `from..to` that the clause
+/// parser left as operands (inside brackets, subqueries, CASE, functions).
+fn mark_sql_keywords(p: &mut P, from: usize, to: usize) {
+    let mut open_case = 0usize;
+    for k in from..to {
+        if p.kind(k) != WORD {
+            continue;
+        }
+        let w = p.upper(k);
+        let paren = p.glued(k + 1) && p.kind(k + 1) == LPAREN;
+        // Inline declaration after `@` (`@DATA(x)`).
+        if p.glued(k) {
+            if k > from && p.kind(k - 1) == AT && paren && matches!(w.as_str(), "DATA" | "FINAL") {
+                p.c.keywords.push(k);
+            }
+            continue;
+        }
+        // `alias~field`, `struct-comp`: a name.
+        if p.glued(k + 1) && p.kind(k + 1) == SELECTOR {
+            continue;
+        }
+        let after_as = k > from && p.is(k - 1, "AS");
+        let kw = if paren {
+            SQL_FUNCTIONS.contains(&w.as_str()) || (after_as && SQL_TYPES.contains(&w.as_str()))
+        } else if after_as {
+            // An alias, or a type without length (`AS INT4 )`).
+            SQL_TYPES.contains(&w.as_str()) && p.kind(k + 1) == RPAREN
+        } else {
+            match w.as_str() {
+                "CASE" => {
+                    open_case += 1;
+                    true
+                }
+                "WHEN" | "THEN" | "ELSE" => open_case > 0,
+                "END" if open_case > 0 => {
+                    open_case -= 1;
+                    true
+                }
+                "GROUP" | "ORDER" => p.is(k + 1, "BY"),
+                "BY" => k > from && (p.is(k - 1, "GROUP") || p.is(k - 1, "ORDER")),
+                "LEFT" | "RIGHT" => p.is(k + 1, "OUTER") || p.is(k + 1, "JOIN"),
+                "CROSS" => p.is(k + 1, "JOIN"),
+                "ALL" => k > from && p.is(k - 1, "UNION"),
+                _ => SQL_WORDS.contains(&w.as_str()),
+            }
+        };
+        if kw {
+            p.c.keywords.push(k);
+        }
+    }
+}
+
 /// Splits a clause doc built as `concat([separator, …])` into its parts.
 fn split_sep(d: Doc) -> (Doc, Doc) {
     match d.into_parts() {
@@ -2712,10 +2861,70 @@ fn keyword_after(prev: &str, w: &str) -> bool {
                 | "STRUCTURE"
         ),
         "VALUE" => w == "IS",
-        "KEY" => matches!(w, "COMPONENTS" | "ALIAS"),
-        "OF" => matches!(w, "STRUCTURE"),
+        // `WITH EMPTY KEY WITH …`
+        "KEY" => matches!(w, "COMPONENTS" | "ALIAS" | "WITH"),
+        "OF" => matches!(w, "STRUCTURE" | "ENUM" | "REF"),
+        "BASE" => w == "TYPE",
         _ => false,
     }
+}
+
+/// Words of a RAP derived type between `FOR` and the entity name
+/// (`TYPE TABLE FOR READ RESULT entity`, `TYPE RESPONSE FOR MAPPED LATE
+/// entity`).
+const DERIVED_TYPE_KW: &[&str] = &[
+    "ACTION",
+    "AUTHORIZATION",
+    "CHANGE",
+    "CREATE",
+    "DELETE",
+    "DETERMINATION",
+    "EARLY",
+    "EVENT",
+    "FAILED",
+    "FEATURES",
+    "FUNCTION",
+    "GLOBAL",
+    "HIERARCHY",
+    "IMPORT",
+    "INSTANCE",
+    "KEY",
+    "LATE",
+    "LINK",
+    "LOCK",
+    "MAPPED",
+    "OF",
+    "PERMISSIONS",
+    "READ",
+    "REPORTED",
+    "REQUEST",
+    "RESULT",
+    "UPDATE",
+    "VALIDATION",
+];
+
+/// Number of keyword tokens of a RAP derived type starting at `i`, the word
+/// after `TYPE`: `TABLE FOR …`, `STRUCTURE FOR …` or `RESPONSE FOR …`, up to
+/// the entity name. 0 if `i` does not start one.
+pub(crate) fn derived_type_len(p: &P, i: usize) -> usize {
+    let starts = matches!(p.upper(i).as_str(), "TABLE" | "STRUCTURE" | "RESPONSE" | "REQUEST")
+        && p.is(i + 1, "FOR")
+        && !p.glued(i + 1);
+    if !starts {
+        return 0;
+    }
+    let mut n = 2;
+    while i + n < p.end
+        && p.kind(i + n) == WORD
+        && !p.glued(i + n)
+        && DERIVED_TYPE_KW.contains(&p.upper(i + n).as_str())
+        // The last word before the end is the entity name.
+        && i + n + 1 < p.end
+        && p.kind(i + n + 1) == WORD
+    {
+        n += 1;
+    }
+    n
 }
 
 /// Lays out tokens `from..to` of a declaration item flat, marking keywords.
@@ -2723,12 +2932,21 @@ fn decl_tokens(p: &mut P, from: usize, to: usize) -> Vec<Doc> {
     let mut docs = Vec::new();
     let mut prev_kw: Option<String> = None;
     let mut in_components = false;
+    let mut derived_until = from;
     for i in from..to {
         if i > from {
             docs.push(p.sp(i));
         }
         let w = p.upper(i);
         let is_word = p.kind(i) == WORD && !p.glued(i);
+        if prev_kw.as_deref() == Some("TYPE") && is_word {
+            derived_until = i + derived_type_len(p, i);
+        }
+        if i < derived_until {
+            docs.push(p.kw(i));
+            prev_kw = None;
+            continue;
+        }
         let operand_slot = prev_kw.as_deref().is_some_and(takes_operand)
             && !prev_kw.as_deref().is_some_and(|pk| keyword_after(pk, &w));
         // After COMPONENTS, words are field names unless they start the
@@ -2741,7 +2959,9 @@ fn decl_tokens(p: &mut P, from: usize, to: usize) -> Vec<Doc> {
         // Type-phrase words are keywords only with their partner word;
         // otherwise they are type names (`TYPE any`, a type named `line`).
         let partner_ok = match w.as_str() {
-            "ANY" | "INDEX" | "STANDARD" | "SORTED" | "HASHED" => p.is(i + 1, "TABLE"),
+            "ANY" | "INDEX" => p.is(i + 1, "TABLE"),
+            // `SORTED TABLE`, `WITH NON-UNIQUE SORTED KEY sk`
+            "STANDARD" | "SORTED" | "HASHED" => p.is(i + 1, "TABLE") || p.is(i + 1, "KEY"),
             "LINE" | "RANGE" => p.is(i + 1, "OF"),
             "REF" => p.is(i + 1, "TO"),
             _ => true,
@@ -2783,6 +3003,10 @@ fn declaration(p: &mut P) -> Option<Doc> {
     if !chain {
         if start + 1 >= p.end {
             return None;
+        }
+        // `TYPES BEGIN OF s.` / `DATA END OF s.`
+        if (p.is(start + 1, "BEGIN") || p.is(start + 1, "END")) && p.is(start + 2, "OF") {
+            p.c.keywords.push(start + 1);
         }
         let ne = name_end(p, start + 1, p.end);
         let mut docs = vec![lead, p.sp(start + 1)];
@@ -2830,7 +3054,7 @@ fn declaration(p: &mut P) -> Option<Doc> {
     }
     // Items must be separable: an item glued to the previous comma cannot be
     // moved to its own line.
-    if items.is_empty() || items.iter().any(|&(a, e)| a >= e || p.glued(a)) {
+    if items.is_empty() || items.iter().any(|&(a, e)| a >= e || (p.glued(a) && a != colon + 1)) {
         return None;
     }
     let mut lines: Vec<(u32, Line, usize)> = Vec::new(); // (level, line, first token)
@@ -3204,6 +3428,13 @@ fn method_item_inner(p: &mut P, name: usize, sections_kw: &[&str]) -> Option<Doc
             params.push((s, section_end));
         } else if j < section_end {
             params.push((j, section_end));
+        }
+        // `IMPORTING … PREFERRED PARAMETER p`
+        for k in i + 1..section_end {
+            if p.is(k, "PREFERRED") && p.is(k + 1, "PARAMETER") {
+                p.c.keywords.push(k);
+                p.c.keywords.push(k + 1);
+            }
         }
         let mut param_docs = Vec::new();
         for (a, e) in params {
