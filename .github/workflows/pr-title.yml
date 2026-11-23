@@ -42,5 +42,6 @@ jobs:
             xtask
             release
             deps
+            deps-dev
             main
           requireScope: false

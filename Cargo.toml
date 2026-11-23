@@ -17,6 +17,12 @@ version = "0.1.1" # x-release-please-version
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.94"
+repository = "https://github.com/nimble-123/origami"
+homepage = "https://nimble-123.github.io/origami/"
+documentation = "https://nimble-123.github.io/origami/"
+readme = "README.md"
+keywords = ["abap", "cds", "formatter", "sap", "rap"]
+categories = ["development-tools", "command-line-utilities"]
 
 [workspace.dependencies]
 origami_syntax = { path = "crates/origami_syntax", version = "0.1.1" } # x-release-please-version

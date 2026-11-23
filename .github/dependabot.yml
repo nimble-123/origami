@@ -1,0 +1,62 @@
+# Weekly dependency updates, one grouped pull request per ecosystem. Titles
+# are Conventional Commits (see .github/workflows/pr-title.yml); the "deps"
+# scope is one of the allowed scopes. Updates to GitHub Actions keep the full
+# commit SHA and rewrite the "# vX.Y.Z" comment next to it.
+version: 2
+
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      cargo:
+        patterns: ["*"]
+
+  - package-ecosystem: cargo
+    directory: /fuzz
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      cargo-fuzz:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /editors/vscode
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      npm-vscode:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /tools/abaplint-oracle
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      npm-abaplint-oracle:
+        patterns: ["*"]
+
+  # "/" covers the workflows in .github/workflows and the root action.yml.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      github-actions:
+        patterns: ["*"]

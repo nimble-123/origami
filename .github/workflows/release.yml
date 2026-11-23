@@ -4,14 +4,25 @@ name: Release
 # release pull request is merged. All crates and the VS Code extension share
 # one version. Steps that need secrets (signing, publishing) are skipped
 # when the secret is not set, so a dry run on a fork still produces the
-# GitHub release assets.
+# GitHub release assets. docs/releasing.md lists the secrets and how to set
+# them up.
+#
+# Job layout (each job has only the permissions it needs; secrets are passed
+# to the single step that uses them, never to build steps):
+#
+#   build   -> binaries per target (+ signing, notarization)
+#   smoke   -> runs every binary on a native runner
+#   vsix    -> packages the VS Code extension per target
+#   extras  -> third-party notices, SBOM, release diff (builds code, read-only)
+#   release -> attests provenance and publishes the GitHub release assets
+#   homebrew, crates, vscode-publish -> publishing, after the release exists
 
 on:
   push:
     tags: ["v*.*.*"]
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -20,14 +31,8 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
-    env:
-      APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
-      APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
-      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-      WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
-      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -40,21 +45,34 @@ jobs:
           - { target: aarch64-unknown-linux-gnu.2.17, os: ubuntu-latest, tool: zigbuild, vscode: linux-arm64 }
           - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, tool: zigbuild, vscode: alpine-x64 }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Rust target
         shell: bash
         env:
           TARGET: ${{ matrix.target }}
         # zigbuild targets carry a glibc suffix that rustup does not know.
         run: rustup target add "${TARGET%.2.17}"
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
+      # No build cache in release jobs: a poisoned cache entry would end up
+      # in the shipped binaries.
       - name: Install cargo-zigbuild
         if: matrix.tool == 'zigbuild'
         run: |
-          pip install ziglang
-          cargo install cargo-zigbuild --locked
+          pip install ziglang==0.17.1
+          cargo install cargo-zigbuild --version 0.24.1 --locked
+      - name: Reproducible build settings
+        shell: bash
+        # SOURCE_DATE_EPOCH is the commit time of the tag. The path prefixes
+        # keep the home directory, the cargo registry, the toolchain and the
+        # workspace out of panic messages and debug info; rustc uses the last
+        # matching mapping, so the general one comes first.
+        run: |
+          native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
+          {
+            echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)"
+            echo "RUSTFLAGS=--remap-path-prefix=$(native "$HOME")=/home/build --remap-path-prefix=$(native "${RUSTUP_HOME:-$HOME/.rustup}")=/rustup --remap-path-prefix=$(native "${CARGO_HOME:-$HOME/.cargo}")=/cargo --remap-path-prefix=${GITHUB_WORKSPACE}=/src/origami"
+          } >> "$GITHUB_ENV"
       - name: Build
         shell: bash
         run: |
@@ -75,64 +93,313 @@ jobs:
           cp "target/${triple}/release/origami${ext}" "dist/${name}"
           echo "name=${name}" >> "$GITHUB_OUTPUT"
           echo "ext=${ext}" >> "$GITHUB_OUTPUT"
-      - name: Sign (macOS)
-        if: runner.os == 'macOS' && env.APPLE_CERT_P12 != ''
+
+      # Signing. The secrets exist only in the environment of the signing
+      # step itself. This step reduces them to two booleans ("true" when all
+      # secrets of a platform are set); the values are not exposed.
+      - name: Check which signing credentials exist
+        id: signing
+        shell: bash
+        env:
+          HAVE_APPLE: ${{ secrets.APPLE_CERT_P12 != '' && secrets.APPLE_CERT_PASSWORD != '' && secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
+          HAVE_WINDOWS: ${{ secrets.WINDOWS_CERT_PFX != '' && secrets.WINDOWS_CERT_PASSWORD != '' }}
         run: |
-          echo "$APPLE_CERT_P12" | base64 --decode > cert.p12
-          security create-keychain -p ci build.keychain
-          security import cert.p12 -k build.keychain -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k ci build.keychain
-          security list-keychains -s build.keychain
-          identity=$(security find-identity -v -p codesigning build.keychain | head -1 | awk '{print $2}')
-          codesign --force --options runtime --timestamp --sign "$identity" "dist/${{ steps.collect.outputs.name }}"
-          echo "$APPLE_API_KEY" > key.p8
-          ditto -c -k "dist/${{ steps.collect.outputs.name }}" notarize.zip
-          xcrun notarytool submit notarize.zip --key key.p8 --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait
+          echo "apple=$HAVE_APPLE" >> "$GITHUB_OUTPUT"
+          echo "windows=$HAVE_WINDOWS" >> "$GITHUB_OUTPUT"
+          case "$RUNNER_OS-$HAVE_APPLE-$HAVE_WINDOWS" in
+            macOS-false-* | Windows-*-false)
+              echo "::notice::No signing credentials for $RUNNER_OS; the binary is not signed."
+              ;;
+          esac
+      - name: Sign and notarize (macOS)
+        if: runner.os == 'macOS' && steps.signing.outputs.apple == 'true'
+        shell: bash
+        env:
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          BINARY: dist/${{ steps.collect.outputs.name }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/build.keychain-db"
+          keychain_password=$(uuidgen)
+          cleanup() {
+            security delete-keychain "$keychain" >/dev/null 2>&1 || true
+            rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/key.p8" "$RUNNER_TEMP/notarize.zip" "$RUNNER_TEMP/notary.json"
+          }
+          trap cleanup EXIT
+
+          printf '%s' "$APPLE_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain"
+          identity=$(security find-identity -v -p codesigning "$keychain" | awk '/Developer ID Application/ { print $2; exit }')
+          if [ -z "$identity" ]; then
+            echo "::error::The certificate contains no 'Developer ID Application' identity."
+            exit 1
+          fi
+
+          # Hardened runtime and a secure timestamp are required for notarization.
+          codesign --force --options runtime --timestamp --sign "$identity" "$BINARY"
+          codesign --verify --strict --verbose=2 "$BINARY"
+
+          # Notarize. A bare executable cannot be stapled; Gatekeeper looks the
+          # ticket up online.
+          printf '%s' "$APPLE_API_KEY" > "$RUNNER_TEMP/key.p8"
+          ditto -c -k --keepParent "$BINARY" "$RUNNER_TEMP/notarize.zip"
+          notarize() {
+            xcrun notarytool "$@" --key "$RUNNER_TEMP/key.p8" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER"
+          }
+          if ! notarize submit "$RUNNER_TEMP/notarize.zip" --wait --output-format json > "$RUNNER_TEMP/notary.json"; then
+            cat "$RUNNER_TEMP/notary.json" || true
+            echo "::error::notarytool could not submit or wait for the binary."
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/notary.json"
+          status=$(plutil -extract status raw -o - "$RUNNER_TEMP/notary.json")
+          if [ "$status" != Accepted ]; then
+            notarize log "$(plutil -extract id raw -o - "$RUNNER_TEMP/notary.json")" || true
+            echo "::error::Notarization finished with status '$status'."
+            exit 1
+          fi
       - name: Sign (Windows)
-        if: runner.os == 'Windows' && env.WINDOWS_CERT_PFX != ''
+        if: runner.os == 'Windows' && steps.signing.outputs.windows == 'true'
         shell: pwsh
+        env:
+          WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          BINARY: dist\${{ steps.collect.outputs.name }}
         run: |
-          [IO.File]::WriteAllBytes("cert.pfx", [Convert]::FromBase64String($env:WINDOWS_CERT_PFX))
-          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -Last 1
-          & $signtool.FullName sign /f cert.pfx /p $env:WINDOWS_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 "dist\${{ steps.collect.outputs.name }}"
+          $ErrorActionPreference = 'Stop'
+          $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX))
+            $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\signtool.exe' |
+              Sort-Object { [version]$_.Directory.Parent.Name } | Select-Object -Last 1
+            if (-not $signtool) { throw 'signtool.exe not found' }
+            $signed = $false
+            foreach ($attempt in 1..3) {
+              & $signtool.FullName sign /f $pfx /p $env:WINDOWS_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $env:BINARY
+              if ($LASTEXITCODE -eq 0) { $signed = $true; break }
+              Start-Sleep -Seconds (5 * $attempt)
+            }
+            if (-not $signed) { throw 'signtool sign failed' }
+            & $signtool.FullName verify /pa /v $env:BINARY
+            if ($LASTEXITCODE -ne 0) { throw 'signtool verify failed' }
+          } finally {
+            Remove-Item -Force -ErrorAction SilentlyContinue $pfx
+          }
+
       - name: Checksum
         shell: bash
         run: |
           cd dist
           if command -v sha256sum >/dev/null; then sha256sum "${{ steps.collect.outputs.name }}" > "${{ steps.collect.outputs.name }}.sha256";
           else shasum -a 256 "${{ steps.collect.outputs.name }}" > "${{ steps.collect.outputs.name }}.sha256"; fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bin-${{ matrix.vscode }}
           path: dist/*
+          if-no-files-found: error
 
-  release:
+  smoke:
+    # Every binary runs on a runner of its own platform: it must start,
+    # report its version and format a small fixture. The x86_64 macOS
+    # binary runs under Rosetta on the arm64 runner; the musl binary runs
+    # on Ubuntu.
+    name: Smoke ${{ matrix.target }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-apple-darwin, os: macos-latest, vscode: darwin-x64, rosetta: true }
+          - { target: aarch64-apple-darwin, os: macos-latest, vscode: darwin-arm64 }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, vscode: win32-x64 }
+          - { target: aarch64-pc-windows-msvc, os: windows-11-arm, vscode: win32-arm64 }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, vscode: linux-x64, glibc: true }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm, vscode: linux-arm64, glibc: true }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, vscode: alpine-x64 }
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: bin-${{ matrix.vscode }}
+          path: bin
+      - name: Run the binary
+        shell: bash
+        env:
+          ROSETTA: ${{ matrix.rosetta || 'false' }}
+          GLIBC_CHECK: ${{ matrix.glibc || 'false' }}
+        run: |
+          set -euo pipefail
+          cd bin
+          if command -v sha256sum >/dev/null; then sha256sum -c ./*.sha256; else shasum -a 256 -c ./*.sha256; fi
+          bin=""
+          for f in origami-*; do
+            case "$f" in *.sha256) ;; *) bin="$f"; break ;; esac
+          done
+          [ -n "$bin" ] || { echo "::error::no binary in the artifact"; exit 1; }
+          chmod +x "$bin"
+          run=("./$bin")
+          if [ "$ROSETTA" = true ]; then
+            arch -x86_64 /usr/bin/true 2>/dev/null || softwareupdate --install-rosetta --agree-to-license
+            run=(arch -x86_64 "./$bin")
+          fi
+
+          "${run[@]}" --version
+
+          if [ "$GLIBC_CHECK" = true ]; then
+            # The zigbuild suffix promises glibc 2.17; fail if a newer symbol slipped in.
+            newest=$(objdump -T "$bin" | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -V | tail -1)
+            echo "newest glibc symbol: ${newest:-none}"
+            if [ -n "$newest" ] && [ "$(printf '%s\n2.17\n' "$newest" | sort -V | tail -1)" != 2.17 ]; then
+              echo "::error::$bin needs glibc $newest, more than the promised 2.17."
+              exit 1
+            fi
+          fi
+
+          # Format a fixture (keywords to upper case, blanks collapsed), then
+          # check that formatting changes nothing more.
+          input=$'REPORT  zdemo.\nif  a=1 .\n  write:/ `x`.\nendif.\n'
+          expected=$'REPORT zdemo.\nIF a=1 .\n  write:/ `x`.\nENDIF.'
+          actual=$(printf '%s' "$input" | "${run[@]}" --stdin --language abap --no-config | tr -d '\r')
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::unexpected output for the ABAP fixture:"
+            printf '%s\n' "$actual"
+            exit 1
+          fi
+          printf '%s\n' "$expected" | "${run[@]}" --stdin --check --language abap --no-config
+          printf 'define view entity ZI_Demo as select from zdemo { key id }\n' | "${run[@]}" --stdin --language ddls --no-config
+
+  vsix:
+    name: Package VSIX ${{ matrix.vscode }}
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        vscode: [darwin-x64, darwin-arm64, win32-x64, win32-arm64, linux-x64, linux-arm64, alpine-x64]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path: artifacts
-          pattern: bin-*
-          merge-multiple: true
-      - uses: taiki-e/install-action@v2
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          tool: cargo-about
+          node-version: 22
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: bin-${{ matrix.vscode }}
+          path: bin-in
+      - name: Package VSIX
+        working-directory: editors/vscode
+        run: |
+          npm ci
+          npm run build
+          mkdir -p bin
+          src=$(ls ../../bin-in/origami-* | grep -v '\.sha256$' | head -1)
+          case "$src" in *.exe) cp "$src" bin/origami.exe ;; *) cp "$src" bin/origami && chmod +x bin/origami ;; esac
+          npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
+          npx vsce package --target "${{ matrix.vscode }}" --no-dependencies
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vsix-${{ matrix.vscode }}
+          path: editors/vscode/*.vsix
+          if-no-files-found: error
+
+  extras:
+    # Builds and runs repository code, so it gets no write permissions.
+    name: Notices, SBOM and release diff
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: cargo-about@0.9.3,cargo-cyclonedx@0.5.10
       - name: Third-party notices
         run: |
+          mkdir -p extras
           cargo about generate about.hbs > THIRD_PARTY_NOTICES.generated.md
-          cat THIRD_PARTY_NOTICES.md THIRD_PARTY_NOTICES.generated.md > artifacts/THIRD_PARTY_NOTICES.md
+          cat THIRD_PARTY_NOTICES.md THIRD_PARTY_NOTICES.generated.md > extras/THIRD_PARTY_NOTICES.md
+      - name: SBOM (CycloneDX)
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # One file per workspace member is written next to its manifest;
+          # the one of the binary crate lists every dependency of origami.
+          cargo cyclonedx --manifest-path crates/origami_cli/Cargo.toml --format json \
+            --spec-version 1.5 --target all --override-filename "origami-${version}.sbom.cdx"
+          mkdir -p extras
+          mv "crates/origami_cli/origami-${version}.sbom.cdx.json" extras/
       - name: Release diff against the previous release
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           cargo xtask corpus fetch
-          cargo xtask release-diff || true
-          [ -f target/release-diff.patch ] && cp target/release-diff.patch artifacts/ || true
+          # The release for this tag exists already (release-please creates
+          # it) but has no assets yet, so compare with the newest other
+          # release that has a Linux x86_64 binary.
+          previous=""
+          for tag in $(gh release list --exclude-drafts --exclude-pre-releases --limit 30 --json tagName --jq '.[].tagName'); do
+            [ "$tag" = "$GITHUB_REF_NAME" ] && continue
+            assets=$(gh release view "$tag" --json assets --jq '.assets[].name')
+            case "$assets" in
+              *-x86_64-unknown-linux-gnu*) previous="$tag"; break ;;
+            esac
+          done
+          if [ -z "$previous" ]; then
+            echo "::notice::No earlier release with binaries; no release diff."
+          else
+            cargo xtask release-diff "$previous"
+            cp target/release-diff.patch extras/
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: extras
+          path: extras/*
+          if-no-files-found: error
+
+  release:
+    # Runs no repository code; it only assembles, attests and uploads.
+    needs: [build, smoke, vsix, extras]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # release assets
+      id-token: write # Sigstore signing for the attestations
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          # Every artifact of this run: bin-*, vsix-* and extras.
+          path: artifacts
+          merge-multiple: true
+      - name: List the release assets
+        run: ls -l artifacts
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            artifacts/origami-*
+            artifacts/*.vsix
+            !artifacts/*.sha256
       - name: GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
         # release-please normally created the release (with its changelog
         # section) together with the tag; then only the assets are added.
         run: |
@@ -141,7 +408,7 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" artifacts/* \
               --title "origami $GITHUB_REF_NAME" \
-              --notes "See CHANGELOG.md. Checksums: *.sha256. Output changes on the test corpus: release-diff.patch."
+              --notes "See CHANGELOG.md. Checksums: *.sha256. Provenance: gh attestation verify FILE --repo $GITHUB_REPOSITORY. SBOM: *.sbom.cdx.json. Output changes on the test corpus: release-diff.patch."
           fi
 
   homebrew:
@@ -149,19 +416,27 @@ jobs:
     # write access to that repository (secret HOMEBREW_TAP_TOKEN).
     needs: release
     runs-on: ubuntu-latest
-    env:
-      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-        if: env.HOMEBREW_TAP_TOKEN != ''
-      - uses: actions/download-artifact@v4
-        if: env.HOMEBREW_TAP_TOKEN != ''
+      - id: tap
+        env:
+          HAVE_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+        run: |
+          echo "enabled=$HAVE_TOKEN" >> "$GITHUB_OUTPUT"
+          [ "$HAVE_TOKEN" = true ] || echo "::notice::HOMEBREW_TAP_TOKEN is not set; the Homebrew formula is not updated."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.tap.outputs.enabled == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.tap.outputs.enabled == 'true'
         with:
           path: artifacts
           pattern: bin-*
           merge-multiple: true
       - name: Update the formula in the tap
-        if: env.HOMEBREW_TAP_TOKEN != ''
+        if: steps.tap.outputs.enabled == 'true'
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
@@ -180,60 +455,77 @@ jobs:
   crates:
     needs: release
     runs-on: ubuntu-latest
-    env:
-      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - name: Publish crates in dependency order
-        if: env.CARGO_REGISTRY_TOKEN != ''
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check that the crates can be published
+        # Packages and builds every crate in dependency order against the
+        # local workspace; needs no token.
+        run: cargo publish --workspace --dry-run --locked
+      - id: token
+        env:
+          HAVE_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN != '' }}
         run: |
-          for crate in origami_syntax origami_layout origami_abap origami_cds origami_core abap-origami; do
-            cargo publish --locked -p "$crate"
-            sleep 30
-          done
+          echo "enabled=$HAVE_TOKEN" >> "$GITHUB_OUTPUT"
+          [ "$HAVE_TOKEN" = true ] || echo "::notice::CARGO_REGISTRY_TOKEN is not set; the crates are not published."
+      - name: Publish crates in dependency order
+        if: steps.token.outputs.enabled == 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        # The dry run above built the crates, so --no-verify keeps the token
+        # away from build scripts of dependencies. cargo waits for each crate
+        # to appear in the index before it publishes the next one.
+        run: cargo publish --workspace --locked --no-verify
 
-  vscode:
+  vscode-publish:
+    name: Publish the extension
     needs: release
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        vscode: [darwin-x64, darwin-arm64, win32-x64, win32-arm64, linux-x64, linux-arm64, alpine-x64]
+    permissions:
+      contents: read
     env:
-      VSCE_PAT: ${{ secrets.VSCE_PAT }}
-      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+      # Install scripts of the publishing tools do not run.
+      npm_config_ignore_scripts: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - id: tokens
+        env:
+          HAVE_VSCE: ${{ secrets.VSCE_PAT != '' }}
+          HAVE_OVSX: ${{ secrets.OVSX_PAT != '' }}
+        run: |
+          echo "vsce=$HAVE_VSCE" >> "$GITHUB_OUTPUT"
+          echo "ovsx=$HAVE_OVSX" >> "$GITHUB_OUTPUT"
+          [ "$HAVE_VSCE" = true ] || echo "::notice::VSCE_PAT is not set; not published to the VS Code Marketplace."
+          [ "$HAVE_OVSX" = true ] || echo "::notice::OVSX_PAT is not set; not published to Open VSX."
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.tokens.outputs.vsce == 'true' || steps.tokens.outputs.ovsx == 'true'
         with:
           node-version: 22
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.tokens.outputs.vsce == 'true' || steps.tokens.outputs.ovsx == 'true'
         with:
-          name: bin-${{ matrix.vscode }}
-          path: bin-in
-      - name: Package VSIX
-        working-directory: editors/vscode
-        run: |
-          npm ci
-          npm run build
-          mkdir -p bin
-          src=$(ls ../../bin-in/origami-* | grep -v '\.sha256$' | head -1)
-          case "$src" in *.exe) cp "$src" bin/origami.exe ;; *) cp "$src" bin/origami && chmod +x bin/origami ;; esac
-          npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
-          npx vsce package --target "${{ matrix.vscode }}" --no-dependencies
+          path: vsix
+          pattern: vsix-*
+          merge-multiple: true
       - name: Publish to VS Code Marketplace
-        if: env.VSCE_PAT != ''
-        working-directory: editors/vscode
-        run: npx vsce publish --packagePath *.vsix --pat "$VSCE_PAT"
-      - name: Publish to Open VSX
-        if: env.OVSX_PAT != ''
-        working-directory: editors/vscode
-        run: npx --yes ovsx publish *.vsix --pat "$OVSX_PAT"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: vsix-${{ matrix.vscode }}
-          path: editors/vscode/*.vsix
-      - name: Attach the VSIX to the release
+        if: steps.tokens.outputs.vsce == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$GITHUB_REF_NAME" editors/vscode/*.vsix --clobber
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          failed=0
+          for f in vsix/*.vsix; do
+            npx --yes @vscode/vsce@4.1.1 publish --packagePath "$f" --pat "$VSCE_PAT" || failed=1
+          done
+          exit $failed
+      - name: Publish to Open VSX
+        if: steps.tokens.outputs.ovsx == 'true'
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          failed=0
+          for f in vsix/*.vsix; do
+            npx --yes ovsx@1.4.0 publish "$f" --pat "$OVSX_PAT" || failed=1
+          done
+          exit $failed

@@ -133,6 +133,8 @@ the tag builds the binaries for macOS, Linux and Windows, attaches them and
 the VS Code extensions to the GitHub release, publishes the crates and
 updates the Homebrew formula in `nimble-123/homebrew-tap`.
 
+Secrets, accounts and the release checklist: [docs/releasing.md](docs/releasing.md).
+
 ## Diagrams and images
 
 Diagrams are SVG files in `docs/assets/` built from `docs/diagrams/` (light
