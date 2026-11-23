@@ -8,10 +8,15 @@ extension. Everything here serves one idea:
 
 The motif comes from origami crease patterns, the line drawings that show
 where a sheet is folded. By convention they draw **mountain folds in red** and
-**valley folds in blue**, on plain paper. origami uses the same vocabulary:
-blue marks what origami adds (a valley fold, a new line), red marks what goes
-away. The paper is cool and plain, the ink is indigo, and creases are drawn as
-dashed lines.
+**valley folds in blue**. origami uses the same vocabulary: blue marks what
+origami adds (a valley fold, a new line), red marks what goes away. Creases
+are drawn as dashed lines.
+
+The colors come from the [Tokyo Night](https://github.com/tokyo-night/tokyo-night-vscode-theme)
+themes for VS Code: **Tokyo Night Light** by day, **Tokyo Night** by night.
+Many ABAP developers already read code in these colors, so the page, the
+diagrams and the terminal look like their editor. Tokyo Night's blue and red
+are the valley and mountain folds.
 
 ## Audience and job
 
@@ -23,43 +28,47 @@ dashed lines.
 
 ## Color
 
-Base palette (light):
+Two themes, chosen by the reader's system setting (`prefers-color-scheme`).
+Every token has a value in both.
 
-| Token | Hex | Use |
-|---|---|---|
-| `--paper` | `#F4F6F9` | page background: cool, untinted paper |
-| `--sheet` | `#FFFFFF` | the "sheet": code panels, the playground |
-| `--ink` | `#18214D` | text and lines: indigo ink, never pure black |
-| `--valley` | `#2456D6` | valley fold: added lines, links, primary action |
-| `--mountain` | `#D23A49` | mountain fold: removed lines, errors; used sparingly |
-| `--crease` | `#C9D1DE` | crease lines, borders, dividers |
+| Token | Light (Tokyo Night Light) | Dark (Tokyo Night) | Use |
+|---|---|---|---|
+| `--paper` | `#D5D6DB` | `#16161E` | page background |
+| `--sheet` | `#E6E7ED` | `#1A1B26` | the "sheet": code panels, the playground |
+| `--ink` | `#343B58` | `#C0CAF5` | text and lines |
+| `--ink-soft` | `#565A6E` | `#A9B1D6` | secondary text |
+| `--ink-dim` | `#6C6E75` | `#737AA2` | line numbers only |
+| `--valley` | `#34548A` | `#7AA2F7` | valley fold: added lines, links, primary action |
+| `--mountain` | `#8C4351` | `#F7768E` | mountain fold: removed lines, errors; used sparingly |
+| `--crease` | `#A8AAB6` | `#3B4261` | crease lines, borders, dividers |
+| `--valley-wash` | `#D1D5E1` | `#20303B` | added-line background |
+| `--mountain-wash` | `#DBD3DA` | `#37222C` | removed-line background |
 
-Supporting tokens: `--ink-soft #4A5478` (secondary text), `--valley-wash
-#E6EDFC` (added-line background), `--mountain-wash #FBE9EB` (removed-line
-background), `--fold-shadow rgba(24, 33, 77, 0.10)` (the only shadow, under a
-folded edge).
+Syntax colors in code, from the same themes:
 
-Dark mode is the same sheet at night, not an inverted page:
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `--syn-keyword` | `#5A4A78` | `#BB9AF7` | ABAP keywords |
+| `--syn-string` | `#485E30` | `#9ECE6A` | string literals and templates |
+| `--syn-number` | `#965027` | `#FF9E64` | numbers |
+| `--syn-comment` | `#5F6272` | `#828BB8` | comments, italic |
+| `--syn-rule` | `#0F4B6E` | `#7DCFFF` | rule IDs in notes (`ABAP-CALL-001`) |
 
-| Token | Hex |
-|---|---|
-| `--paper` | `#0E1430` |
-| `--sheet` | `#151D42` |
-| `--ink` | `#E7EBF6` |
-| `--valley` | `#7FA2FF` |
-| `--mountain` | `#FF7A86` |
-| `--crease` | `#2E3866` |
+The page and sheet values, `--ink`, the accents and the syntax colors are the
+theme's own. `--sheet` (light), `--crease` (light) and the light washes are
+mixed from them. Comments are lighter in the editor themes (`#9699A3`,
+`#565F89`); here they are raised to reach 4.5:1.
 
 Rules:
 
 * Blue and red carry meaning (added / removed, fold / unfold). They are never
   decoration and never a gradient.
-* Text on `--paper` and `--sheet` meets WCAG AA; `--valley` on `--paper` is
-  5.7:1 (light) and 7.3:1 (dark). On the diff washes, text stays `--ink`;
-  red and blue mark only the `-` / `+` signs and the changed characters
-  (red on its wash is 4.0:1, too low for running text).
-* Syntax highlighting in code stays quiet: keywords in `--ink` bold, strings
-  and comments in `--ink-soft`; only the diff uses color.
+* Text meets WCAG AA on `--paper` and `--sheet`: `--ink` 7.6:1 (light) and
+  11.1:1 (dark), `--valley` 5.2:1 and 7.1:1, every syntax color at least
+  4.5:1 on `--sheet`. `--ink-dim` (about 4:1) is for line numbers only.
+* On the diff washes, text stays `--ink`; red and blue mark the `-` / `+`
+  signs and the changed characters.
+* Syntax colors appear only in code. Keywords are colored, not bold.
 
 ## Type
 
@@ -91,11 +100,13 @@ non-code content. Line length: at most 68 characters for prose.
 ## Logo
 
 A square sheet folded along its diagonal. The upper-left half carries three
-lines of code that get shorter towards the crease; the lower-right half is
-the folded flap, showing the back of the paper in `--crease`; between them
-runs the crease as a dashed `--valley` line. Outline and code lines in
-`--ink`. Wordmark: "origami" in Schibsted Grotesk 800, lower case. Files:
-`docs/assets/logo.svg`, `docs/assets/logo-dark.svg`.
+lines of code that get shorter towards the crease, in the keyword, cyan and
+string colors of the theme; the lower-right half is the folded flap, showing
+the back of the paper in `--crease`; between them runs the crease as a dashed
+`--valley` line. Outline in `--ink`. Wordmark: "origami" in Schibsted Grotesk
+800, lower case. Files: `docs/assets/logo.svg` (Tokyo Night Light),
+`docs/assets/logo-dark.svg` (Tokyo Night). The social preview
+(`docs/assets/social-preview.png`, from `site/og/og.html`) uses the dark theme.
 
 ## Motion
 
@@ -122,5 +133,5 @@ Numbers are measured and linked to their source. No exclamation marks.
 * **Website (`site/`):** a single page on GitHub Pages: hero with the fold
   animation, the playground (origami in WebAssembly), how the self-check
   works, line-break notes, speed, install.
-* **Diagrams:** pipeline and benchmark in the palette above, crease-line
-  frames, Schibsted Grotesk labels, Martian Mono for code.
+* **Diagrams:** pipeline and benchmark in the palette above (light and dark
+  SVG), crease-line frames, Schibsted Grotesk labels, Martian Mono for code.

@@ -17,3 +17,6 @@ editors/vscode/.vscode-test/
 .egm/
 .diagram-design
 site/dist/
+
+# Local secrets (API keys)
+.env

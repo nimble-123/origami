@@ -10,12 +10,12 @@
 **A long line of ABAP, folded into shape.**<br>
 A formatter for ABAP and CDS that changes layout and nothing else, checks its own output token by token, and tells you why it broke each line.
 
-[![Release](https://img.shields.io/github/v/release/nimble-123/origami?color=2456D6&include_prereleases)](https://github.com/nimble-123/origami/releases)
+[![Release](https://img.shields.io/github/v/release/nimble-123/origami?color=34548A&include_prereleases)](https://github.com/nimble-123/origami/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/nimble-123/origami/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/nimble-123/origami/actions/workflows/ci.yml)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-2456D6)](#license)
-[![Rust 2024](https://img.shields.io/badge/Rust-2024-18214D?logo=rust&logoColor=white)](https://www.rust-lang.org)
-[![ABAP and CDS](https://img.shields.io/badge/ABAP%20%2B%20CDS-up%20to%20SAP__BASIS%208.16-18214D)](#supported-files)
-[![Homebrew](https://img.shields.io/badge/brew-nimble--123%2Ftap-2456D6?logo=homebrew&logoColor=white)](#install)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-34548A)](#license)
+[![Rust 2024](https://img.shields.io/badge/Rust-2024-1A1B26?logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![ABAP and CDS](https://img.shields.io/badge/ABAP%20%2B%20CDS-up%20to%20SAP__BASIS%208.16-1A1B26)](#supported-files)
+[![Homebrew](https://img.shields.io/badge/brew-nimble--123%2Ftap-34548A?logo=homebrew&logoColor=white)](#install)
 
 [Website](https://nimble-123.github.io/origami/) · [Playground](https://nimble-123.github.io/origami/#playground) · [Why origami](#why-origami) · [Install](#install) · [Use](#use) · [How it works](#how-it-works) · [Documentation](#documentation) · [License](#license)
 
