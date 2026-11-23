@@ -31,7 +31,6 @@ pub struct CdsUnit {
     extra: u32,
 }
 
-
 /// Index after the annotation value starting at `k` (after the colon).
 fn skip_value(toks: &[origami_syntax::Token], mut k: usize) -> usize {
     if k >= toks.len() {

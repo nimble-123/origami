@@ -1101,10 +1101,8 @@ impl<'c, 'a> Printer<'c, 'a> {
         }
         let mut first_row = true;
         for seg in segments.iter().filter(|s| !s.is_empty()) {
-            let heads: Vec<Option<usize>> = seg
-                .iter()
-                .map(|r| self.ctx.flat_width(&r.head))
-                .collect();
+            let heads: Vec<Option<usize>> =
+                seg.iter().map(|r| self.ctx.flat_width(&r.head)).collect();
             let anchor_glued = seg
                 .iter()
                 .any(|r| !matches!(r.tail.first().map(|d| &d.0), Some(Inner::Space)));

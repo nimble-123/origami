@@ -14,8 +14,8 @@ pub mod structure;
 
 use origami_layout::{PrintOptions, print_bounded};
 use origami_syntax::{
-    LangOptions, LangResult, Language, SourceText, Stats, TokenIndex, Unit, UnitId,
-    max_output_len, output_limit_diagnostic,
+    LangOptions, LangResult, Language, SourceText, Stats, TokenIndex, Unit, UnitId, max_output_len,
+    output_limit_diagnostic,
 };
 use std::collections::BTreeSet;
 

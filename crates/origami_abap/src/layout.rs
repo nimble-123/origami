@@ -7,11 +7,11 @@
 //! statements nested deeper than `MAX_NESTING` (W004).
 
 use crate::block_pairs::Role;
+use crate::kinds::*;
 use crate::statements;
 use crate::stmt::{Ctx, P};
 use crate::structure::Statement;
 use origami_layout::{Doc, builder as b};
-use crate::kinds::*;
 use origami_syntax::{
     Code, Diagnostic, MAX_NESTING, RuleSpan, TokenIndex, TokenStream, TriviaPosition, UnitId,
 };
@@ -103,7 +103,8 @@ pub fn layout(
         let too_deep = st.depth + bracket_nesting(stream, st) > MAX_NESTING;
         if too_deep {
             if depth_limited == 0 {
-                let range = stream.tokens[first.0 as usize].start..stream.tokens[last.0 as usize].end;
+                let range =
+                    stream.tokens[first.0 as usize].start..stream.tokens[last.0 as usize].end;
                 diagnostics.push(Diagnostic::new(
                     Code::W004,
                     format!(
@@ -162,7 +163,10 @@ pub fn layout(
         } else {
             b::hard(stream, first)
         };
-        docs.push(nest(st.depth.min(MAX_NESTING), b::concat(vec![start, body])));
+        docs.push(nest(
+            st.depth.min(MAX_NESTING),
+            b::concat(vec![start, body]),
+        ));
         prev_role = st.role;
     }
     Laid {

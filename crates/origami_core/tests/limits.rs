@@ -36,7 +36,11 @@ fn run(lang: Language, src: &str, opts: &Options) -> FormatResult {
 
 /// W004 reported once, for units nested deeper than the limit.
 fn assert_depth_limited(r: &FormatResult) {
-    let w004 = r.diagnostics.iter().filter(|d| d.code == Code::W004).count();
+    let w004 = r
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == Code::W004)
+        .count();
     assert_eq!(w004, 1, "{:?}", r.diagnostics);
     assert!(r.stats.depth_limited > 0);
 }
@@ -114,7 +118,10 @@ fn nested_calls_are_not_exponential() {
         let r = run(Language::Abap, &src, &Options::default());
         assert!(!r.has(Code::W004), "{:?}", r.diagnostics);
     }
-    let src = format!("REPORT z.\nx = {}.\n", nested("VALUE #( a = 1 b = ", "1", " )", 60));
+    let src = format!(
+        "REPORT z.\nx = {}.\n",
+        nested("VALUE #( a = 1 b = ", "1", " )", 60)
+    );
     run(Language::Abap, &src, &Options::default());
 }
 
