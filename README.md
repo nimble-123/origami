@@ -25,8 +25,9 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 > origami is pre-release (0.1). All six languages are formatted by grammar,
 > every file of a 2,100-file test corpus passes the self-check and is
 > idempotent, and the abaplint lexer finds no token changes. Still open:
-> signed builds, the VS Code Marketplace listing and feedback from teams
-> using it daily. Please [open an issue](https://github.com/nimble-123/origami/issues)
+> signed builds and the VS Code Marketplace listing (both wait for
+> maintainer accounts), publishing to crates.io, and feedback from teams using
+> it daily. Please [open an issue](https://github.com/nimble-123/origami/issues)
 > with any line origami formats in a way you would not.
 
 <div align="center">
@@ -63,7 +64,7 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 
 ```sh
 brew install nimble-123/tap/origami        # macOS and Linux
-cargo install abap-origami                 # any platform with Rust
+cargo install abap-origami                 # crates.io: not published yet
 ```
 
 Release binaries for macOS, Linux and Windows, each with a `.sha256` file, and

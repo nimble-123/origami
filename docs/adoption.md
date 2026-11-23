@@ -16,6 +16,15 @@ Every origami run, the VS Code extension included, refuses to format with a
 version outside this range (E020). This keeps CI, editors and agents on the
 same output. Raise the range in a pull request when you move to a new version.
 
+While origami is 0.x, any release can change the formatted output, patch
+releases included (0.1.1 did), and the changelog lists each change with its
+rule ID. The range above takes new patch releases; to keep the output of one
+release exactly, pin it (`required_version = "=0.1.1"`). To upgrade: raise the
+range, run `origami` once, review the diff by sampling, and commit it on its
+own (step 2). From 1.0, new and changed rules come behind `--preview` first and
+become the default only with a new style edition; see [STYLE.md](STYLE.md),
+"Stability".
+
 ## 2. Format everything once, in its own commit
 
 Look first: `origami --review` shows every change origami would make, with a

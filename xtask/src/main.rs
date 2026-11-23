@@ -1,8 +1,9 @@
 //! `cargo xtask <task>`: corpus fetch/run/bless, explain, freq, oracle, bench-check,
-//! release-diff. Run from anywhere inside the repository.
+//! release-diff, ci. Run from anywhere inside the repository.
 
 mod bench_check;
 mod bench_matrix;
+mod ci;
 mod corpus;
 mod explain;
 mod freq;
@@ -40,8 +41,9 @@ fn main() -> ExitCode {
         ["release-diff", rest @ ..] => release_diff::run(rest),
         ["stress", rest @ ..] => stress::run(rest),
         ["idempotency"] => idempotency::run(),
+        ["ci", rest @ ..] => ci::run(rest),
         _ => Err(
-            "usage: cargo xtask <corpus fetch|corpus run [--hashes FILE]|corpus bless|explain FILE|explain --corpus|freq [N]|oracle|bench-check [hyperfine.json...]|bench-matrix [--report]|release-diff [tag]|stress [n] [seed]|idempotency>"
+            "usage: cargo xtask <corpus fetch|corpus run [--hashes FILE]|corpus bless|explain FILE|explain --corpus|freq [N]|oracle|bench-check [hyperfine.json...]|bench-matrix [--report]|release-diff [tag]|stress [n] [seed]|idempotency|ci [--full]>"
                 .into(),
         ),
     };
