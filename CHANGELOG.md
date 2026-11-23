@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/nimble-123/origami/compare/v0.2.0...v0.2.1) (2026-11-23)
+
+
+### Fixes
+
+* publish a release whose test-corpus output did not change ([#31](https://github.com/nimble-123/origami/issues/31)) ([98e4b4f](https://github.com/nimble-123/origami/commit/98e4b4f903512cf511a751c1674f6ee648d58e9b))
+
 ## [0.2.0](https://github.com/nimble-123/origami/compare/v0.1.1...v0.2.0) (2026-11-23)
 
 
