@@ -66,6 +66,7 @@ fn lex(src: &str) -> TokenStream {
                 glued: !gap && !tokens.is_empty(),
                 keyword: false,
                 ident: false,
+                may_glue: false,
             });
             gap = false;
             on_line = true;
@@ -81,6 +82,7 @@ fn opts(width: u16) -> PrintOptions {
         indent: 2,
         keyword_case: Some(Case::Upper),
         identity: false,
+        comment_overrides: Default::default(),
     }
 }
 

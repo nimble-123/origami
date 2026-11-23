@@ -96,6 +96,7 @@ impl<'a> Lexer<'a> {
             glued,
             keyword: false,
             ident: false,
+            may_glue: false,
         });
         self.i = end;
         self.gap = false;

@@ -29,7 +29,7 @@ use origami_syntax::{
     Case, CommentSyntax, Placement, SourceText, TokenIndex, TokenStream, TriviaKind, TriviaPosition,
 };
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 /// Characters the lexers treat as blanks between tokens.
 const BLANKS: [char; 3] = [' ', '\t', '\r'];
@@ -42,6 +42,10 @@ pub struct PrintOptions {
     pub keyword_case: Option<Case>,
     /// Return the source text unchanged.
     pub identity: bool,
+    /// Replacement texts of comment lines, by trivia index (ABAP-DOC-001).
+    /// The comment lines in front of one token use them only if no
+    /// replacement ends past the width while being longer than the original.
+    pub comment_overrides: BTreeMap<usize, String>,
 }
 
 pub fn print(doc: &Doc, src: &SourceText, tokens: &TokenStream, opts: &PrintOptions) -> String {
@@ -225,7 +229,7 @@ impl<'a> Ctx<'a> {
         let mut w = 0;
         for k in first.0..=last.0 {
             let t = &self.tokens.tokens[k as usize];
-            if k > first.0 {
+            if k > first.0 && !glued_gap(self, k as usize) {
                 let prev_end = self.tokens.tokens[k as usize - 1].end as usize;
                 let gap = &self.src[prev_end..t.start as usize];
                 if gap.contains('\n') {
@@ -563,6 +567,22 @@ impl<'c, 'a> Printer<'c, 'a> {
 
     fn leading_comments(&mut self, i: TokenIndex, indent: usize, blank: bool) {
         let leading = &self.ctx.leading[i.0 as usize];
+        // A token that starts a line stays in that line's column after its
+        // comment lines, as it would without them.
+        let indent = match self.pending_indent {
+            Some(col) if !leading.is_empty() && self.line_empty && !self.pending_eol => col,
+            _ => indent,
+        };
+        let overrides = &self.ctx.opts.comment_overrides;
+        let width = self.ctx.opts.width as usize;
+        let use_overrides = !overrides.is_empty()
+            && leading.iter().all(|l| match overrides.get(&l.trivia) {
+                Some(new) => {
+                    let n = new.chars().count();
+                    indent + n <= width || n <= self.comment_text(l.trivia).chars().count()
+                }
+                None => true,
+            });
         for l in leading {
             if !self.line_empty || self.pending_eol {
                 self.newline(indent);
@@ -571,7 +591,10 @@ impl<'c, 'a> Printer<'c, 'a> {
                 self.blank_line();
             }
             let t = &self.ctx.tokens.trivia[l.trivia];
-            let text = self.comment_text(l.trivia).to_string();
+            let text = match overrides.get(&l.trivia) {
+                Some(new) if use_overrides => new.clone(),
+                _ => self.comment_text(l.trivia).to_string(),
+            };
             if matches!(
                 t.kind,
                 TriviaKind::Comment {
@@ -698,7 +721,9 @@ impl<'c, 'a> Printer<'c, 'a> {
 
         for k in first.0..=last.0 {
             let k = k as usize;
-            if k > first.0 as usize {
+            // A token glued by the layout (ABAP-SPACE-001) loses the blanks
+            // and line breaks before it.
+            if k > first.0 as usize && !(kind == RawKind::Unknown && glued_gap(ctx, k)) {
                 let gap = &src[toks[k - 1].end as usize..toks[k].start as usize];
                 if gap.contains('\n') {
                     self.raw_gap(gap, shift, min_indent, indent);
@@ -1164,6 +1189,16 @@ enum RawKind {
     Unknown,
     Verbatim,
     Opaque,
+}
+
+/// Token `k` is glued, but the source has blanks or line breaks (and nothing
+/// else) before it: the language crate glued it.
+fn glued_gap(ctx: &Ctx, k: usize) -> bool {
+    let toks = &ctx.tokens.tokens;
+    toks[k].glued
+        && ctx.src[toks[k - 1].end as usize..toks[k].start as usize]
+            .chars()
+            .all(|c| BLANKS.contains(&c) || c == '\n')
 }
 
 /// Width of leading indentation; a tab counts as one indent step.

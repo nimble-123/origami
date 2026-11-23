@@ -84,6 +84,7 @@ fn format_with(
         indent: opts.indent_width,
         keyword_case: None,
         identity,
+        comment_overrides: Default::default(),
     };
     let limit = max_output_len(src.text().len());
     let (output, diagnostics) = match print_bounded(&laid.doc, src, &stream, &print_opts, limit) {

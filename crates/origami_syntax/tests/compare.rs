@@ -3,8 +3,9 @@ use origami_syntax::{
     CommentSyntax, MismatchKind, Placement, Token, TokenStream, Trivia, TriviaKind, equivalent,
 };
 
-/// Minimal whitespace lexer for tests: words separated by spaces; `"` starts a
-/// comment to end of line.
+/// Minimal whitespace lexer for tests: words separated by spaces, `.` and `,`
+/// are tokens of their own; `"` starts a comment to end of line (`"!` an ABAP
+/// Doc comment).
 fn lex(src: &str) -> TokenStream {
     let mut tokens = Vec::new();
     let mut trivia = Vec::new();
@@ -33,18 +34,21 @@ fn lex(src: &str) -> TokenStream {
                 } else {
                     Placement::OwnLine
                 };
-                trivia.push(Trivia::new(
-                    TriviaKind::Comment {
-                        syntax: CommentSyntax::AbapQuote,
-                        placement,
-                    },
-                    s..i,
-                ));
+                let syntax = if src[s..].starts_with("\"!") {
+                    CommentSyntax::AbapDoc
+                } else {
+                    CommentSyntax::AbapQuote
+                };
+                trivia.push(Trivia::new(TriviaKind::Comment { syntax, placement }, s..i));
                 gap = true;
             }
             _ => {
                 let s = i;
-                while i < b.len() && !matches!(b[i], b' ' | b'\n' | b'"') {
+                i += 1;
+                while i < b.len()
+                    && !matches!(b[s], b'.' | b',')
+                    && !matches!(b[i], b' ' | b'\n' | b'"' | b'.' | b',')
+                {
                     i += 1;
                 }
                 tokens.push(Token {
@@ -54,6 +58,7 @@ fn lex(src: &str) -> TokenStream {
                     glued: !gap && !tokens.is_empty(),
                     keyword: false,
                     ident: false,
+                    may_glue: false,
                 });
                 gap = false;
                 token_on_line = true;
@@ -154,4 +159,104 @@ fn count_mismatch_points_past_keyword_case_changes() {
     assert_eq!(ms.len(), 1);
     assert_eq!(ms[0].kind, MismatchKind::Count);
     assert_eq!(ms[0].input_index.0, 2);
+}
+
+/// Like `kinds`, with `may_glue` set on input tokens `marked`.
+fn glue_kinds(a: &str, b: &str, marked: &[usize]) -> Vec<MismatchKind> {
+    let mut input = lex(a);
+    for &k in marked {
+        input.tokens[k].may_glue = true;
+    }
+    match equivalent(&input, a, &lex(b), b) {
+        Ok(()) => vec![],
+        Err(m) => m.into_iter().map(|m| m.kind).collect(),
+    }
+}
+
+#[test]
+fn marked_period_and_comma_may_become_glued() {
+    assert!(glue_kinds("a , b .", "a, b.", &[1, 3]).is_empty());
+    // Without the mark, the same change is a mismatch.
+    assert_eq!(
+        glue_kinds("a , b .", "a, b.", &[1]),
+        vec![MismatchKind::Glued]
+    );
+}
+
+#[test]
+fn only_marked_tokens_may_become_glued() {
+    // The token after the comma may not touch it, and a glued token may not
+    // be separated.
+    assert_eq!(glue_kinds("a , b", "a ,b", &[1]), vec![MismatchKind::Glued]);
+    assert_eq!(glue_kinds("a.", "a .", &[1]), vec![MismatchKind::Glued]);
+}
+
+#[test]
+fn comments_move_behind_a_glued_period_or_comma() {
+    // End-of-line comment of the previous token, then a comment line.
+    assert!(glue_kinds("a \"x\n\"y\n.\nb", "a. \"x\n\"y\nb", &[1]).is_empty());
+    assert!(glue_kinds("a \"x\n, b", "a, \"x\nb", &[1]).is_empty());
+}
+
+#[test]
+fn comments_move_only_with_a_glued_marked_token() {
+    let a = "a \"x\n.\nb";
+    // Not marked.
+    assert!(glue_kinds(a, "a. \"x\nb", &[]).contains(&MismatchKind::CommentAnchor));
+    // Marked, but not glued in the output.
+    assert_eq!(
+        glue_kinds(a, "a\n. \"x\nb", &[1]),
+        vec![MismatchKind::CommentAnchor]
+    );
+}
+
+#[test]
+fn comments_move_by_one_token_only() {
+    // Two tokens further.
+    assert_eq!(
+        glue_kinds("a \"x\n. b c", "a. b \"x\nc", &[1]),
+        vec![MismatchKind::CommentAnchor]
+    );
+    assert_eq!(
+        glue_kinds("a\n\"x\n. b c", "a. b\n\"x\nc", &[1]),
+        vec![MismatchKind::CommentAnchor]
+    );
+    // A comment that did not stand in front of the glued token stays.
+    assert_eq!(
+        glue_kinds("a \"x\nb .", "a b. \"x", &[2]),
+        vec![MismatchKind::CommentAnchor]
+    );
+    // Nor may a comment change its placement on the way.
+    assert_eq!(
+        glue_kinds("a \"x\n.\nb", "a.\n\"x\nb", &[1]),
+        vec![MismatchKind::CommentKind]
+    );
+}
+
+#[test]
+fn abap_doc_tag_lines_may_change_blanks_after_tag_and_before_bar() {
+    let ok = |a: &str, b: &str| kinds(&format!("{a}\nm"), &format!("{b}\nm")).is_empty();
+    assert!(ok("\"! @parameter a | x", "\"! @parameter a    | x"));
+    assert!(ok("\"! @raising a| x", "\"! @raising   a | x"));
+    assert!(ok("\"! @EXCEPTION a\t| x", "\"! @EXCEPTION   a  | x"));
+    assert!(ok("\"! @parameter    a | x", "\"! @parameter a | x"));
+}
+
+#[test]
+fn abap_doc_lines_keep_every_other_byte() {
+    let bad = |a: &str, b: &str| {
+        kinds(&format!("{a}\nm"), &format!("{b}\nm")) == vec![MismatchKind::CommentText]
+    };
+    // After the bar, before the tag, the name, the tag itself.
+    assert!(bad("\"! @parameter a | x", "\"! @parameter a |  x"));
+    assert!(bad("\"! @parameter a | x", "\"!  @parameter a | x"));
+    assert!(bad("\"! @parameter a | x", "\"! @parameter b | x"));
+    assert!(bad("\"! @parameter a | x", "\"! @PARAMETER a | x"));
+    // The blank after the tag stays, and the name stays one word.
+    assert!(bad("\"! @parameter a | x", "\"! @parametera | x"));
+    assert!(bad("\"! @parameter ab | x", "\"! @parameter a b | x"));
+    // Other tags, lines without a bar, and comments that are not ABAP Doc.
+    assert!(bad("\"! @see a | x", "\"! @see   a | x"));
+    assert!(bad("\"! @parameter a x", "\"! @parameter   a x"));
+    assert!(bad("\" @parameter a | x", "\" @parameter   a | x"));
 }

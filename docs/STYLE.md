@@ -622,6 +622,87 @@ READ ENTITIES OF /DMO/I_Travel_M IN LOCAL MODE
     FAILED DATA(failed).
 ```
 
+### ABAP-SPACE-001: No space before a period or comma
+Milestone: M4
+
+Approved by the maintainer, Nils Lutz, on 2026-11-23, as ABAP Cleaner's
+"Remove space before commas and period" with its default options. The period
+that ends a statement and every comma outside brackets follow the token
+before them without a space, in class definitions too. These are the commas
+of a chain (`DATA:`, `CLEAR:`, `WRITE:`, …) and, as in ABAP Cleaner, the
+commas of ABAP SQL lists (`SELECT a, b`, `ORDER BY a, b`); commas inside
+brackets (`IN ( 'AA' , 'LH' )`, SQL function arguments, embedded expressions
+of string templates) keep their spacing. A period or comma on a line of its
+own after an end-of-line comment or comment lines moves up behind the token
+before it: the end-of-line comment then follows the period or comma, and the
+comment lines stand before the next item or statement. A pragma counts as a
+token (`##NEEDED.`).
+
+Kept as in ABAP Cleaner: a period or comma after `/` (`WRITE / .`), a
+period or comma with its own end-of-line comment that would have to move in
+front of other comments, and the period of a `FUNCTION` statement behind
+comment lines (the generated signature comment). Units printed as written
+(W001, W002, W004) keep their spacing, and in statements without grammar
+(W003) only spaces and line breaks are removed; comments do not move there.
+One deviation: where a comma with its own end-of-line comment would move in
+front of other comments, ABAP Cleaner turns that comment into a comment line;
+origami keeps the comma where it is, because a comment never changes between
+end of line and own line (INVARIANTS 1.3).
+
+```abap
+before: DATA lo_any TYPE REF TO object ##NEEDED .
+        SELECT carrid , connid FROM spfli ORDER BY carrid , connid INTO TABLE @DATA(lt_conn) .
+        lv_a = 42 " the answer
+        .
+        CLEAR: lv_a " first item
+               , lv_b
+        * comment line
+               .
+after:  DATA lo_any TYPE REF TO object ##NEEDED.
+        SELECT carrid, connid FROM spfli ORDER BY carrid, connid INTO TABLE @DATA(lt_conn).
+        lv_a = 42. " the answer
+        CLEAR: lv_a, " first item
+               lv_b.
+        * comment line
+```
+
+### ABAP-DOC-001: Align ABAP Doc parameters and exceptions
+Milestone: M4
+
+Approved by the maintainer, Nils Lutz, on 2026-11-23, as ABAP Cleaner's
+"Align parameters and exceptions in ABAP Doc" with its default options
+(align across empty and non-empty ABAP Doc lines). In the ABAP Doc comment
+lines (`"!`) in front of a statement, the lines `"! @parameter name | text`,
+`"! @raising name | text` and `"! @exception name | text` are aligned: the
+names start in one column, one space after the longest tag, and the `|`
+signs line up one space after the longest name. Other ABAP Doc lines and
+blank lines between them do not end the group; any other comment does. Only
+the blanks after the tag and between the name and `|` change (INVARIANTS
+1.3); everything else in the line stays as written.
+
+As in ABAP Cleaner, a line is not aligned when it has no `|`, no text after
+`|`, or more than one word before `|`, and ABAP Doc in front of a chain item
+(`METHODS: "! … m1, …`) is not aligned. If padding would push a line past
+`line_width` (and make it longer than as written), the ABAP Doc in front of
+that statement keeps its spacing; ABAP Cleaner aligns whatever the width.
+Other deviations: origami keeps the text between `"!` and the tag and after
+`|` as written (ABAP Cleaner writes `"! @parameter` and one space after
+`|`), and with other spacing before the tag the names still start in one
+column.
+
+```abap
+before: "! @parameter iv_carrier | Airline
+        "! @parameter iv_connection_id | Connection
+        "! The connection must exist.
+        "! @parameter rs_flight| Flight
+        "! @raising zcx_not_found | Flight not found
+after:  "! @parameter iv_carrier       | Airline
+        "! @parameter iv_connection_id | Connection
+        "! The connection must exist.
+        "! @parameter rs_flight        | Flight
+        "! @raising   zcx_not_found    | Flight not found
+```
+
 ## CDS family (M2/M3 batch 1, structural)
 
 Approved by the maintainer, Nils Lutz, on 2026-11-21, including single

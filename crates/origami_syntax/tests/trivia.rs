@@ -11,6 +11,7 @@ fn tok(start: u32, end: u32) -> Token {
         glued: false,
         keyword: false,
         ident: false,
+        may_glue: false,
     }
 }
 
