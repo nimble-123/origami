@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/nimble-123/origami/compare/v0.2.2...v0.2.3) (2026-11-23)
+
+
+### Fixes
+
+* **release:** expect no blank before the period in the smoke fixture ([#45](https://github.com/nimble-123/origami/issues/45)) ([81bb609](https://github.com/nimble-123/origami/commit/81bb6093d141e35a7f55a53fd96014715ffa6787))
+
 ## [0.2.2](https://github.com/nimble-123/origami/compare/v0.2.1...v0.2.2) (2026-11-23)
 
 
