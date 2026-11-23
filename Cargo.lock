@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "abap-origami"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -1243,7 +1243,7 @@ checksum = "7e036b411754132fd6b74e94b74e9a13c5cf606fa93d1885c35860d3060820b1"
 
 [[package]]
 name = "origami_abap"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "origami_layout",
  "origami_syntax",
@@ -1251,7 +1251,7 @@ dependencies = [
 
 [[package]]
 name = "origami_cds"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "origami_layout",
  "origami_syntax",
@@ -1259,7 +1259,7 @@ dependencies = [
 
 [[package]]
 name = "origami_core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "criterion",
  "origami_abap",
@@ -1272,21 +1272,21 @@ dependencies = [
 
 [[package]]
 name = "origami_layout"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "origami_syntax",
 ]
 
 [[package]]
 name = "origami_syntax"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "origami_wasm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "origami_core",
  "serde_json",
@@ -2467,7 +2467,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "origami_core",
  "serde",
