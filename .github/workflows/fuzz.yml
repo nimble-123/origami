@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [format_abap, format_cds]
+        target: [format_abap, format_cds, format_lines, explain]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -25,36 +25,83 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: fuzz
+      # The corpus libFuzzer grew in earlier nights; every run saves a new
+      # cache entry, and the newest one is restored.
+      - name: Restore corpus
+        uses: actions/cache/restore@v4
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: fuzz-corpus-${{ matrix.target }}-
+      # format_abap takes ABAP as is; format_cds takes a language byte and
+      # the source. format_lines and explain take a language byte for all
+      # six languages (0 = ABAP, 1..5 = DDLS, DDLX, DCL, BDEF, SRVD).
       - name: Seed corpus
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
           cargo xtask corpus fetch
-          mkdir -p fuzz/corpus/${{ matrix.target }}
-          if [ "${{ matrix.target }}" = format_abap ]; then
-            find corpus/repos -name '*.abap' -size -64k | head -500 | xargs -I{} cp {} fuzz/corpus/format_abap/ || true
-          else
-            find corpus/repos \( -name '*.asddls' -o -name '*.asbdef' -o -name '*.srvdsrv' \) | head -300 | xargs -I{} cp {} fuzz/corpus/format_cds/ || true
-          fi
+          dir=fuzz/corpus/$TARGET
+          mkdir -p "$dir"
+          seed() { # seed <language byte, octal> <file>
+            { printf %b "\\0$1"; cat "$2"; } > "$dir/seed-$(sha1sum "$2" | cut -c1-16)"
+          }
+          find corpus/repos -name '*.abap' -size -64k | head -500 > abap.txt
+          find corpus/repos \( -name '*.asddls' -o -name '*.asddlxs' -o -name '*.asdcls' \
+            -o -name '*.asbdef' -o -name '*.srvdsrv' \) -size -64k | head -300 > cds.txt
+          case "$TARGET" in
+            format_abap) xargs -I{} cp {} "$dir/" < abap.txt || true ;;
+            format_cds) xargs -I{} cp {} "$dir/" < cds.txt || true ;;
+            *)
+              while read -r f; do seed 000 "$f"; done < abap.txt
+              while read -r f; do
+                case "$f" in
+                  *.asddls) seed 001 "$f" ;; *.asddlxs) seed 002 "$f" ;;
+                  *.asdcls) seed 003 "$f" ;; *.asbdef) seed 004 "$f" ;;
+                  *) seed 005 "$f" ;;
+                esac
+              done < cds.txt
+              ;;
+          esac
       # cargo-binstall fetches a musl build of cargo-fuzz, which would
       # otherwise compile for its own musl target (no sanitizer support).
       - name: Build
         run: cargo +nightly fuzz build --target x86_64-unknown-linux-gnu ${{ matrix.target }}
+      # One input may take 10 s and 2 GiB (origami formats 64 KiB in
+      # milliseconds; more means a hang or a blow-up). Inputs are cut at
+      # 64 KiB, the size of the seeds.
       - name: Fuzz for one hour
         id: fuzz
-        run: cargo +nightly fuzz run --target x86_64-unknown-linux-gnu ${{ matrix.target }} -- -max_total_time=3600
+        run: >-
+          cargo +nightly fuzz run --target x86_64-unknown-linux-gnu ${{ matrix.target }} --
+          -max_total_time=3600 -timeout=10 -rss_limit_mb=2048 -max_len=65536
+      - name: Save corpus
+        if: always() && steps.fuzz.outcome != 'skipped'
+        uses: actions/cache/save@v4
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Upload crash
         if: failure() && steps.fuzz.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: fuzz-${{ matrix.target }}
           path: fuzz/artifacts/
-      - name: Open issue
+      # One open issue per target: a new finding is a comment on it.
+      - name: Open or update issue
         if: failure() && steps.fuzz.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
+          TITLE: Fuzz crash in ${{ matrix.target }}
+          BODY: "Nightly fuzzing found a crash. Artifact: run ${{ github.run_id }}."
         run: |
-          gh issue create \
-            --title "Fuzz crash in ${{ matrix.target }}" \
-            --body "Nightly fuzzing found a crash. Artifact: run ${{ github.run_id }}."
+          number=$(gh issue list --state open --search "\"$TITLE\" in:title" \
+            --json number,title --jq "map(select(.title == \"$TITLE\")) | .[0].number // empty")
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY"
+          fi
 
   # Every corpus file at 80 combinations of width, indent and keyword case;
   # too slow for every pull request.
