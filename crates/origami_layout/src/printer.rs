@@ -9,8 +9,10 @@
 //! * `Hang` continues broken lines at the column where it starts.
 //! * `Choice(a, b)` prints `a` when every line of `a` fits, else `b`.
 //! * `AlignGroup` prints one row per line and pads each row's head to the
-//!   widest head of its segment; a segment falls back to single spaces when
-//!   padding would overflow or an anchor is glued.
+//!   widest head of its segment (anchors of different widths can be aligned
+//!   at their right end); a segment falls back to single spaces when padding
+//!   would overflow (see `AlignFit`) or an anchor is glued. Unaligned lines
+//!   inside the group get their own line too.
 //! * Comments are printed with their token. Own-line comments go on their own
 //!   lines at the token's indent (`*` comments in column 1); end-of-line
 //!   comments follow their token after one space and end the line.
@@ -24,7 +26,7 @@
 //! doc and printer state, so nested choices are decided once, not once per
 //! enclosing trial (which would be exponential in their depth).
 
-use crate::ir::{AlignItem, Doc, Inner};
+use crate::ir::{AlignFit, AlignItem, Doc, Inner};
 use origami_syntax::{
     Case, CommentSyntax, Placement, SourceText, TokenIndex, TokenStream, TriviaKind, TriviaPosition,
 };
@@ -272,12 +274,9 @@ impl<'a> Ctx<'a> {
                         stack.push(sep);
                     }
                 }
-                Inner::AlignGroup(items) => {
-                    if let Some(AlignItem::Row(r)) =
-                        items.iter().find(|i| matches!(i, AlignItem::Row(_)))
-                    {
-                        stack.extend(r.tail.iter().rev());
-                        stack.extend(r.head.iter().rev());
+                Inner::AlignGroup(items, _) => {
+                    if let Some(docs) = items.iter().find_map(AlignItem::docs) {
+                        stack.extend(docs.rev());
                     }
                 }
                 Inner::Unknown { first, last, .. } => {
@@ -320,14 +319,10 @@ impl<'a> Ctx<'a> {
                 let (a, b) = self.raw_range(*f, *last);
                 lead || self.src[a..b].contains('\n') || trailing(*last)
             }
-            Inner::AlignGroup(items) => items.iter().any(|it| match it {
-                AlignItem::Row(r) => r
-                    .head
-                    .iter()
-                    .chain(r.tail.iter())
-                    .any(|d| self.forced(d, first, end)),
-                AlignItem::Break => false,
-            }),
+            Inner::AlignGroup(items, _) => items
+                .iter()
+                .filter_map(AlignItem::docs)
+                .any(|mut docs| docs.any(|d| self.forced(d, first, end))),
             Inner::Group(ds) | Inner::Indent(ds) | Inner::Hang(ds) | Inner::Concat(ds) => {
                 ds.iter().any(|d| self.forced(d, first, end))
             }
@@ -368,17 +363,11 @@ impl<'a> Ctx<'a> {
                         stack.push(sep);
                     }
                 }
-                Inner::AlignGroup(items) => {
-                    let rows = items
-                        .iter()
-                        .filter(|i| matches!(i, AlignItem::Row(_)))
-                        .count();
+                Inner::AlignGroup(items, _) => {
+                    let rows = items.iter().filter_map(AlignItem::docs).count();
                     w += rows.saturating_sub(1);
-                    for it in items {
-                        if let AlignItem::Row(r) = it {
-                            stack.extend(r.tail.iter().rev());
-                            stack.extend(r.head.iter().rev());
-                        }
+                    for docs in items.iter().rev().filter_map(AlignItem::docs) {
+                        stack.extend(docs.rev());
                     }
                 }
                 Inner::Unknown { first, last, .. } => w += self.raw_width(true, *first, *last),
@@ -849,29 +838,17 @@ impl<'c, 'a> Printer<'c, 'a> {
                         stack.push((Mode::Flat, sep));
                     }
                 }
-                Inner::AlignGroup(items) if mode == Mode::Flat => {
+                Inner::AlignGroup(items, _) if mode == Mode::Flat => {
                     let mut flat: Vec<(Mode, &Doc)> = Vec::new();
-                    for (k, it) in items
-                        .iter()
-                        .filter_map(|i| match i {
-                            AlignItem::Row(r) => Some(r),
-                            AlignItem::Break => None,
-                        })
-                        .enumerate()
-                    {
+                    for (k, docs) in items.iter().filter_map(AlignItem::docs).enumerate() {
                         if k > 0 {
                             flat.push((Mode::Flat, &SPACE_DOC));
                         }
-                        flat.extend(
-                            it.head
-                                .iter()
-                                .chain(it.tail.iter())
-                                .map(|d| (Mode::Flat, d)),
-                        );
+                        flat.extend(docs.map(|d| (Mode::Flat, d)));
                     }
                     stack.extend(flat.into_iter().rev());
                 }
-                Inner::AlignGroup(_) => return remaining >= 0,
+                Inner::AlignGroup(..) => return remaining >= 0,
                 Inner::Unknown { first, last, .. }
                 | Inner::Verbatim { first, last, .. }
                 | Inner::Opaque { first, last, .. } => {
@@ -1014,13 +991,9 @@ impl<'c, 'a> Printer<'c, 'a> {
                         k += 2;
                     }
                 }
-                Inner::AlignGroup(items) if mode == Mode::Flat => {
+                Inner::AlignGroup(items, _) if mode == Mode::Flat => {
                     let mut flat: Vec<Cmd> = Vec::new();
-                    let rows = items.iter().filter_map(|i| match i {
-                        AlignItem::Row(r) => Some(r),
-                        AlignItem::Break => None,
-                    });
-                    for (k, r) in rows.enumerate() {
+                    for (k, docs) in items.iter().filter_map(AlignItem::docs).enumerate() {
                         if k > 0 {
                             flat.push(Cmd {
                                 indent,
@@ -1028,7 +1001,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                                 doc: &SPACE_DOC,
                             });
                         }
-                        flat.extend(r.head.iter().chain(r.tail.iter()).map(|d| Cmd {
+                        flat.extend(docs.map(|d| Cmd {
                             indent,
                             mode,
                             doc: d,
@@ -1036,7 +1009,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                     }
                     stack.extend(flat.into_iter().rev());
                 }
-                Inner::AlignGroup(items) => self.align_group(items, indent, width),
+                Inner::AlignGroup(items, fit) => self.align_group(items, *fit, indent, width),
                 Inner::Unknown { first, last, blank } => {
                     self.raw(RawKind::Unknown, *first, *last, indent, *blank)
                 }
@@ -1114,36 +1087,55 @@ impl<'c, 'a> Printer<'c, 'a> {
         fits
     }
 
-    fn align_group(&mut self, items: &[AlignItem], indent: usize, width: usize) {
+    fn align_group(&mut self, items: &[AlignItem], fit: AlignFit, indent: usize, width: usize) {
         let col = self.column().max(indent);
         // Split into segments at `Break`.
-        let mut segments: Vec<Vec<&crate::ir::AlignRow>> = vec![Vec::new()];
+        let mut segments: Vec<Vec<&AlignItem>> = vec![Vec::new()];
         for it in items {
             match it {
-                AlignItem::Row(r) => segments.last_mut().unwrap().push(r),
                 AlignItem::Break => segments.push(Vec::new()),
+                _ => segments.last_mut().unwrap().push(it),
             }
         }
         let mut first_row = true;
         for seg in segments.iter().filter(|s| !s.is_empty()) {
+            let rows: Vec<&crate::ir::AlignRow> = seg
+                .iter()
+                .filter_map(|it| match it {
+                    AlignItem::Row(r) => Some(r),
+                    _ => None,
+                })
+                .collect();
             let heads: Vec<Option<usize>> =
-                seg.iter().map(|r| self.ctx.flat_width(&r.head)).collect();
-            let anchor_glued = seg
+                rows.iter().map(|r| self.ctx.flat_width(&r.head)).collect();
+            let anchor_glued = rows
                 .iter()
                 .any(|r| !matches!(r.tail.first().map(|d| &d.0), Some(Inner::Space)));
+            // Heads are padded to the widest head, and anchors of different
+            // widths are right-aligned in a column as wide as the widest.
             let max = heads.iter().flatten().copied().max().unwrap_or(0);
-            // Only rows whose tail can be flat count for overflow; a tail that
-            // breaks anyway (a nested multi-line expression) does not block
-            // alignment.
-            let overflow = seg.iter().zip(&heads).any(|(r, h)| match h {
-                Some(_) => {
-                    let tail = self.ctx.min_first_line(&r.tail);
-                    col + max + tail > width
+            let max_anchor = rows.iter().map(|r| r.anchor).max().unwrap_or(0);
+            let pad = |r: &crate::ir::AlignRow, h: usize| max - h + max_anchor - r.anchor;
+            let overflow = rows.iter().zip(&heads).any(|(r, h)| match (h, fit) {
+                (None, _) => true,
+                // Only rows whose tail can be flat count for overflow; a tail
+                // that breaks anyway (a nested multi-line expression) does not
+                // block alignment.
+                (Some(h), AlignFit::FirstLine) => {
+                    col + h + pad(r, *h) + self.ctx.min_first_line(&r.tail) > width
                 }
-                None => true,
+                // A row that fits on one line must still fit; otherwise its
+                // first line must still fit if it did.
+                (Some(h), AlignFit::KeepLines) => {
+                    let line = match self.ctx.flat_width(&r.tail) {
+                        Some(t) if col + h + t <= width => t,
+                        _ => self.ctx.min_first_line(&r.tail),
+                    };
+                    col + h + line <= width && col + h + pad(r, *h) + line > width
+                }
             });
-            let aligned = !anchor_glued && !overflow && heads.iter().all(Option::is_some);
-            for (r, h) in seg.iter().zip(&heads) {
+            let aligned = !anchor_glued && !overflow;
+            for it in seg {
                 if self.stopped() {
                     return;
                 }
@@ -1151,6 +1143,23 @@ impl<'c, 'a> Printer<'c, 'a> {
                     self.newline(col);
                 }
                 first_row = false;
+                let r = match it {
+                    AlignItem::Row(r) => r,
+                    AlignItem::Line(docs) => {
+                        self.run(
+                            docs.iter()
+                                .rev()
+                                .map(|d| Cmd {
+                                    indent: col,
+                                    mode: Mode::Break,
+                                    doc: d,
+                                })
+                                .collect(),
+                        );
+                        continue;
+                    }
+                    AlignItem::Break => continue,
+                };
                 self.run(
                     r.head
                         .iter()
@@ -1164,8 +1173,8 @@ impl<'c, 'a> Printer<'c, 'a> {
                 );
                 let mut tail: &[Doc] = &r.tail;
                 if aligned {
-                    let pad = max - h.unwrap_or(max);
-                    let spaces = " ".repeat(pad + 1);
+                    let h = self.ctx.flat_width(&r.head).unwrap_or(0);
+                    let spaces = " ".repeat(pad(r, h) + 1);
                     self.write(&spaces, col);
                     tail = &r.tail[1..];
                 }
@@ -1241,15 +1250,11 @@ fn last_token(doc: &Doc) -> Option<TokenIndex> {
         Inner::Choice(a, _) => last_token(a),
         Inner::Shared(d) => last_token(d),
         Inner::Fill(items) => items.iter().rev().find_map(|(_, c)| last_token(c)),
-        Inner::AlignGroup(items) => items.iter().rev().find_map(|it| match it {
-            AlignItem::Row(r) => r
-                .head
-                .iter()
-                .chain(r.tail.iter())
-                .rev()
-                .find_map(last_token),
-            AlignItem::Break => None,
-        }),
+        Inner::AlignGroup(items, _) => items
+            .iter()
+            .rev()
+            .filter_map(AlignItem::docs)
+            .find_map(|docs| docs.rev().find_map(last_token)),
         Inner::Space | Inner::SoftLine | Inner::SoftBreak | Inner::HardLine => None,
     }
 }

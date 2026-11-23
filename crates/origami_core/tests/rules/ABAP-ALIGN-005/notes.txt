@@ -1,0 +1,1 @@
+23: ABAP-ALIGN-005: one test method per line

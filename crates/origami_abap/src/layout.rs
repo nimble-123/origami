@@ -9,7 +9,7 @@
 use crate::block_pairs::Role;
 use crate::kinds::*;
 use crate::statements;
-use crate::stmt::{Ctx, P};
+use crate::stmt::{AlignKey, Ctx, P, Row, Stmt};
 use crate::structure::Statement;
 use origami_layout::{Doc, builder as b};
 use origami_syntax::{
@@ -71,6 +71,62 @@ fn bracket_nesting(stream: &TokenStream, st: &Statement) -> u32 {
     max
 }
 
+/// A laid-out statement before cross-statement alignment.
+struct Entry {
+    depth: u32,
+    /// The line break before the statement (none for the first statement
+    /// and for one glued to the previous statement).
+    start: Doc,
+    glued: bool,
+    body: Stmt,
+}
+
+impl Entry {
+    fn key(&self) -> Option<&AlignKey> {
+        match &self.body {
+            Stmt::Row(r) if !self.glued => Some(&r.key),
+            _ => None,
+        }
+    }
+}
+
+/// ABAP-ALIGN-004 to ABAP-ALIGN-007: consecutive statements with the same
+/// alignment key at the same level are aligned as one group. Blank lines and
+/// comment lines between them do not end the group (they are trivia of the
+/// statements' first tokens); any other statement does.
+fn align_statements(entries: Vec<Entry>) -> Vec<Doc> {
+    let mut docs = Vec::with_capacity(entries.len());
+    let mut entries = entries.into_iter().peekable();
+    while let Some(e) = entries.next() {
+        let mut group: Vec<Row> = Vec::new();
+        while let Some(next) = entries.peek()
+            && e.key().is_some()
+            && next.depth == e.depth
+            && next.key() == e.key()
+        {
+            let Some(Entry {
+                body: Stmt::Row(r), ..
+            }) = entries.next()
+            else {
+                unreachable!()
+            };
+            group.push(r);
+        }
+        let Entry {
+            depth, start, body, ..
+        } = e;
+        let body = match body {
+            Stmt::Row(r) if !group.is_empty() => {
+                let rows = std::iter::once(r).chain(group).map(Row::aligned).collect();
+                b::align_lines(rows)
+            }
+            other => other.into_doc(),
+        };
+        docs.push(nest(depth, b::concat(vec![start, body])));
+    }
+    docs
+}
+
 pub fn layout(
     text: &str,
     stream: &TokenStream,
@@ -93,7 +149,7 @@ pub fn layout(
         explain,
         rule_spans: Vec::new(),
     };
-    let mut docs = Vec::with_capacity(statements.len());
+    let mut entries: Vec<Entry> = Vec::with_capacity(statements.len());
     let mut parsed_ranges = Vec::new();
     let mut diagnostics = Vec::new();
     let mut unknown = 0;
@@ -129,15 +185,15 @@ pub fn layout(
             }
             depth_limited += 1;
         }
-        let body = if opaque.contains(&id)
+        let body: Stmt = if opaque.contains(&id)
             || too_deep
             || (glued_start && stream.tokens[first.0 as usize].kind != crate::kinds::OPAQUE)
         {
             bodies.push(Body::AsWritten);
-            b::opaque(first, last, blank)
+            Stmt::Doc(b::opaque(first, last, blank))
         } else if quarantine.contains(&id) {
             bodies.push(Body::AsWritten);
-            b::verbatim(first, last, blank)
+            Stmt::Doc(b::verbatim(first, last, blank))
         } else {
             let saved = ctx.mark();
             let parsed = {
@@ -169,7 +225,7 @@ pub fn layout(
                         "Statement not recognized; formatted generically",
                         t.start..stream.tokens[last.0 as usize].end,
                     ));
-                    b::unknown(first, last, blank)
+                    Stmt::Doc(b::unknown(first, last, blank))
                 }
             }
         };
@@ -181,14 +237,16 @@ pub fn layout(
         } else {
             b::hard(stream, first)
         };
-        docs.push(nest(
-            st.depth.min(MAX_NESTING),
-            b::concat(vec![start, body]),
-        ));
+        entries.push(Entry {
+            depth: st.depth.min(MAX_NESTING),
+            start,
+            glued,
+            body,
+        });
         prev_role = st.role;
     }
     Laid {
-        doc: b::concat(docs),
+        doc: b::concat(align_statements(entries)),
         diagnostics,
         unknown,
         keywords: ctx.keywords,

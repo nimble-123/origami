@@ -6,7 +6,7 @@
 //! mistake shows up in tests. Comments are emitted by the printer together
 //! with the token they are attached to; layout code never emits them.
 
-use crate::ir::{AlignItem, AlignRow, Doc, Inner};
+use crate::ir::{AlignFit, AlignItem, AlignRow, Doc, Inner};
 use origami_syntax::{TokenIndex, TokenStream};
 
 /// The original token `i`, with its attached comments.
@@ -100,11 +100,32 @@ pub fn choice(first: Doc, second: Doc) -> Doc {
 }
 
 pub fn align(items: Vec<AlignItem>) -> Doc {
-    Doc(Inner::AlignGroup(items))
+    Doc(Inner::AlignGroup(items, AlignFit::FirstLine))
+}
+
+/// Aligned rows that fall back to single spaces when alignment would push a
+/// row past the width ([`AlignFit::KeepLines`]); for rows that are whole
+/// statements or chain items.
+pub fn align_lines(items: Vec<AlignItem>) -> Doc {
+    Doc(Inner::AlignGroup(items, AlignFit::KeepLines))
 }
 
 pub fn row(head: Vec<Doc>, tail: Vec<Doc>) -> AlignItem {
-    AlignItem::Row(AlignRow { head, tail })
+    AlignItem::Row(AlignRow {
+        head,
+        tail,
+        anchor: 0,
+    })
+}
+
+/// A row whose anchor (`anchor` characters wide) is aligned at its right end.
+pub fn row_right(head: Vec<Doc>, anchor: usize, tail: Vec<Doc>) -> AlignItem {
+    AlignItem::Row(AlignRow { head, tail, anchor })
+}
+
+/// An unaligned line inside an alignment group.
+pub fn line(docs: Vec<Doc>) -> AlignItem {
+    AlignItem::Line(docs)
 }
 
 pub fn concat(docs: Vec<Doc>) -> Doc {

@@ -50,7 +50,7 @@ pub(crate) enum Inner {
     /// `first` if every line of it fits into the width, else `second`.
     Choice(Box<Doc>, Box<Doc>),
     /// Aligned rows (design decision D7); printed one row per line.
-    AlignGroup(Vec<AlignItem>),
+    AlignGroup(Vec<AlignItem>, AlignFit),
     /// Unknown statement: re-indent and shrink runs of spaces to one.
     Unknown {
         first: TokenIndex,
@@ -82,12 +82,43 @@ pub enum AlignItem {
     /// Ends the current alignment segment (a blank line or comment line in
     /// the input).
     Break,
+    /// A line of its own that is not aligned and does not end the segment
+    /// (a chain item without the anchor).
+    Line(Vec<Doc>),
+}
+
+impl AlignItem {
+    /// The docs of a row (head, then tail) or line, in order; `None` for a
+    /// segment break.
+    pub(crate) fn docs(&self) -> Option<impl DoubleEndedIterator<Item = &Doc>> {
+        match self {
+            AlignItem::Row(r) => Some(r.head.iter().chain(r.tail.iter())),
+            AlignItem::Line(d) => Some(d.iter().chain([].iter())),
+            AlignItem::Break => None,
+        }
+    }
 }
 
 /// One row: `head` is padded to the widest head of its segment, then `tail`
-/// follows. `tail` starts with the anchor token (for example `=` or `TYPE`).
+/// follows. `tail` starts with the gap before the anchor token (for example
+/// `=` or `TYPE`). With `anchor > 0` (the anchor's width), anchors of
+/// different widths are right-aligned in a column as wide as the widest one
+/// (` =` above `-=`), as ABAP Cleaner aligns assignment operators.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AlignRow {
     pub head: Vec<Doc>,
     pub tail: Vec<Doc>,
+    pub anchor: usize,
+}
+
+/// When a segment is too wide to align, it falls back to single spaces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AlignFit {
+    /// Too wide: a row's first line (up to its first possible break) would
+    /// end past the width.
+    FirstLine,
+    /// Too wide: alignment would push a row that fits on one line past the
+    /// width, or the first line of a longer row that fits past it. Rows that
+    /// are too wide anyway do not count.
+    KeepLines,
 }

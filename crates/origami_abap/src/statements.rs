@@ -12,10 +12,10 @@
 //! statement falls back to the generic layout.
 
 use crate::kinds::*;
-use crate::stmt::P;
+use crate::stmt::{AlignKey, P, Row, Stmt};
 use origami_layout::{AlignItem, Doc, builder as b};
 
-pub fn parse(p: &mut P) -> Option<Doc> {
+pub fn parse(p: &mut P) -> Option<Stmt> {
     let start = p.pos;
     // Pragmas before the statement (`##NEEDED foo = bar.`).
     if p.kind(start) == PRAGMA {
@@ -32,8 +32,8 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             return None;
         }
         p.pos = k;
-        let rest = parse(p)?;
-        return Some(b::concat(vec![b::concat(lead), p.sp(k), rest]));
+        let rest = parse(p)?.into_doc();
+        return Some(Stmt::Doc(b::concat(vec![b::concat(lead), p.sp(k), rest])));
     }
     let w0 = p.upper(start);
     let call_like = p.glued(start + 1) && matches!(p.kind(start + 1), LPAREN | SELECTOR | LBRACKET);
@@ -49,7 +49,7 @@ pub fn parse(p: &mut P) -> Option<Doc> {
         if DECL_LEADS.contains(&w0.as_str()) {
             if let Some(d) = declaration(p) {
                 p.c.span(start, p.end, "ABAP-DECL-001");
-                return Some(d);
+                return Some(Stmt::Doc(d));
             }
             p.pos = start;
             return None;
@@ -64,7 +64,7 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             let saved = p.c.mark();
             if let Some(d) = eml(p) {
                 p.c.span(start, p.end, "ABAP-EML-001");
-                return Some(d);
+                return Some(Stmt::Doc(d));
             }
             p.c.reset(saved);
             p.pos = start;
@@ -78,7 +78,7 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             let saved = p.c.mark();
             if let Some(d) = call_with_groups(p) {
                 p.c.span(start, p.end, "ABAP-CALL-003");
-                return Some(d);
+                return Some(Stmt::Doc(d));
             }
             p.c.reset(saved);
             p.pos = start;
@@ -87,7 +87,7 @@ pub fn parse(p: &mut P) -> Option<Doc> {
         if w0 == "OPEN" && p.is(start + 1, "CURSOR") {
             let saved = p.c.mark();
             if let Some(d) = open_cursor(p) {
-                return Some(d);
+                return Some(Stmt::Doc(d));
             }
             p.c.reset(saved);
             p.pos = start;
@@ -95,7 +95,7 @@ pub fn parse(p: &mut P) -> Option<Doc> {
         if w0 == "WITH" && p.text(start + 1).starts_with('+') {
             let saved = p.c.mark();
             if let Some(d) = with_select(p) {
-                return Some(d);
+                return Some(Stmt::Doc(d));
             }
             p.c.reset(saved);
             p.pos = start;
@@ -105,7 +105,20 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             let lead = p.kw(start);
             if let Some(item) = method_item(p, start + 1, p.end, FORM_SECTIONS) {
                 p.pos = p.end;
-                return Some(b::group(vec![lead, p.sp(start + 1), item, p.period()]));
+                return Some(Stmt::Doc(b::group(vec![
+                    lead,
+                    p.sp(start + 1),
+                    item,
+                    p.period(),
+                ])));
+            }
+            p.c.reset(saved);
+            p.pos = start;
+        }
+        if w0 == "ALIASES" {
+            let saved = p.c.mark();
+            if let Some(s) = aliases(p) {
+                return Some(s);
             }
             p.c.reset(saved);
             p.pos = start;
@@ -151,7 +164,7 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             if matches_words(p, start, spec.lead) {
                 let saved = p.c.mark();
                 if let Some(d) = keyword_statement(p, spec) {
-                    return Some(d);
+                    return Some(Stmt::Doc(d));
                 }
                 p.c.reset(saved);
                 p.pos = start;
@@ -3300,6 +3313,77 @@ fn declaration(p: &mut P) -> Option<Doc> {
     ]))
 }
 
+// ---- aliases -----------------------------------------------------------------
+
+/// `ALIASES name FOR intf~comp.`, aligned with its neighbors, and chains of
+/// two or more such items, one per line and aligned (ABAP-ALIGN-007). Other
+/// forms are keyword statements.
+fn aliases(p: &mut P) -> Option<Stmt> {
+    let start = p.pos;
+    let chain = p.kind(start + 1) == COLON;
+    let first = if chain { start + 2 } else { start + 1 };
+    // (name, FOR, end of the component)
+    let mut items = Vec::new();
+    let mut x = first;
+    loop {
+        if x >= p.end || p.kind(x) != WORD || (x > first && p.glued(x)) {
+            return None;
+        }
+        let f = name_end(p, x, p.end);
+        if !p.is(f, "FOR") || p.glued(f) || p.kind(f + 1) != WORD || p.glued(f + 1) {
+            return None;
+        }
+        let e = name_end(p, f + 1, p.end);
+        items.push((x, f, e));
+        if e == p.end {
+            break;
+        }
+        if !chain || p.kind(e) != COMMA {
+            return None;
+        }
+        x = e + 1;
+    }
+    if chain && items.len() < 2 {
+        return None;
+    }
+    let lead = p.kw(start);
+    p.pos = p.end;
+    if !chain {
+        let (x, f, e) = items[0];
+        let for_kw = p.kw(f);
+        return Some(Stmt::Row(Row {
+            key: AlignKey::Aliases,
+            head: vec![lead, p.sp(x), p.flat(x, f - 1)],
+            gap: p.sp(f),
+            rest: vec![for_kw, p.sp(f + 1), p.flat(f + 1, e - 1), p.period()],
+            anchor: 0,
+        }));
+    }
+    let mut rows = Vec::new();
+    for &(x, f, e) in &items {
+        let for_kw = p.kw(f);
+        let mut rest = vec![for_kw, p.sp(f + 1), p.flat(f + 1, e - 1)];
+        if e < p.end {
+            rest.push(p.sp(e));
+            rest.push(p.t(e));
+        } else {
+            rest.push(p.period());
+        }
+        rows.push(b::row(
+            vec![p.flat(x, f - 1)],
+            vec![p.sp(f), b::group(rest)],
+        ));
+    }
+    p.c.span(start, p.end, "ABAP-ALIGN-007");
+    Some(Stmt::Doc(b::concat(vec![
+        lead,
+        p.sp(start + 1),
+        p.t(start + 1),
+        p.sp(first),
+        b::hang(vec![b::align_lines(rows)]),
+    ])))
+}
+
 // ---- method signatures ----------------------------------------------------
 
 const SECTIONS: &[&str] = &[
@@ -3442,13 +3526,33 @@ fn param_start(p: &P, i: usize) -> bool {
     p.is(j, "TYPE") || p.is(j, "LIKE") || p.is(j, "STRUCTURE")
 }
 
-fn methods(p: &mut P) -> Option<Doc> {
+fn methods(p: &mut P) -> Option<Stmt> {
     let start = p.pos;
     let lead = p.kw(start);
+    // ABAP-ALIGN-005 and ABAP-ALIGN-006 apply to `METHODS` only.
+    let alignable = p.is(start, "METHODS");
     if p.kind(start + 1) != COLON {
-        let item = method_item(p, start + 1, p.end, SECTIONS)?;
+        let parts = method_parts(p, start + 1, p.end, SECTIONS)?;
         p.pos = p.end;
-        return Some(b::group(vec![lead, p.sp(start + 1), item, p.period()]));
+        if let Some(key) = parts.key.clone().filter(|_| alignable) {
+            let (name, gap, mut rest) = parts.split();
+            rest.push(p.period());
+            let mut head = vec![lead, p.sp(start + 1)];
+            head.extend(name);
+            return Some(Stmt::Row(Row {
+                key,
+                head,
+                gap,
+                rest,
+                anchor: 0,
+            }));
+        }
+        return Some(Stmt::Doc(b::group(vec![
+            lead,
+            p.sp(start + 1),
+            parts.doc(),
+            p.period(),
+        ])));
     }
     // Chain `METHODS: a …, b … .`: one item per line, aligned after the colon.
     let colon = start + 1;
@@ -3473,36 +3577,118 @@ fn methods(p: &mut P) -> Option<Doc> {
     if items.is_empty() || items.iter().any(|&(x, e)| x >= e || p.glued(x)) {
         return None;
     }
+    let mut parts = Vec::with_capacity(items.len());
+    for &(x, e) in &items {
+        parts.push(method_parts(p, x, e, SECTIONS)?);
+    }
+    // ABAP-ALIGN-005: a chain with two or more test methods has one item per
+    // line, and the test methods are aligned. ABAP-ALIGN-006: the same for a
+    // chain of two or more redefinitions and nothing else (as ABAP Cleaner).
+    let count = |k: &AlignKey| parts.iter().filter(|m| m.key.as_ref() == Some(k)).count();
+    let key = if !alignable {
+        None
+    } else if count(&AlignKey::ForTesting) >= 2 {
+        Some(AlignKey::ForTesting)
+    } else if parts.len() >= 2 && count(&AlignKey::Redefinition) == parts.len() {
+        Some(AlignKey::Redefinition)
+    } else {
+        None
+    };
     let mut docs = Vec::new();
-    for (n, &(x, e)) in items.iter().enumerate() {
-        let item = method_item(p, x, e, SECTIONS)?;
+    let mut rows = Vec::new();
+    for (n, (&(x, e), item)) in items.iter().zip(parts).enumerate() {
+        let mut end = Vec::new();
+        if e < p.end && p.kind(e) == COMMA {
+            end.push(p.sp(e));
+            end.push(p.t(e));
+        }
+        if key.is_some() {
+            if n + 1 == items.len() {
+                end.push(p.period());
+            }
+            if item.key == key {
+                let (name, gap, mut rest) = item.split();
+                rest.extend(end);
+                rows.push(b::row(name, vec![gap, b::group(rest)]));
+            } else {
+                let mut line = vec![b::group(vec![item.doc()])];
+                line.extend(end);
+                rows.push(b::line(line));
+            }
+            continue;
+        }
         let mut d = Vec::new();
         if n > 0 {
             d.push(p.ln(x));
         }
         // Each item decides on its own whether its sections break.
-        d.push(b::group(vec![item]));
-        if e < p.end && p.kind(e) == COMMA {
-            d.push(p.sp(e));
-            d.push(p.t(e));
-        }
+        d.push(b::group(vec![item.doc()]));
+        d.extend(end);
         docs.push(b::concat(d));
     }
     p.pos = p.end;
+    if let Some(key) = key {
+        let rule = if key == AlignKey::ForTesting {
+            "ABAP-ALIGN-005"
+        } else {
+            "ABAP-ALIGN-006"
+        };
+        p.c.span(start, p.end, rule);
+        return Some(Stmt::Doc(b::concat(vec![
+            lead,
+            p.sp(colon),
+            p.t(colon),
+            p.sp(colon + 1),
+            b::hang(vec![b::align_lines(rows)]),
+        ])));
+    }
     p.c.span(start, p.end, "ABAP-CHAIN-001");
-    Some(b::group(vec![
+    Some(Stmt::Doc(b::group(vec![
         lead,
         p.sp(colon),
         p.t(colon),
         p.sp(colon + 1),
         b::hang(docs),
         p.period(),
-    ]))
+    ])))
+}
+
+/// A method signature in parts: the name, the header words after it
+/// (starting with the gap before the first one) and the sections; `key`
+/// when the signature is a test method or a redefinition.
+struct MethodParts {
+    name: Vec<Doc>,
+    header: Vec<Doc>,
+    sections: Doc,
+    key: Option<AlignKey>,
+}
+
+impl MethodParts {
+    fn doc(self) -> Doc {
+        let mut docs = self.name;
+        docs.extend(self.header);
+        docs.push(self.sections);
+        b::concat(docs)
+    }
+
+    /// Name, gap before the first header word, and the rest from that word
+    /// (a signature with a `key` has header words).
+    fn split(self) -> (Vec<Doc>, Doc, Vec<Doc>) {
+        let mut header = self.header.into_iter();
+        let gap = header.next().unwrap_or_else(b::empty);
+        let mut rest: Vec<Doc> = header.collect();
+        rest.push(self.sections);
+        (self.name, gap, rest)
+    }
 }
 
 /// One method signature from its name (`from`) to `to` (exclusive), without
 /// the leading `METHODS` keyword.
 fn method_item(p: &mut P, from: usize, to: usize, sections: &[&str]) -> Option<Doc> {
+    method_parts(p, from, to, sections).map(MethodParts::doc)
+}
+
+fn method_parts(p: &mut P, from: usize, to: usize, sections: &[&str]) -> Option<MethodParts> {
     let name = from;
     if p.kind(name) != WORD {
         return None;
@@ -3522,8 +3708,7 @@ fn method_item(p: &mut P, from: usize, to: usize, sections: &[&str]) -> Option<D
     result
 }
 
-fn method_item_inner(p: &mut P, name: usize, sections_kw: &[&str]) -> Option<Doc> {
-    let mut first_line = vec![p.t(name)];
+fn method_item_inner(p: &mut P, name: usize, sections_kw: &[&str]) -> Option<MethodParts> {
     let mut i = name + 1;
     // Header words up to the first section keyword (FOR TESTING, ABSTRACT,
     // RAP handler phrases, FOR EVENT … OF …).
@@ -3531,11 +3716,39 @@ fn method_item_inner(p: &mut P, name: usize, sections_kw: &[&str]) -> Option<Doc
         .find(|&k| is_section(p, k, sections_kw))
         .unwrap_or(p.end);
     mark_phrase_keywords(p, i, header_end, METHOD_HEADER_WORDS, METHOD_HEADER_OPERAND);
+    // The name ends at the first token not glued to it (`if_intf~meth`).
+    let name_stop = name_end(p, name, header_end);
+    let mut name_docs = vec![p.t(name)];
+    let mut header = Vec::new();
     while i < header_end {
-        first_line.push(p.sp(i));
-        first_line.push(p.t(i));
+        let docs = if i < name_stop {
+            &mut name_docs
+        } else {
+            &mut header
+        };
+        docs.push(p.sp(i));
+        docs.push(p.t(i));
         i += 1;
     }
+    // ABAP-ALIGN-005: `[ABSTRACT] FOR TESTING`, then sections (`RAISING`);
+    // ABAP-ALIGN-006: `[FINAL] REDEFINITION` alone.
+    let words: Vec<String> = (name_stop..header_end)
+        .map(|k| {
+            if p.kind(k) == WORD && !p.glued(k) {
+                p.upper(k)
+            } else {
+                String::new()
+            }
+        })
+        .collect();
+    let words: Vec<&str> = words.iter().map(String::as_str).collect();
+    let key = match words.as_slice() {
+        ["FOR", "TESTING"] | ["ABSTRACT", "FOR", "TESTING"] => Some(AlignKey::ForTesting),
+        ["REDEFINITION"] | ["FINAL", "REDEFINITION"] if header_end == p.end => {
+            Some(AlignKey::Redefinition)
+        }
+        _ => None,
+    };
     let mut sections = Vec::new();
     while i < p.end {
         if !is_section(p, i, sections_kw) {
@@ -3612,7 +3825,12 @@ fn method_item_inner(p: &mut P, name: usize, sections_kw: &[&str]) -> Option<Doc
         sections.push(b::concat(vec![p.ln(i), kw, b::indent(param_docs)]));
         i = section_end;
     }
-    Some(b::concat(vec![b::concat(first_line), b::cont(sections)]))
+    Some(MethodParts {
+        name: name_docs,
+        header,
+        sections: b::cont(sections),
+        key,
+    })
 }
 
 // ---- EML ------------------------------------------------------------------
