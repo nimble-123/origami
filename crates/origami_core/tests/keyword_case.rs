@@ -651,6 +651,16 @@ fn rarer_statements() {
 "#,
         ),
         (
+            r#"select carrid, first from scarr order by carrid descending nulls first, first ascending nulls last into table @data(t).
+"#,
+            r#"SELECT carrid, first
+    FROM scarr
+    ORDER BY carrid DESCENDING NULLS FIRST,
+             first ASCENDING NULLS LAST
+    INTO TABLE @DATA(t).
+"#,
+        ),
+        (
             r#"x = filter #( itab except where a >= 3 ).
 "#,
             r#"x = FILTER #( itab EXCEPT WHERE a >= 3 ).
