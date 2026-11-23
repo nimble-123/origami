@@ -20,9 +20,15 @@ written and approved before its layout code is merged.
 * **Batches.** The first pull request of M1 adds the rules for the ABAP
   statement kinds that `cargo xtask freq` ranks highest, including the
   alignment rules `ABAP-ALIGN-001..003`. M2 and M3 start the same way.
-* **Stability.** Within a style edition, output changes only to fix bugs, and
-  every such change is listed in `CHANGELOG.md` with its rule ID. New rules
-  first appear behind `--preview`.
+* **Stability.** Before 1.0, any release may change the formatted output: a
+  new rule, a changed rule or a bug fix. 0.1.1 did (ABAP-CASE-001 and
+  ABAP-CASE-002). Every such change is listed in `CHANGELOG.md` under
+  "Formatting output" with its rule ID, and the style edition (`2026`) stays
+  the same. `--preview` is accepted but no rule reads it yet. To keep the
+  output of one release, pin it with `required_version` in `origami.toml`
+  (see [adoption.md](adoption.md)). From 1.0, a new or changed rule first
+  appears behind `--preview` and becomes the default only with a new style
+  edition; within an edition, output changes only to fix bugs.
 
 ## Line-break notes
 

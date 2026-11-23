@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/nimble-123/origami/security/advisories/new
+    about: Report vulnerabilities privately, not in a public issue. See SECURITY.md.
+  - name: Read the style rules
+    url: https://github.com/nimble-123/origami/blob/main/docs/STYLE.md
+    about: Every layout decision is a rule with an ID. Check whether the line you disagree with is covered.

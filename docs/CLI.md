@@ -1,6 +1,9 @@
 # origami command-line contract
 
-This contract is frozen at v1.0. Agents and CI scripts can rely on it.
+This contract is frozen from v1.0. Until then (0.x), flags, exit codes and
+diagnostic codes can change in a release, and the changelog lists each
+change. Pin the version with `required_version` to rely on it. Formatted
+output follows the same rule: [STYLE.md](STYLE.md), "Stability".
 
 ## Usage
 
