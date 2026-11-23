@@ -105,6 +105,12 @@ impl SourceText {
         } else if !self.final_newline && body.ends_with('\n') {
             body.pop();
         }
+        // A U+FEFF that is not the input's byte-order mark (it stood after a
+        // blank line that formatting removed) must not open the output, or
+        // the next run would read it as a byte-order mark (idempotency).
+        if !self.bom && body.starts_with('\u{feff}') {
+            body.insert(0, '\n');
+        }
         if self.line_ending == LineEnding::CrLf {
             body = body.replace('\n', "\r\n");
         }
