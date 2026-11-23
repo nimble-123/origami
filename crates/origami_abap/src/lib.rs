@@ -6,10 +6,12 @@
 //! to one, and W003. Statement parsers are added in order of corpus
 //! frequency.
 
+mod abap_doc;
 pub mod block_pairs;
 pub mod kinds;
 mod layout;
 mod lexer;
+mod space;
 mod statements;
 mod stmt;
 pub mod structure;
@@ -92,14 +94,23 @@ fn format_with(
         })
         .collect();
 
+    // ABAP-SPACE-001: the layout sees the periods and commas glued.
+    let glue = if identity {
+        Vec::new()
+    } else {
+        space::candidates(src.text(), &stream, &statements)
+    };
+    let mut laid_stream = stream.clone();
+    space::apply(&mut laid_stream, &glue);
     let laid = layout::layout(
         src.text(),
-        &stream,
+        &laid_stream,
         &statements,
         quarantine,
         opaque,
         explain,
     );
+    drop(laid_stream);
     if !identity {
         for &k in &laid.keywords {
             stream.tokens[k].keyword = true;
@@ -116,19 +127,42 @@ fn format_with(
             }
         }
     }
+    // The printer's stream: statements printed as written keep their gaps,
+    // and in unknown statements comments stay where they are.
+    let mut print_stream = stream.clone();
+    let printed: Vec<space::Glue> = glue
+        .iter()
+        .filter(|g| match laid.bodies[g.statement] {
+            layout::Body::Parsed => true,
+            layout::Body::Unknown => !g.moves,
+            layout::Body::AsWritten => false,
+        })
+        .copied()
+        .collect();
+    space::apply(&mut print_stream, &printed);
+    for g in &glue {
+        stream.tokens[g.at].may_glue = true;
+    }
+    let comment_overrides = if identity {
+        Default::default()
+    } else {
+        abap_doc::align(src.text(), &print_stream, &statements, &laid.bodies)
+    };
     let print_opts = PrintOptions {
         width: opts.line_width,
         indent: opts.indent_width,
         keyword_case: Some(opts.abap_keyword_case),
         identity,
+        comment_overrides,
     };
     let limit = max_output_len(src.text().len());
-    let (output, diagnostics) = match print_bounded(&laid.doc, src, &stream, &print_opts, limit) {
-        // In identity mode nothing is formatted, so no W003 is reported.
-        Some(output) if identity => (output, Vec::new()),
-        Some(output) => (output, laid.diagnostics),
-        None => (src.text().to_string(), vec![output_limit_diagnostic()]),
-    };
+    let (output, diagnostics) =
+        match print_bounded(&laid.doc, src, &print_stream, &print_opts, limit) {
+            // In identity mode nothing is formatted, so no W003 is reported.
+            Some(output) if identity => (output, Vec::new()),
+            Some(output) => (output, laid.diagnostics),
+            None => (src.text().to_string(), vec![output_limit_diagnostic()]),
+        };
     LangResult {
         output,
         input_tokens: stream,

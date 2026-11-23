@@ -15,7 +15,8 @@ pub struct Token {
     pub start: u32,
     pub end: u32,
     /// True when no whitespace, line break or comment separates this token from
-    /// the previous token. The printer never changes it.
+    /// the previous token. The output keeps it, except that a token marked
+    /// `may_glue` may become glued.
     pub glued: bool,
     /// Set only by a parser, for tokens consumed as keywords of a recognized
     /// statement. These tokens may be re-cased.
@@ -24,6 +25,11 @@ pub struct Token {
     /// (ABAP). The printer writes them in lower case when they contain no
     /// lower-case letter, so they may be re-cased too.
     pub ident: bool,
+    /// Set only by the ABAP crate, for a statement's closing period and a
+    /// comma outside brackets that is not glued (ABAP-SPACE-001). The output
+    /// may glue it to the previous token; the comments between the two then
+    /// move behind it (see `compare::equivalent`).
+    pub may_glue: bool,
 }
 
 impl Token {

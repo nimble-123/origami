@@ -17,8 +17,8 @@ equal when all of these hold:
 | # | Rule | Test |
 |---|---|---|
 | 1.1 | Same number of tokens, same kinds, same texts. Only tokens a parser marked as keywords or (ABAP) identifiers may differ in letter case. | `crates/origami_syntax/tests/compare.rs` |
-| 1.2 | Same `glued` flag on every token: two tokens that touch in the input touch in the output, and two tokens separated by whitespace stay separated. | `compare.rs`, `crates/origami_abap/tests/lexer.rs::glued_flags` |
-| 1.3 | Same comments: same text, same syntax (`*`, `"`, `"!`, `"#EC`, `//`/`--`, `/* */`), same placement (own line / end of line), attached to the same token in the same position. | `compare.rs`, `crates/origami_syntax/tests/trivia.rs` |
+| 1.2 | Same `glued` flag on every token: two tokens that touch in the input touch in the output, and two tokens separated by whitespace stay separated. One exception (ABAP-SPACE-001): an ABAP statement's closing period and a comma outside brackets, which the ABAP crate marks `may_glue`, may become glued to the token before them. | `compare.rs`, `crates/origami_abap/tests/lexer.rs::glued_flags` |
+| 1.3 | Same comments: same text, same syntax (`*`, `"`, `"!`, `"#EC`, `//`/`--`, `/* */`), same placement (own line / end of line), attached to the same token in the same position. Two exceptions (section 3): comments in front of a period or comma that 1.2 glues move behind it (ABAP-SPACE-001), and ABAP Doc tag lines may change two runs of blanks (ABAP-DOC-001). | `compare.rs`, `crates/origami_syntax/tests/trivia.rs` |
 | 1.4 | Verbatim regions (AMDP, `EXEC SQL`, macro bodies) are single opaque tokens, so rule 1.1 compares them byte for byte. | `lexer.rs::verbatim_regions` |
 | 1.5 | No ABAP output line exceeds 255 characters unless the same input line already did. | `crates/origami_core/src/check.rs` |
 
@@ -54,6 +54,22 @@ Printing rules (from M1): `*` comments stay in column 1 unchanged; other own-lin
 comments are printed at the indent of the token they lead; only the first line
 of a multi-line `/* */` comment is re-indented; an end-of-line comment forces a
 line break after it.
+
+The only exceptions to rule 1.3, each checked by `equivalent` and tested in
+`crates/origami_syntax/tests/compare.rs`:
+
+* **ABAP-SPACE-001.** When a period or comma marked `may_glue` is glued in the
+  output, the comments that stood between it and the token before it move
+  behind it, by exactly one token and in the same order: an end-of-line
+  comment of the token before now trails the period or comma, and comment
+  lines that led it now lead the next token. Syntax and placement do not
+  change. Any other move is a mismatch, and so is a move without the glue.
+* **ABAP-DOC-001.** In an ABAP Doc comment (`"!`) of the form
+  `"! @parameter name | text` (also `@raising` and `@exception`, in any letter
+  case), only the blanks after the tag (at least one) and between the name
+  and `|` (possibly none) may change. The text up to the end of the tag, the
+  name, and everything from `|` on are compared byte for byte; every other
+  comment change is a mismatch.
 
 ## 4. Re-indentation of unknown and quarantined statements (from M1)
 

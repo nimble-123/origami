@@ -149,6 +149,7 @@ pub fn lex(src: &SourceText, lang: Language) -> Result<TokenStream, Diagnostic> 
             glued: !gap && !tokens.is_empty(),
             keyword: false,
             ident: false,
+            may_glue: false,
         });
         i = end;
         gap = false;

@@ -3,6 +3,11 @@
 //! sequences: type plus text, with words compared case-insensitively outside
 //! strings, templates and comments. This catches lexer bugs that origami's own
 //! self-check would share.
+//!
+//! Both sides are brought into one form for the two changes the self-check
+//! allows (docs/INVARIANTS.md, section 3): a period or comma that follows
+//! comments stands in front of them (ABAP-SPACE-001), and an ABAP Doc tag
+//! line has one blank after the tag and one before `|` (ABAP-DOC-001).
 
 use crate::corpus::{files, manifest};
 use crate::root;
@@ -34,12 +39,55 @@ fn normalize(t: &Tok) -> (String, String) {
             | "StringTemplateEnd"
             | "Comment"
     );
-    let text = if literal {
+    let text = if t.kind == "Comment" {
+        abap_doc_line(&t.text).unwrap_or_else(|| t.text.clone())
+    } else if literal {
         t.text.clone()
     } else {
         t.text.to_ascii_uppercase()
     };
     (t.kind.clone(), text)
+}
+
+/// `"! @parameter name | text` (or `@raising`, `@exception`) with one blank
+/// after the tag and one before `|`; `None` for any other comment.
+fn abap_doc_line(s: &str) -> Option<String> {
+    let blank = |c: char| c == ' ' || c == '\t';
+    let rest = s.strip_prefix("\"!")?.trim_start_matches(blank);
+    let tag = ["@parameter", "@raising", "@exception"]
+        .into_iter()
+        .find(|t| {
+            rest.get(..t.len())
+                .is_some_and(|r| r.eq_ignore_ascii_case(t))
+        })?;
+    let head = &s[..s.len() - rest.len() + tag.len()];
+    let after = &rest[tag.len()..];
+    let name_part = after.trim_start_matches(blank);
+    if name_part.len() == after.len() {
+        return None;
+    }
+    let end = name_part.find(|c: char| blank(c) || c == '|')?;
+    let bar = name_part[end..].trim_start_matches(blank);
+    if end == 0 || !bar.starts_with('|') {
+        return None;
+    }
+    Some(format!("{head} {} {bar}", &name_part[..end]))
+}
+
+/// The normalized tokens, with every period and comma moved in front of the
+/// comments directly before it.
+fn canonical(tokens: &[Tok]) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = Vec::with_capacity(tokens.len());
+    for t in tokens {
+        let tok = normalize(t);
+        if tok.0 == "Punctuation" && matches!(tok.1.as_str(), "." | ",") {
+            let at = out.len() - out.iter().rev().take_while(|c| c.0 == "Comment").count();
+            out.insert(at, tok);
+        } else {
+            out.push(tok);
+        }
+    }
+    out
 }
 
 fn lex_all(paths: &[String]) -> Result<Vec<Lexed>, String> {
@@ -97,8 +145,8 @@ pub fn run() -> Result<(), String> {
     let b = lex_all(&outputs)?;
     let mut mismatches = 0;
     for (x, y) in a.iter().zip(b.iter()) {
-        let xa: Vec<_> = x.tokens.iter().map(normalize).collect();
-        let yb: Vec<_> = y.tokens.iter().map(normalize).collect();
+        let xa = canonical(&x.tokens);
+        let yb = canonical(&y.tokens);
         if xa != yb {
             mismatches += 1;
             eprintln!("MISMATCH {} vs {}", x.path, y.path);

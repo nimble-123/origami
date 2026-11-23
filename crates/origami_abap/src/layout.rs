@@ -29,6 +29,19 @@ pub struct Laid {
     pub rule_spans: Vec<RuleSpan>,
     /// Statements left as written because they nest too deep (W004).
     pub depth_limited: u32,
+    /// How each statement is printed.
+    pub bodies: Vec<Body>,
+}
+
+/// How a statement is printed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Body {
+    /// Laid out by its parser.
+    Parsed,
+    /// Without a parser (W003): its own line breaks, single spaces.
+    Unknown,
+    /// Quarantined, opaque or nested too deep: as written.
+    AsWritten,
 }
 
 fn nest(level: u32, doc: Doc) -> Doc {
@@ -85,6 +98,7 @@ pub fn layout(
     let mut diagnostics = Vec::new();
     let mut unknown = 0;
     let mut depth_limited = 0;
+    let mut bodies = Vec::with_capacity(statements.len());
     let mut prev_role = None;
     for (id, st) in statements.iter().enumerate() {
         let id = id as UnitId;
@@ -119,8 +133,10 @@ pub fn layout(
             || too_deep
             || (glued_start && stream.tokens[first.0 as usize].kind != crate::kinds::OPAQUE)
         {
+            bodies.push(Body::AsWritten);
             b::opaque(first, last, blank)
         } else if quarantine.contains(&id) {
+            bodies.push(Body::AsWritten);
             b::verbatim(first, last, blank)
         } else {
             let saved = ctx.mark();
@@ -139,12 +155,14 @@ pub fn layout(
                 Some(d) => {
                     mark_ctor(&mut ctx);
                     parsed_ranges.push(st.tokens.clone());
+                    bodies.push(Body::Parsed);
                     d
                 }
                 None => {
                     ctx.reset(saved);
                     mark_ctor(&mut ctx);
                     unknown += 1;
+                    bodies.push(Body::Unknown);
                     let t = &stream.tokens[first.0 as usize];
                     diagnostics.push(Diagnostic::new(
                         Code::W003,
@@ -177,5 +195,6 @@ pub fn layout(
         parsed: parsed_ranges,
         rule_spans: ctx.rule_spans,
         depth_limited,
+        bodies,
     }
 }
