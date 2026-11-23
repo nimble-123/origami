@@ -482,8 +482,39 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         # The dry run above built the crates, so --no-verify keeps the token
         # away from build scripts of dependencies. cargo waits for each crate
-        # to appear in the index before it publishes the next one.
-        run: cargo publish --workspace --locked --no-verify
+        # to appear in the index before it publishes the next one. Crates
+        # whose version is already in the index are skipped, so a re-run after
+        # a partial publish works, and a failure (crates.io limits new crates
+        # per period, HTTP 429) is retried after 10 minutes, up to 3 times.
+        run: |
+          meta=$(cargo metadata --no-deps --format-version 1)
+          names=$(echo "$meta" | jq -r '.packages[] | select(.publish == null) | .name')
+          version=$(echo "$meta" | jq -r '.packages[] | select(.name == "abap-origami") | .version')
+          total=$(echo "$names" | wc -w)
+          for attempt in 1 2 3; do
+            exclude=()
+            for name in $names; do
+              case ${#name} in
+                1) path="1/$name" ;;
+                2) path="2/$name" ;;
+                3) path="3/${name:0:1}/$name" ;;
+                *) path="${name:0:2}/${name:2:2}/$name" ;;
+              esac
+              if curl -fsS "https://index.crates.io/$path" 2>/dev/null \
+                | jq -e --arg v "$version" 'select(.vers == $v)' >/dev/null; then
+                exclude+=(--exclude "$name")
+              fi
+            done
+            if [ $(( ${#exclude[@]} / 2 )) -eq "$total" ]; then
+              echo "All $total crates are published at $version."
+              exit 0
+            fi
+            cargo publish --workspace --locked --no-verify "${exclude[@]}" && exit 0
+            [ "$attempt" -lt 3 ] || break
+            echo "::warning::Publishing failed (attempt $attempt); retrying in 10 minutes."
+            sleep 600
+          done
+          exit 1
 
   vscode-publish:
     name: Publish the extension

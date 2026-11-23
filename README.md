@@ -16,17 +16,19 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 [![Rust 2024](https://img.shields.io/badge/Rust-2024-1A1B26?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![ABAP and CDS](https://img.shields.io/badge/ABAP%20%2B%20CDS-up%20to%20SAP__BASIS%208.16-1A1B26)](#supported-files)
 [![Homebrew](https://img.shields.io/badge/brew-nimble--123%2Ftap-34548A?logo=homebrew&logoColor=white)](#install)
+[![crates.io](https://img.shields.io/crates/v/abap-origami?color=34548A&logo=rust&logoColor=white&label=crates.io)](https://crates.io/crates/abap-origami)
+[![VS Code Marketplace](https://vsmarketplacebadges.dev/version-short/nimble-123.abap-origami.svg?label=VS%20Code&colorB=34548A)](https://marketplace.visualstudio.com/items?itemName=nimble-123.abap-origami)
 
 [Website](https://nimble-123.github.io/origami/) · [Playground](https://nimble-123.github.io/origami/#playground) · [Why origami](#why-origami) · [Install](#install) · [Use](#use) · [How it works](#how-it-works) · [Documentation](#documentation) · [License](#license)
 
 </div>
 
 > [!NOTE]
-> origami is pre-release (0.1). All six languages are formatted by grammar,
+> origami is pre-release (0.x). All six languages are formatted by grammar,
 > every file of a 2,100-file test corpus passes the self-check and is
 > idempotent at 80 combinations of line width, indent and keyword case, and
-> the abaplint lexer finds no token changes. From the next release, origami
-> is also published to crates.io and the VS Code Marketplace. Still open:
+> the abaplint lexer finds no token changes. origami is on crates.io and
+> the VS Code Marketplace. Still open:
 > signed builds (they wait for signing certificates), Open VSX, and feedback
 > from teams using it daily. Please [open an issue](https://github.com/nimble-123/origami/issues)
 > with any line origami formats in a way you would not.
@@ -65,7 +67,7 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 
 ```sh
 brew install nimble-123/tap/origami        # macOS and Linux
-cargo install abap-origami                 # crates.io, from the next release
+cargo install abap-origami                 # any platform with Rust
 ```
 
 Release binaries for macOS, Linux and Windows, each with a `.sha256` file, and
