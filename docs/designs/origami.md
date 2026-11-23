@@ -26,7 +26,7 @@ The formatter changes layout only. It may change:
 *   line breaks and indentation;
 *   the letter case of ABAP keywords.
 
-It never adds or removes a gap between two tokens, never re-cases identifiers, and never rewrites statements. After every run it checks its own output against the input and refuses to write if the two differ in anything but layout.
+It never adds or removes a gap between two tokens, never re-cases identifiers (superseded for ABAP on 2026-11-23: ABAP-CASE-002 writes identifiers without lower-case letters in lower case), and never rewrites statements. After every run it checks its own output against the input and refuses to write if the two differ in anything but layout.
 
 The style is fixed, in the spirit of Prettier and rustfmt: the formatter recomputes line breaks from the syntax and a 120-character width, regardless of how the author broke the lines. Teams can change only three settings: ABAP keyword case, line width and indent.
 
@@ -637,6 +637,7 @@ Where the author chose between options during drafting without stating a reason,
 *   **Pros**: More uniform appearance.
 *   **Cons**: In CDS, alias case becomes the OData property name, so re-casing changes a public API. In ABAP, a word list cannot tell keywords from identifiers, because ABAP has no reserved words.
 *   **Reason for Rejection**: Rejected by author: identifiers are never re-cased.
+*   **Update 2026-11-23**: adopted for ABAP by the maintainer, as ABAP Cleaner does it (STYLE ABAP-CASE-002). The keyword objection was answered by completing keyword marking, measured against ABAP Cleaner on the corpus. CDS stays unchanged.
 
 ### Layout
 

@@ -148,6 +148,7 @@ pub fn lex(src: &SourceText, lang: Language) -> Result<TokenStream, Diagnostic> 
             end: end as u32,
             glued: !gap && !tokens.is_empty(),
             keyword: false,
+            ident: false,
         });
         i = end;
         gap = false;

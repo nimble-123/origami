@@ -93,11 +93,12 @@ METHOD get BY DATABASE PROCEDURE FOR HDB LANGUAGE SQLSCRIPT.
 ENDMETHOD.
 ```
 
-### GEN-CASE-001: Identifiers are never re-cased
+### GEN-CASE-001: Literals, comments and unrecognized statements keep their case
 Milestone: M0
 
-Only tokens that a parser recognized as keywords may change case. Identifiers,
-literals, comments and every word of an unrecognized statement keep their case.
+Only tokens that a parser recognized as keywords (ABAP-CASE-001) or as ABAP
+identifiers (ABAP-CASE-002) may change case. Literals, comments and every word
+of an unrecognized statement keep their case.
 
 ```abap
 before: Data lv_Value type i.
@@ -124,15 +125,27 @@ all ABAP statements. Four choices were decided explicitly: hanging call
 parameters (ABAP Cleaner style), a two-level continuation indent, `WHEN` and
 `CATCH` indented as in ADT, and one space before end-of-line comments.
 
-### ABAP-CASE-001: Keywords upper case, everything else as written
+### ABAP-CASE-001: Keywords upper case
 Milestone: M1
 
 Tokens that a statement parser recognized as keywords are printed in the
 configured case (default upper). This includes constructor operators (`VALUE`,
 `NEW`, `CONV`, `COND`, `SWITCH`, `REDUCE`, `CORRESPONDING`, `REF`, `CAST`,
-`EXACT`, `FILTER`) and ABAP SQL keywords. Identifiers, built-in functions
-(`lines( )`, `xsdbool( )`), built-in types (`i`, `string`), `me`, `abap_true`,
-literals and comments keep their case.
+`EXACT`, `FILTER`) and ABAP SQL keywords. Built-in functions (`lines( )`,
+`xsdbool( )`), built-in types (`i`, `string`), `me` and `abap_true` are
+identifiers (ABAP-CASE-002); literals and comments keep their case.
+
+Approved by the maintainer, Nils Lutz, on 2026-11-23: a keyword is
+upper-cased wherever it stands in a recognized statement, as ABAP Cleaner
+does. This includes the words of RAP derived types (`TYPE TABLE FOR READ
+RESULT`, `TYPE RESPONSE FOR MAPPED LATE`), inline `FIELD-SYMBOL( )`,
+`OTHERS` in `WHEN OTHERS` and `EXCEPTIONS`, logical expressions inside
+function arguments and constructor bodies, table keys (`[ KEY k COMPONENTS …
+]`), format options of string templates (`{ d DATE = ISO }`), text symbols
+with a numeric ID (`TEXT-001`), and in ABAP SQL the aggregate functions
+(`COUNT( )`, `SUM( )`, `MIN( )`, `MAX( )`, `AVG( )`) and `CAST( … AS CHAR( n )
+)`. Other SQL functions (`length( )`, `substring( )`) are built-in functions
+and keep their case.
 
 Approved by the maintainer, Nils Lutz, on 2026-11-23: a keyword is
 upper-cased wherever it stands in a recognized statement, as ABAP Cleaner
@@ -151,6 +164,29 @@ before: data(lv_count) = lines( mt_items ).
 after:  DATA(lv_count) = lines( mt_items ).
 before: loop at mt_items assigning field-symbol(<ls_item>) where status is initial.
 after:  LOOP AT mt_items ASSIGNING FIELD-SYMBOL(<ls_item>) WHERE status IS INITIAL.
+```
+
+### ABAP-CASE-002: Identifiers in lower case
+Milestone: M1
+
+Approved by the maintainer, Nils Lutz, on 2026-11-23, as ABAP Cleaner does
+it. In a recognized statement, every word that is not a keyword and has no
+lower-case letter is printed in lower case: variables, types, classes,
+methods, `sy-datum`, `me`, built-in types and functions. A word with a
+lower-case letter keeps its case (`lv_a`, `lvMixed`, `/DMO/I_Travel`).
+
+Never changed: statements without grammar (W003), units left as written
+(W002), embedded languages, literals, comments, pragmas and the CDS family
+(CDS-CASE-001, where alias case is the OData property name). Operators that
+cannot be names (`AND`, `OR`, `NOT`, `EQ`, `NE`, `BETWEEN`, `DIV`, `MOD`, …)
+and constructor operators before their type (`VALUE #(`, `CONV i(`) are never
+lower-cased, even where a parser did not mark them as keywords.
+
+```abap
+before: DATA LV_COUNT TYPE I.
+        LV_COUNT = LINES( MT_ITEMS ) + lvOffset.
+after:  DATA lv_count TYPE i.
+        lv_count = lines( mt_items ) + lvOffset.
 ```
 
 ### ABAP-STMT-001: One statement per line

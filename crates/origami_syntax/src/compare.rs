@@ -1,7 +1,8 @@
 //! Token-stream equality for the self-check (see `docs/INVARIANTS.md`).
 //!
 //! Two streams are equivalent when they have the same tokens (kind and text;
-//! case-insensitive only for tokens the input marks as keywords), the same
+//! case-insensitive only for tokens the input marks as keywords or
+//! identifiers), the same
 //! `glued` flags, and the same comments: same text, same syntax, same
 //! placement, attached to the same token in the same position.
 
@@ -40,7 +41,7 @@ pub fn equivalent(
     let same_text = |i: usize| {
         let a = &input.tokens[i];
         let (ta, tb) = (a.text(input_src), output.tokens[i].text(output_src));
-        ta == tb || (a.keyword && ta.eq_ignore_ascii_case(tb))
+        ta == tb || ((a.keyword || a.ident) && ta.eq_ignore_ascii_case(tb))
     };
     // Different counts shift every later token, so only the first difference
     // is meaningful. A keyword that only changed case is not a difference:
