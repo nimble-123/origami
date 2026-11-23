@@ -56,7 +56,7 @@ EXAMPLES = [
      "line."),
     ("06-comments-blank-lines.abap", "Comments and blank lines",
      "origami puts exactly one space before an end-of-line comment and never "
-     "changes comment text. ABAP Cleaner keeps aligned comments, adds a space "
+     "changes comment text, apart from aligning ABAP Doc. ABAP Cleaner keeps aligned comments, adds a space "
      "after <code>\"</code> and adds blank lines, for example after "
      "declarations."),
     ("07-call-function.abap", "CALL FUNCTION",
@@ -73,6 +73,15 @@ EXAMPLES = [
      "ABAP Cleaner also aligns <code>as</code> aliases and adds blank lines "
      "between sections; origami lines up names after <code>key</code> and "
      "keeps single spaces."),
+    ("10-aligned-statements.abap", "Aligned statements, COND and SELECT lists",
+     "Both tools align consecutive <code>ALIASES</code>, "
+     "<code>REDEFINITION</code> and <code>FOR TESTING</code> declarations, "
+     "assignments to the same structure, ABAP Doc parameters, the branches of "
+     "<code>COND</code> and a <code>SELECT</code> list with aliases, and both "
+     "remove the space before the period. The differences: origami indents "
+     "the SQL clauses by four spaces and keeps a method signature that fits "
+     "on one line; ABAP Cleaner indents by two, aligns the signature in a "
+     "table and adds blank lines."),
 ]
 
 # ---- origami's answer to each ABAP Cleaner rule ----------------------------
@@ -80,7 +89,6 @@ EXAMPLES = [
 # own layout), "no" (layout rule without an origami counterpart). Rules not
 # listed change code, comments or names, which origami never does.
 
-ONLY_LAYOUT = "Printed on its own; origami does not align across statements."
 MAP = {
     "EMPTY_LINES_WITHIN_METHODS": ("own", ["ABAP-BLANK-001"],
         "Removes blank lines after a block opener and before its closer and keeps at most one in a row; never adds one."),
@@ -92,7 +100,8 @@ MAP = {
     "SPACES_IN_EMPTY_BRACKETS": ("no", [],
         "Tokens that touch in the input stay together, because in ABAP a space can change the meaning."),
     "CLOSING_BRACKETS_POSITION": ("yes", ["ABAP-CALL-001", "ABAP-VALUE-001"], ""),
-    "SPACE_BEFORE_PERIOD": ("no", [], "A space before a period or comma is kept."),
+    "SPACE_BEFORE_PERIOD": ("yes", ["ABAP-SPACE-001"],
+        "Also before commas in SQL lists; a lone period or comma moves up across comment lines."),
     "SPACE_AROUND_COMMENT_SIGN": ("own", ["ABAP-COMMENT-002"],
         "One space before an end-of-line comment; the comment text is never changed."),
     "NEEDLESS_SPACES": ("yes", ["ABAP-COMMENT-002"],
@@ -100,15 +109,20 @@ MAP = {
     "UPPER_AND_LOWER_CASE": ("yes", ["ABAP-CASE-001", "ABAP-CASE-002"],
         "Keywords in upper case; identifiers without lower-case letters in lower case, mixed case kept."),
     "INSET": ("yes", ["ABAP-BLOCK-001", "ABAP-CLASS-001"], ""),
-    "ALIGN_ABAP_DOC": ("no", [], "ABAP Doc comments are copied as written."),
+    "ALIGN_ABAP_DOC": ("yes", ["ABAP-DOC-001"],
+        "Only the blanks after the tag and before | change; not aligned if a line would exceed the width."),
     "ALIGN_METHODS_DECLARATION": ("own", ["ABAP-METHODS-001"],
         "Each section keyword on its own line, parameters one level deeper, types not aligned."),
-    "ALIGN_METHODS_FOR_TESTING": ("no", [], ONLY_LAYOUT),
-    "ALIGN_METHODS_REDEFINITION": ("no", [], ONLY_LAYOUT),
-    "ALIGN_ALIASES_FOR": ("no", [], ONLY_LAYOUT),
+    "ALIGN_METHODS_FOR_TESTING": ("yes", ["ABAP-ALIGN-005"],
+        "Not aligned if a line would exceed the width."),
+    "ALIGN_METHODS_REDEFINITION": ("yes", ["ABAP-ALIGN-006"],
+        "Not aligned if a line would exceed the width."),
+    "ALIGN_ALIASES_FOR": ("yes", ["ABAP-ALIGN-007"],
+        "Not aligned if a line would exceed the width."),
     "ALIGN_DECLARATIONS": ("own", ["ABAP-DECL-001", "ABAP-ALIGN-003"],
         "TYPE is aligned inside a broken chain, not across separate DATA statements."),
-    "ALIGN_ASSIGNMENTS": ("no", [], "Consecutive assignments are not aligned."),
+    "ALIGN_ASSIGNMENTS": ("yes", ["ABAP-ALIGN-004"],
+        "Not across a chain; not aligned if a line would exceed the width."),
     "ALIGN_WITH_SECOND_WORD": ("own", ["ABAP-INDENT-001"],
         "Continuation lines use a fixed indent of two levels."),
     "ALIGN_CLEAR_FREE_AND_SORT": ("own", ["ABAP-CHAIN-001"],
@@ -117,13 +131,15 @@ MAP = {
         "Each clause starts its own line when the statement does not fit."),
     "ALIGN_SELECT_FROM": ("own", ["ABAP-SQL-001"],
         "A JOIN starts its own clause line; ON conditions are not aligned."),
-    "ALIGN_SELECT_LISTS": ("no", [], "Field lists are not aligned in columns."),
+    "ALIGN_SELECT_LISTS": ("own", ["ABAP-SQL-003"],
+        "Lists with complex fields one field per line, AS aligned; simple lists on one line if they fit (not derived from the rest of the file)."),
     "ALIGN_PARAMETERS": ("yes", ["ABAP-CALL-001", "ABAP-CALL-002", "ABAP-ALIGN-001", "ABAP-ALIGN-002", "ABAP-VALUE-001"],
         "With several parameter keywords, origami aligns = per keyword."),
     "ALIGN_LOGICAL_EXPRESSIONS": ("own", ["ABAP-COND-001"],
         "Breaks before AND and OR at a fixed indent; operands are not aligned in columns."),
     "LOGICAL_OPERATOR_POSITION": ("yes", ["ABAP-COND-001"], "AND and OR always start the line."),
-    "ALIGN_COND_EXPRESSIONS": ("no", [], "COND and SWITCH have no layout rule yet; a long one stays on one line."),
+    "ALIGN_COND_EXPRESSIONS": ("yes", ["ABAP-COND-002"],
+        "A COND with one WHEN is joined onto one line when it fits."),
     "ALIGN_FORM_DECLARATION": ("own", ["ABAP-FORM-001"],
         "Each section on its own line, parameters one level deeper."),
     "ALIGN_PERFORM": ("own", [], "A long PERFORM breaks before a section keyword that does not fit."),
@@ -151,7 +167,8 @@ MAP = {
     "DDL_POSITION_JOIN": ("yes", ["CDS-HEAD-001"], ""),
     "DDL_POSITION_ASSOCIATION": ("yes", ["CDS-HEAD-001"], ""),
     "DDL_POSITION_BRACES": ("yes", ["CDS-UNIT-001", "CDS-BLOCK-001"], ""),
-    "DDL_POSITION_CLAUSES": ("no", [], "WHERE, GROUP BY and similar clauses after the select list keep their line breaks."),
+    "DDL_POSITION_CLAUSES": ("yes", ["CDS-CLAUSE-001"],
+        "No blank line is added before UNION or INTERSECT."),
     "DDL_ANNO_LAYOUT": ("own", ["CDS-ANNO-001"],
         "A value goes on one line when it fits, otherwise one item per line as in JSON; not aligned in columns."),
 }
