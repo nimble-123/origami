@@ -17,7 +17,7 @@ jobs:
       matrix:
         target: [format_abap, format_cds]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@nightly
       - uses: taiki-e/install-action@v2
         with:
@@ -43,7 +43,7 @@ jobs:
         run: cargo +nightly fuzz run --target x86_64-unknown-linux-gnu ${{ matrix.target }} -- -max_total_time=3600
       - name: Upload crash
         if: failure() && steps.fuzz.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-${{ matrix.target }}
           path: fuzz/artifacts/
@@ -61,7 +61,7 @@ jobs:
   idempotency:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - run: cargo xtask corpus fetch
       - run: cargo xtask idempotency
