@@ -23,16 +23,6 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 
 </div>
 
-> [!NOTE]
-> origami is pre-release (0.x). All six languages are formatted by grammar,
-> every file of a 2,100-file test corpus passes the self-check and is
-> idempotent at 80 combinations of line width, indent and keyword case, and
-> the abaplint lexer finds no token changes. origami is on crates.io and
-> the VS Code Marketplace. Still open:
-> signed builds (they wait for signing certificates), Open VSX, and feedback
-> from teams using it daily. Please [open an issue](https://github.com/nimble-123/origami/issues)
-> with any line origami formats in a way you would not.
-
 <div align="center">
 
 <picture>
