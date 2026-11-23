@@ -15,9 +15,10 @@ mod stmt;
 pub mod structure;
 pub mod verbatim;
 
-use origami_layout::{PrintOptions, print};
+use origami_layout::{PrintOptions, print_bounded};
 use origami_syntax::{
     LangOptions, LangResult, SourceText, Stats, TokenIndex, TokenStream, Unit, UnitId,
+    max_output_len, output_limit_diagnostic,
 };
 use std::collections::BTreeSet;
 
@@ -121,12 +122,12 @@ fn format_with(
         keyword_case: Some(opts.abap_keyword_case),
         identity,
     };
-    let output = print(&laid.doc, src, &stream, &print_opts);
-    // In identity mode nothing is formatted, so no W003 is reported.
-    let diagnostics = if identity {
-        Vec::new()
-    } else {
-        laid.diagnostics
+    let limit = max_output_len(src.text().len());
+    let (output, diagnostics) = match print_bounded(&laid.doc, src, &stream, &print_opts, limit) {
+        // In identity mode nothing is formatted, so no W003 is reported.
+        Some(output) if identity => (output, Vec::new()),
+        Some(output) => (output, laid.diagnostics),
+        None => (src.text().to_string(), vec![output_limit_diagnostic()]),
     };
     LangResult {
         output,
@@ -136,6 +137,7 @@ fn format_with(
         stats: Stats {
             statements: statements.len() as u32,
             unknown: laid.unknown,
+            depth_limited: laid.depth_limited,
             ..Stats::default()
         },
         rule_spans: laid.rule_spans,

@@ -17,11 +17,19 @@
 //! * Indentation is written lazily, so lines never end in spaces.
 //!
 //! In identity mode the printer returns the source text unchanged (M0).
+//!
+//! Cost: a `Choice` is decided by printing its first branch into a trial
+//! printer that starts from the current line only (the printer never looks
+//! behind the last line break), and each decision is remembered for its
+//! doc and printer state, so nested choices are decided once, not once per
+//! enclosing trial (which would be exponential in their depth).
 
 use crate::ir::{AlignItem, Doc, Inner};
 use origami_syntax::{
     Case, CommentSyntax, Placement, SourceText, TokenIndex, TokenStream, TriviaKind, TriviaPosition,
 };
+use std::cell::RefCell;
+use std::collections::HashMap;
 
 /// Characters the lexers treat as blanks between tokens.
 const BLANKS: [char; 3] = [' ', '\t', '\r'];
@@ -37,23 +45,39 @@ pub struct PrintOptions {
 }
 
 pub fn print(doc: &Doc, src: &SourceText, tokens: &TokenStream, opts: &PrintOptions) -> String {
+    print_bounded(doc, src, tokens, opts, usize::MAX).expect("no output limit")
+}
+
+/// Like [`print`], but stops and returns `None` as soon as the output grows
+/// beyond `max_len` bytes, so a layout that would blow up the input never
+/// holds more than about `max_len` bytes in memory.
+pub fn print_bounded(
+    doc: &Doc,
+    src: &SourceText,
+    tokens: &TokenStream,
+    opts: &PrintOptions,
+    max_len: usize,
+) -> Option<String> {
     if opts.identity {
-        return src.text().to_string();
+        return Some(src.text().to_string());
     }
-    let ctx = Ctx::new(src.text(), tokens, opts);
+    let ctx = Ctx::new(src.text(), tokens, opts, max_len);
     let mut p = Printer::new(&ctx);
     p.run(vec![Cmd {
         indent: 0,
         mode: Mode::Break,
         doc,
     }]);
-    p.finish()
+    if p.overflow {
+        return None;
+    }
+    Some(p.finish())
 }
 
 /// A space, for joining aligned rows printed flat.
 static SPACE_DOC: Doc = Doc(Inner::Space);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Mode {
     Flat,
     Break,
@@ -64,6 +88,26 @@ struct Cmd<'d> {
     indent: usize,
     mode: Mode,
     doc: &'d Doc,
+}
+
+/// What a trial print of a `Choice` branch depends on: the doc, where it
+/// starts, and the printer state. Of the output so far, the printer only
+/// reads whether there is any, and of the current line its visual width
+/// (`raw`) and its trailing blanks (removed before a line break).
+#[derive(PartialEq, Eq, Hash)]
+struct TrialKey {
+    doc: *const Doc,
+    indent: usize,
+    mode: Mode,
+    width: usize,
+    col: usize,
+    pending_indent: Option<usize>,
+    pending_eol: bool,
+    line_empty: bool,
+    prev_blank: bool,
+    out_empty: bool,
+    line_width: usize,
+    trailing_blanks: String,
 }
 
 /// A leading comment and whether a blank line preceded it.
@@ -81,10 +125,19 @@ struct Ctx<'a> {
     /// and the token itself.
     blank_before_token: Vec<bool>,
     trailing: Vec<Vec<usize>>,
+    /// Output limit in bytes (see [`print_bounded`]).
+    max_len: usize,
+    /// Decided choices: whether the first branch fits.
+    trials: RefCell<HashMap<TrialKey, bool>>,
 }
 
 impl<'a> Ctx<'a> {
-    fn new(src: &'a str, tokens: &'a TokenStream, opts: &'a PrintOptions) -> Ctx<'a> {
+    fn new(
+        src: &'a str,
+        tokens: &'a TokenStream,
+        opts: &'a PrintOptions,
+        max_len: usize,
+    ) -> Ctx<'a> {
         let n = tokens.tokens.len() + 1;
         let mut leading: Vec<Vec<Leading>> = (0..n).map(|_| Vec::new()).collect();
         let mut blank_before_token = vec![false; n];
@@ -125,6 +178,8 @@ impl<'a> Ctx<'a> {
             leading,
             blank_before_token,
             trailing,
+            max_len,
+            trials: RefCell::new(HashMap::new()),
         }
     }
 
@@ -187,11 +242,11 @@ impl<'a> Ctx<'a> {
         w
     }
 
-    /// Width of the doc up to its first possible line break (the shortest
-    /// first line it can be printed with).
-    fn min_first_line(&self, doc: &Doc) -> usize {
+    /// Width of the docs up to their first possible line break (the shortest
+    /// first line they can be printed with).
+    fn min_first_line(&self, docs: &[Doc]) -> usize {
         let mut w = 0usize;
-        let mut stack = vec![doc];
+        let mut stack: Vec<&Doc> = docs.iter().rev().collect();
         while let Some(d) = stack.pop() {
             match &d.0 {
                 Inner::Token { index, .. } => {
@@ -206,6 +261,7 @@ impl<'a> Ctx<'a> {
                     stack.extend(ds.iter().rev())
                 }
                 Inner::Choice(a, _) => stack.push(a),
+                Inner::Shared(d) => stack.push(d),
                 Inner::Fill(items) => {
                     for (sep, c) in items.iter().rev() {
                         stack.push(c);
@@ -272,6 +328,7 @@ impl<'a> Ctx<'a> {
                 ds.iter().any(|d| self.forced(d, first, end))
             }
             Inner::Choice(a, _) => self.forced(a, first, end),
+            Inner::Shared(d) => self.forced(d, first, end),
             Inner::Fill(items) => items.iter().any(|(_, c)| self.forced(c, first, end)),
             Inner::Space | Inner::SoftLine | Inner::SoftBreak => false,
         }
@@ -281,13 +338,15 @@ impl<'a> Ctx<'a> {
         self.forced(doc, &mut true, last_token(doc))
     }
 
-    /// Width of the doc printed flat, or `None` if it cannot be flat.
-    fn flat_width(&self, doc: &Doc) -> Option<usize> {
-        if self.is_forced(doc) {
+    /// Width of the docs printed flat, or `None` if they cannot be flat.
+    fn flat_width(&self, docs: &[Doc]) -> Option<usize> {
+        let end = docs.iter().rev().find_map(last_token);
+        let mut first = true;
+        if docs.iter().any(|d| self.forced(d, &mut first, end)) {
             return None;
         }
         let mut w = 0usize;
-        let mut stack = vec![doc];
+        let mut stack: Vec<&Doc> = docs.iter().rev().collect();
         while let Some(d) = stack.pop() {
             match &d.0 {
                 Inner::Token { index, .. } => w += self.token_text(*index).chars().count(),
@@ -298,6 +357,7 @@ impl<'a> Ctx<'a> {
                     stack.extend(ds.iter().rev())
                 }
                 Inner::Choice(a, _) => stack.push(a),
+                Inner::Shared(d) => stack.push(d),
                 Inner::Fill(items) => {
                     for (sep, c) in items.iter().rev() {
                         stack.push(c);
@@ -327,10 +387,33 @@ impl<'a> Ctx<'a> {
     }
 }
 
-#[derive(Clone)]
+/// State of a trial print (`Printer::trial_fits`): it stops at the first
+/// finished line that is too wide, because the branch cannot fit then.
+struct Trial {
+    width: usize,
+    /// Where the trial's text starts in `out`, and the column there.
+    start: usize,
+    start_col: usize,
+    /// Start of the line being written.
+    line_from: usize,
+    /// `out` holds no line break between `line_from` and here.
+    scanned: usize,
+    /// Blanks before `start` were removed: lines are only checked at the end.
+    unchecked: bool,
+    /// A line is too wide.
+    failed: bool,
+}
+
 struct Printer<'c, 'a> {
     ctx: &'c Ctx<'a>,
     out: String,
+    /// Set in a trial print.
+    trial: Option<Trial>,
+    /// Bytes of the real output before `out` (a trial printer holds only the
+    /// current line).
+    base: usize,
+    /// The output grew beyond `Ctx::max_len`; printing stopped.
+    overflow: bool,
     /// Characters on the current line (including pending indentation).
     col: usize,
     pending_indent: Option<usize>,
@@ -348,6 +431,9 @@ impl<'c, 'a> Printer<'c, 'a> {
         Printer {
             ctx,
             out: String::new(),
+            trial: None,
+            base: 0,
+            overflow: false,
             col: 0,
             pending_indent: None,
             pending_eol: false,
@@ -369,10 +455,65 @@ impl<'c, 'a> Printer<'c, 'a> {
         self.out
     }
 
-    fn newline(&mut self, indent: usize) {
+    /// Removes blanks at the end of the current line.
+    fn trim_line_end(&mut self) {
         while self.out.ends_with(BLANKS) {
             self.out.pop();
         }
+        if let Some(t) = &mut self.trial {
+            t.scanned = t.scanned.min(self.out.len());
+        }
+    }
+
+    /// Printing stopped: the output limit was reached, or a trial print found
+    /// a line that is too wide.
+    fn stopped(&mut self) -> bool {
+        if self.base + self.out.len() > self.ctx.max_len {
+            self.overflow = true;
+        }
+        if self.overflow {
+            return true;
+        }
+        let Some(t) = &mut self.trial else {
+            return false;
+        };
+        if t.failed {
+            return true;
+        }
+        if t.unchecked || self.out.len() < t.line_from {
+            t.unchecked = true;
+            return false;
+        }
+        let out = &self.out;
+        // Width of `out[a..b]` without trailing blanks, or 0 when it is
+        // certainly narrow enough (bytes bound characters from above).
+        let width_of = |t: &Trial, a: usize, b: usize| {
+            let extra = if a == t.start { t.start_col } else { 0 };
+            if b - a + extra <= t.width {
+                return 0;
+            }
+            out[a..b].trim_end_matches(BLANKS).chars().count() + extra
+        };
+        let mut pos = t.scanned.max(t.line_from);
+        while let Some(k) = out.as_bytes()[pos..].iter().position(|&c| c == b'\n') {
+            let nl = pos + k;
+            if width_of(t, t.line_from, nl) > t.width {
+                t.failed = true;
+                return true;
+            }
+            t.line_from = nl + 1;
+            pos = nl + 1;
+        }
+        t.scanned = out.len();
+        // The current line can only lose trailing blanks.
+        if width_of(t, t.line_from, out.len()) > t.width {
+            t.failed = true;
+        }
+        t.failed
+    }
+
+    fn newline(&mut self, indent: usize) {
+        self.trim_line_end();
         self.prev_blank = self.line_empty;
         self.out.push('\n');
         self.col = 0;
@@ -614,9 +755,7 @@ impl<'c, 'a> Printer<'c, 'a> {
             }
             // Write the line break and indentation.
             self.pending_eol = false;
-            while self.out.ends_with(BLANKS) {
-                self.out.pop();
-            }
+            self.trim_line_end();
             self.out.push('\n');
             self.col = 0;
             self.line_empty = true;
@@ -678,6 +817,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                     stack.extend(ds.iter().rev().map(|x| (m, x)));
                 }
                 Inner::Choice(a, _) => stack.push((mode, a)),
+                Inner::Shared(d) => stack.push((mode, d)),
                 Inner::Fill(items) => {
                     for (sep, c) in items.iter().rev() {
                         stack.push((mode, c));
@@ -726,6 +866,9 @@ impl<'c, 'a> Printer<'c, 'a> {
         let width = self.ctx.opts.width as usize;
         let step = self.ctx.opts.indent as usize;
         while let Some(cmd) = stack.pop() {
+            if self.stopped() {
+                return;
+            }
             let Cmd { indent, mode, doc } = cmd;
             match &doc.0 {
                 Inner::Token { index, blank } => self.token(*index, indent, *blank),
@@ -786,6 +929,11 @@ impl<'c, 'a> Printer<'c, 'a> {
                         doc: d,
                     }));
                 }
+                Inner::Shared(d) => stack.push(Cmd {
+                    indent,
+                    mode,
+                    doc: d,
+                }),
                 Inner::Choice(a, b) => {
                     let pick = if self.trial_fits(a, indent, mode, width) {
                         a
@@ -814,7 +962,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                         });
                     }
                     let mut k = 0;
-                    while k < cmds.len() {
+                    while k < cmds.len() && !self.stopped() {
                         let sep = cmds[k];
                         let content = cmds[k + 1];
                         // The last item shares its line with what follows the
@@ -877,26 +1025,68 @@ impl<'c, 'a> Printer<'c, 'a> {
         }
     }
 
-    /// Prints `doc` into a copy of this printer and checks every line.
-    fn trial_fits(&self, doc: &Doc, indent: usize, mode: Mode, width: usize) -> bool {
-        let mut trial = self.clone();
-        let start = trial.out.len();
-        let start_col = trial.column();
-        trial.run(vec![Cmd { indent, mode, doc }]);
-        let text = &trial.out[start..];
-        let mut first = true;
-        for line in text.split('\n') {
-            let w = if first {
-                start_col + line.chars().count()
-            } else {
-                line.chars().count()
-            };
-            first = false;
-            if w > width {
-                return false;
-            }
+    /// Prints `doc` into a copy of this printer and checks every line. The
+    /// copy starts with the current line only, and the answer is remembered
+    /// for the same doc and state.
+    fn trial_fits(&mut self, doc: &Doc, indent: usize, mode: Mode, width: usize) -> bool {
+        let line_start = self.out.rfind('\n').unwrap_or(0);
+        let line = &self.out[self.out.rfind('\n').map_or(0, |p| p + 1)..];
+        let key = TrialKey {
+            doc,
+            indent,
+            mode,
+            width,
+            col: self.col,
+            pending_indent: self.pending_indent,
+            pending_eol: self.pending_eol,
+            line_empty: self.line_empty,
+            prev_blank: self.prev_blank,
+            out_empty: self.out.is_empty(),
+            line_width: visual_width(line, self.ctx.opts.indent as usize),
+            trailing_blanks: line[line.trim_end_matches(BLANKS).len()..].to_string(),
+        };
+        if let Some(&fits) = self.ctx.trials.borrow().get(&key) {
+            return fits;
         }
-        true
+
+        let seed = self.out[line_start..].to_string();
+        let start = seed.len();
+        let start_col = self.column();
+        let mut trial = Printer {
+            ctx: self.ctx,
+            out: seed,
+            trial: Some(Trial {
+                width,
+                start,
+                start_col,
+                line_from: start,
+                scanned: start,
+                unchecked: false,
+                failed: false,
+            }),
+            base: self.base + line_start,
+            overflow: false,
+            col: self.col,
+            pending_indent: self.pending_indent,
+            pending_eol: self.pending_eol,
+            line_empty: self.line_empty,
+            prev_blank: self.prev_blank,
+        };
+        trial.run(vec![Cmd { indent, mode, doc }]);
+        if trial.overflow {
+            // The branch alone exceeds the output limit: stop printing.
+            self.overflow = true;
+            return false;
+        }
+        // A trial that stopped early has a line that is too wide.
+        let failed = trial.trial.as_ref().is_some_and(|t| t.failed);
+        let fits = !failed
+            && trial.out[start..].split('\n').enumerate().all(|(k, line)| {
+                let w = line.chars().count();
+                (if k == 0 { start_col + w } else { w }) <= width
+            });
+        self.ctx.trials.borrow_mut().insert(key, fits);
+        fits
     }
 
     fn align_group(&mut self, items: &[AlignItem], indent: usize, width: usize) {
@@ -913,7 +1103,7 @@ impl<'c, 'a> Printer<'c, 'a> {
         for seg in segments.iter().filter(|s| !s.is_empty()) {
             let heads: Vec<Option<usize>> = seg
                 .iter()
-                .map(|r| self.ctx.flat_width(&crate::builder::concat(r.head.clone())))
+                .map(|r| self.ctx.flat_width(&r.head))
                 .collect();
             let anchor_glued = seg
                 .iter()
@@ -924,15 +1114,16 @@ impl<'c, 'a> Printer<'c, 'a> {
             // alignment.
             let overflow = seg.iter().zip(&heads).any(|(r, h)| match h {
                 Some(_) => {
-                    let tail = self
-                        .ctx
-                        .min_first_line(&crate::builder::concat(r.tail.clone()));
+                    let tail = self.ctx.min_first_line(&r.tail);
                     col + max + tail > width
                 }
                 None => true,
             });
             let aligned = !anchor_glued && !overflow && heads.iter().all(Option::is_some);
             for (r, h) in seg.iter().zip(&heads) {
+                if self.stopped() {
+                    return;
+                }
                 if !first_row {
                     self.newline(col);
                 }
@@ -1015,6 +1206,7 @@ fn last_token(doc: &Doc) -> Option<TokenIndex> {
             ds.iter().rev().find_map(last_token)
         }
         Inner::Choice(a, _) => last_token(a),
+        Inner::Shared(d) => last_token(d),
         Inner::Fill(items) => items.iter().rev().find_map(|(_, c)| last_token(c)),
         Inner::AlignGroup(items) => items.iter().rev().find_map(|it| match it {
             AlignItem::Row(r) => r

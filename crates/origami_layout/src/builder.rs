@@ -111,6 +111,11 @@ pub fn concat(docs: Vec<Doc>) -> Doc {
     Doc(Inner::Concat(docs))
 }
 
+/// `doc`, cheap to clone: for a doc used in both branches of a [`choice`].
+pub fn shared(doc: Doc) -> Doc {
+    Doc(Inner::Shared(std::sync::Arc::new(doc)))
+}
+
 /// `blank`: keep one blank line before the unit when the input had one.
 pub fn unknown(first: TokenIndex, last: TokenIndex, blank: bool) -> Doc {
     Doc(Inner::Unknown { first, last, blank })

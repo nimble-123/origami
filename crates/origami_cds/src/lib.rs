@@ -12,9 +12,10 @@ mod layout;
 mod lexer;
 pub mod structure;
 
-use origami_layout::{PrintOptions, print};
+use origami_layout::{PrintOptions, print_bounded};
 use origami_syntax::{
     LangOptions, LangResult, Language, SourceText, Stats, TokenIndex, Unit, UnitId,
+    max_output_len, output_limit_diagnostic,
 };
 use std::collections::BTreeSet;
 
@@ -69,7 +70,7 @@ fn format_with(
             tokens: TokenIndex(u.first as u32)..TokenIndex(u.last as u32 + 1),
         })
         .collect();
-    let (doc, rule_spans) = layout::layout(
+    let laid = layout::layout(
         src.text(),
         &stream,
         lang,
@@ -84,17 +85,24 @@ fn format_with(
         keyword_case: None,
         identity,
     };
-    let output = print(&doc, src, &stream, &print_opts);
+    let limit = max_output_len(src.text().len());
+    let (output, diagnostics) = match print_bounded(&laid.doc, src, &stream, &print_opts, limit) {
+        // In identity mode nothing is formatted, so nothing is reported.
+        Some(output) if identity => (output, Vec::new()),
+        Some(output) => (output, laid.diagnostics),
+        None => (src.text().to_string(), vec![output_limit_diagnostic()]),
+    };
     let n = units.len() as u32;
     LangResult {
         output,
         input_tokens: stream,
         units,
-        diagnostics: Vec::new(),
+        diagnostics,
         stats: Stats {
             statements: n,
+            depth_limited: laid.depth_limited,
             ..Stats::default()
         },
-        rule_spans,
+        rule_spans: laid.rule_spans,
     }
 }

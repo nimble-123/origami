@@ -103,10 +103,20 @@ fn extra_level(words: &[String]) -> u32 {
     }
 }
 
+/// An open block: its closer, the opener's offset, the indent levels it adds,
+/// and the levels of all open blocks up to and including it (so the current
+/// level costs no walk over the stack, however deep the nesting).
+type Block = (&'static str, u32, u32, u32);
+
+fn push(blocks: &mut Vec<Block>, closer: &'static str, at: u32, levels: u32) {
+    let total = blocks.last().map_or(0, |b| b.3) + levels;
+    blocks.push((closer, at, levels, total));
+}
+
 pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnostic> {
     let tokens = &stream.tokens;
     let mut statements = Vec::new();
-    let mut blocks: Vec<(&'static str, u32, u32)> = Vec::new(); // (closer, opener offset, levels)
+    let mut blocks: Vec<Block> = Vec::new();
     let mut brackets: Vec<(u16, u32)> = Vec::new(); // (closing kind, offset)
     let mut start = 0usize;
     // Dynpro flow logic starts with PROCESS; there `MODULE x.` calls a
@@ -178,21 +188,21 @@ pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnos
                         }
                     }
                 }
-                let level: u32 = blocks.iter().map(|b| b.2).sum();
+                let level: u32 = blocks.last().map_or(0, |b| b.3);
                 if event && blocks.is_empty() {
-                    blocks.push((EVENT, opener_at, 1));
+                    push(&mut blocks, EVENT, opener_at, 1);
                 }
                 for _ in 0..delta.max(0) {
-                    blocks.push((END_OF, opener_at, 1));
+                    push(&mut blocks, END_OF, opener_at, 1);
                 }
                 let depth_here = match role {
                     Some(Role::Opener(closer)) => {
-                        blocks.push((closer, opener_at, 1 + extra_level(&words)));
+                        push(&mut blocks, closer, opener_at, 1 + extra_level(&words));
                         level
                     }
                     Some(Role::Closer) => match blocks.pop() {
-                        Some((closer, _, levels)) if closer == words[0] => level - levels,
-                        Some((closer, _, _)) => {
+                        Some((closer, _, levels, _)) if closer == words[0] => level - levels,
+                        Some((closer, _, _, _)) => {
                             return Err(err(
                                 Code::E004,
                                 format!("Found {} but expected {closer}", words[0]),
@@ -242,7 +252,7 @@ pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnos
     while blocks.last().is_some_and(|b| b.0 == EVENT || b.0 == END_OF) {
         blocks.pop();
     }
-    if let Some((closer, at, _)) = blocks.last() {
+    if let Some((closer, at, _, _)) = blocks.last() {
         return Err(err(
             Code::E004,
             format!("Missing {closer} for this block"),
