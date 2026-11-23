@@ -134,8 +134,16 @@ pub fn parse(p: &mut P) -> Option<Doc> {
                 && !p.glued(start + 3)
                 && !matches!(
                     p.upper(start + 3).as_str(),
-                    "INTO" | "ASSIGNING" | "REFERENCE" | "TRANSPORTING" | "WHERE" | "USING" | "FROM"
-                        | "TO" | "GROUP" | "CASTING"
+                    "INTO"
+                        | "ASSIGNING"
+                        | "REFERENCE"
+                        | "TRANSPORTING"
+                        | "WHERE"
+                        | "USING"
+                        | "FROM"
+                        | "TO"
+                        | "GROUP"
+                        | "CASTING"
                 )
             {
                 continue;
@@ -340,7 +348,16 @@ static SPECS: &[Spec] = &[
     },
     Spec {
         clauses: &["INTO", "ASSIGNING", "REFERENCE INTO", "WHERE", "GROUP BY"],
-        words: &["CASTING", "ELSE", "UNASSIGN", "ASCENDING", "DESCENDING", "WITHOUT", "MEMBERS", "AS"],
+        words: &[
+            "CASTING",
+            "ELSE",
+            "UNASSIGN",
+            "ASCENDING",
+            "DESCENDING",
+            "WITHOUT",
+            "MEMBERS",
+            "AS",
+        ],
         logical_clauses: LOGIC_WHERE,
         bare: false,
         ..spec(&["LOOP", "AT", "GROUP"])
@@ -700,7 +717,16 @@ static SPECS: &[Spec] = &[
     },
     Spec {
         words: &[
-            "OF", "TO", "DEFAULT", "ID", "TYPE", "NUMBER", "WITH", "INTO", "RAISING", "DISPLAY LIKE",
+            "OF",
+            "TO",
+            "DEFAULT",
+            "ID",
+            "TYPE",
+            "NUMBER",
+            "WITH",
+            "INTO",
+            "RAISING",
+            "DISPLAY LIKE",
         ],
         bare: false,
         ..spec(&["MESSAGE"])
@@ -835,7 +861,13 @@ static SPECS: &[Spec] = &[
         ..spec(&["ROLLBACK", "WORK"])
     },
     Spec {
-        words: &["TYPE", "STRUCTURE", "AS", "RENAMING WITH SUFFIX", "IF FOUND"],
+        words: &[
+            "TYPE",
+            "STRUCTURE",
+            "AS",
+            "RENAMING WITH SUFFIX",
+            "IF FOUND",
+        ],
         bare: false,
         ..spec(&["INCLUDE"])
     },
@@ -2368,7 +2400,9 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
             && p.is(i, "VALUE")
             && p.glued(i + 1)
             && p.kind(i + 1) == LPAREN;
-        if event_value || (in_exceptions && p.is(i, "OTHERS") && p.is(i + 1, "=") && !p.glued(i + 1)) {
+        if event_value
+            || (in_exceptions && p.is(i, "OTHERS") && p.is(i + 1, "=") && !p.glued(i + 1))
+        {
             current.push(gap(p, i, skip));
             current.push(p.kw(i));
             p.pos = i + 1;
@@ -2757,9 +2791,32 @@ fn with_select(p: &mut P) -> Option<Doc> {
 
 /// SQL words that are keywords wherever they stand in an ABAP SQL statement.
 const SQL_WORDS: &[&str] = &[
-    "AS", "AND", "OR", "NOT", "LIKE", "IN", "BETWEEN", "IS", "NULL", "EXISTS", "SELECT", "FROM",
-    "WHERE", "INNER", "OUTER", "JOIN", "ON", "DISTINCT", "ESCAPE", "ASCENDING",
-    "DESCENDING", "HAVING", "SINGLE", "INTO", "UNION", "INTERSECT",
+    "AS",
+    "AND",
+    "OR",
+    "NOT",
+    "LIKE",
+    "IN",
+    "BETWEEN",
+    "IS",
+    "NULL",
+    "EXISTS",
+    "SELECT",
+    "FROM",
+    "WHERE",
+    "INNER",
+    "OUTER",
+    "JOIN",
+    "ON",
+    "DISTINCT",
+    "ESCAPE",
+    "ASCENDING",
+    "DESCENDING",
+    "HAVING",
+    "SINGLE",
+    "INTO",
+    "UNION",
+    "INTERSECT",
 ];
 
 /// SQL functions written as keywords when a bracket follows (`COUNT( * )`,
@@ -2812,7 +2869,10 @@ fn mark_sql_keywords(p: &mut P, from: usize, to: usize) {
                 }
                 "GROUP" | "ORDER" => p.is(k + 1, "BY"),
                 "BY" => {
-                    k > from && (p.is(k - 1, "GROUP") || p.is(k - 1, "ORDER") || p.is(k - 1, "PARTITION"))
+                    k > from
+                        && (p.is(k - 1, "GROUP")
+                            || p.is(k - 1, "ORDER")
+                            || p.is(k - 1, "PARTITION"))
                 }
                 "LEFT" | "RIGHT" => p.is(k + 1, "OUTER") || p.is(k + 1, "JOIN"),
                 "CROSS" => p.is(k + 1, "JOIN"),
@@ -2984,8 +3044,10 @@ const DERIVED_TYPE_KW: &[&str] = &[
 /// after `TYPE`: `TABLE FOR …`, `STRUCTURE FOR …` or `RESPONSE FOR …`, up to
 /// the entity name. 0 if `i` does not start one.
 pub(crate) fn derived_type_len(p: &P, i: usize) -> usize {
-    let starts = matches!(p.upper(i).as_str(), "TABLE" | "STRUCTURE" | "RESPONSE" | "REQUEST")
-        && p.is(i + 1, "FOR")
+    let starts = matches!(
+        p.upper(i).as_str(),
+        "TABLE" | "STRUCTURE" | "RESPONSE" | "REQUEST"
+    ) && p.is(i + 1, "FOR")
         && !p.glued(i + 1);
     if !starts {
         return 0;
@@ -3131,7 +3193,11 @@ fn declaration(p: &mut P) -> Option<Doc> {
     }
     // Items must be separable: an item glued to the previous comma cannot be
     // moved to its own line.
-    if items.is_empty() || items.iter().any(|&(a, e)| a >= e || (p.glued(a) && a != colon + 1)) {
+    if items.is_empty()
+        || items
+            .iter()
+            .any(|&(a, e)| a >= e || (p.glued(a) && a != colon + 1))
+    {
         return None;
     }
     let mut lines: Vec<(u32, Line, usize)> = Vec::new(); // (level, line, first token)

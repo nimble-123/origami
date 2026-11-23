@@ -103,16 +103,53 @@ pub struct P<'c, 'a> {
 
 /// Format options of embedded expressions in string templates.
 const TEMPLATE_OPTIONS: &[&str] = &[
-    "WIDTH", "ALIGN", "PAD", "CASE", "SIGN", "EXPONENT", "DECIMALS", "ZERO", "XSD", "STYLE",
-    "CURRENCY", "NUMBER", "ALPHA", "DATE", "TIME", "TIMESTAMP", "TIMEZONE", "COUNTRY",
+    "WIDTH",
+    "ALIGN",
+    "PAD",
+    "CASE",
+    "SIGN",
+    "EXPONENT",
+    "DECIMALS",
+    "ZERO",
+    "XSD",
+    "STYLE",
+    "CURRENCY",
+    "NUMBER",
+    "ALPHA",
+    "DATE",
+    "TIME",
+    "TIMESTAMP",
+    "TIMEZONE",
+    "COUNTRY",
 ];
 
 /// Predefined values of those options (`ALIGN = RIGHT`, `DATE = ISO`).
 const TEMPLATE_VALUES: &[&str] = &[
-    "LEFT", "RIGHT", "CENTER", "RAW", "UPPER", "LOWER", "ISO", "USER", "ENVIRONMENT", "YES", "NO",
-    "IN", "OUT", "LEFTPLUS", "LEFTSPACE", "RIGHTPLUS", "RIGHTSPACE", "SIMPLE", "SIGN_AS_POSTFIX",
-    "SCALE_PRESERVING", "SCIENTIFIC", "SCIENTIFIC_WITH_LEADING_ZERO",
-    "SCALE_PRESERVING_SCIENTIFIC", "ENGINEERING", "SPACE",
+    "LEFT",
+    "RIGHT",
+    "CENTER",
+    "RAW",
+    "UPPER",
+    "LOWER",
+    "ISO",
+    "USER",
+    "ENVIRONMENT",
+    "YES",
+    "NO",
+    "IN",
+    "OUT",
+    "LEFTPLUS",
+    "LEFTSPACE",
+    "RIGHTPLUS",
+    "RIGHTSPACE",
+    "SIMPLE",
+    "SIGN_AS_POSTFIX",
+    "SCALE_PRESERVING",
+    "SCIENTIFIC",
+    "SCIENTIFIC_WITH_LEADING_ZERO",
+    "SCALE_PRESERVING_SCIENTIFIC",
+    "ENGINEERING",
+    "SPACE",
 ];
 
 impl<'c, 'a> P<'c, 'a> {
@@ -267,7 +304,10 @@ impl<'c, 'a> P<'c, 'a> {
             self.c.keywords.push(k);
             let v = k + 2;
             let option_ends = part(self.kind(v + 1)) || self.is(v + 2, "=");
-            if self.kind(v) == WORD && option_ends && TEMPLATE_VALUES.contains(&self.upper(v).as_str()) {
+            if self.kind(v) == WORD
+                && option_ends
+                && TEMPLATE_VALUES.contains(&self.upper(v).as_str())
+            {
                 self.c.keywords.push(v);
             }
         }
@@ -864,7 +904,7 @@ impl<'c, 'a> P<'c, 'a> {
                     ty -= 2;
                 }
                 let ctor = k == LPAREN
-                    && ty >= from + 1
+                    && ty > from
                     && self.glued(i)
                     && !self.glued(ty)
                     && self.kind(ty - 1) == WORD
@@ -900,17 +940,18 @@ impl<'c, 'a> P<'c, 'a> {
                 // A word equal to the keyword before it is a name
                 // (`IN GROUP group`).
                 let repeated = prev.as_deref() == Some(w.as_str());
-                let operand = repeated || prev.as_deref().is_some_and(|p| {
-                    CTOR_TAKES_OPERAND.contains(&p)
-                        && !matches!(
-                            (p, w.as_str()),
-                            (_, "NOT" | "THROW")
-                                | ("IN", "GROUP" | "FOR")
-                                | ("MAPPING", "FROM" | "TO")
-                                | ("EXCEPT", "IN" | "WHERE" | "USING")
-                                | ("FOR", "GROUPS")
-                        )
-                });
+                let operand = repeated
+                    || prev.as_deref().is_some_and(|p| {
+                        CTOR_TAKES_OPERAND.contains(&p)
+                            && !matches!(
+                                (p, w.as_str()),
+                                (_, "NOT" | "THROW")
+                                    | ("IN", "GROUP" | "FOR")
+                                    | ("MAPPING", "FROM" | "TO")
+                                    | ("EXCEPT", "IN" | "WHERE" | "USING")
+                                    | ("FOR", "GROUPS")
+                            )
+                    });
                 // A word right after an operator is an operand (`name = key`).
                 let after_op = i > from
                     && self.kind(i - 1) == WORD
@@ -923,7 +964,9 @@ impl<'c, 'a> P<'c, 'a> {
                 let paired = match w.as_str() {
                     "GROUP" if self.is(i + 1, "SIZE") || self.is(i + 1, "INDEX") => true,
                     "SIZE" | "INDEX" if prev.as_deref() == Some("GROUP") => true,
-                    "INSTANCE" => matches!(prev.as_deref(), Some("IS" | "NOT")) && self.is(i + 1, "OF"),
+                    "INSTANCE" => {
+                        matches!(prev.as_deref(), Some("IS" | "NOT")) && self.is(i + 1, "OF")
+                    }
                     "ENTITY" => matches!(prev.as_deref(), Some("FROM" | "TO")),
                     "CONTROL" => prev.as_deref() == Some("USING"),
                     _ => false,
