@@ -5,34 +5,76 @@ mod changed;
 mod config;
 mod io;
 mod mcp;
+mod panic;
 mod report;
 mod run;
 mod walk;
 
-use clap::Parser;
+use args::DiagFormat;
 use clap::error::ErrorKind;
+use clap::{Parser, ValueEnum};
 
 fn main() {
-    // The core catches panics and reports X002. The default hook would print
-    // to stderr and corrupt JSON diagnostics there, so this hook prints
-    // nothing and only remembers where the panic happened.
-    std::panic::set_hook(Box::new(|info| {
-        let loc = info
-            .location()
-            .map(|l| format!("{}:{}", l.file(), l.line()));
-        run::LAST_PANIC.with(|p| *p.borrow_mut() = loc);
-    }));
-
+    panic::install_hook();
     let args = match args::Args::try_parse() {
         Ok(a) => a,
         Err(e) => {
-            let code = match e.kind() {
-                ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => 0,
-                _ => 3,
-            };
-            let _ = e.print();
-            std::process::exit(code);
+            if matches!(e.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayVersion) {
+                let _ = e.print();
+                std::process::exit(0);
+            }
+            match requested_format() {
+                Some(format) if format != DiagFormat::Human => {
+                    run::report_usage_error(format, &clap_message(&e));
+                }
+                _ => {
+                    let _ = e.print();
+                }
+            }
+            std::process::exit(3);
         }
     };
-    std::process::exit(run::run(&args));
+    panic::set_quiet(
+        !args.mcp && matches!(args.diag_format(), DiagFormat::Json | DiagFormat::Sarif),
+    );
+    let code = panic::catch(|| run::run(&args))
+        .unwrap_or_else(|msg| panic::catch(|| run::internal_error(&args, &msg)).unwrap_or(70));
+    std::process::exit(code);
+}
+
+/// The diagnostics format asked for on a command line that clap rejected:
+/// `--diagnostics F` or `--diagnostics=F`, else the environment.
+fn requested_format() -> Option<DiagFormat> {
+    let parse = |v: &str| DiagFormat::from_str(v, false).ok();
+    let argv: Vec<String> = std::env::args_os()
+        .skip(1)
+        .map(|a| a.to_string_lossy().into_owned())
+        .take_while(|a| a != "--")
+        .collect();
+    for (i, a) in argv.iter().enumerate() {
+        if let Some(v) = a.strip_prefix("--diagnostics=") {
+            return parse(v);
+        }
+        if a == "--diagnostics" {
+            return argv.get(i + 1).and_then(|v| parse(v));
+        }
+    }
+    match std::env::var("ORIGAMI_DIAGNOSTICS") {
+        Ok(v) => parse(&v),
+        Err(_) if std::env::var_os("CLAUDECODE").is_some() => Some(DiagFormat::Agent),
+        Err(_) => None,
+    }
+}
+
+/// clap's error without the usage block, on one line.
+fn clap_message(e: &clap::Error) -> String {
+    e.render()
+        .to_string()
+        .lines()
+        .map(str::trim)
+        .take_while(|l| !l.starts_with("Usage:") && !l.starts_with("For more information"))
+        .filter(|l| !l.is_empty())
+        .map(|l| l.strip_prefix("error: ").unwrap_or(l))
+        .collect::<Vec<_>>()
+        .join("; ")
 }

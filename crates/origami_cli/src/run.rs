@@ -5,19 +5,14 @@ use crate::config::{self, ConfigIssue, FileConfig, Resolver};
 use crate::report::{self, FileReport, Run};
 use origami_core::detect::LanguageHint;
 use origami_core::{
-    Code, Edition, Language, Options, Reported, Severity, Status, explain, format_lines,
+    Code, Edition, Explained, FormatResult, Language, Options, Reported, ReportedRange, Severity,
+    Status,
 };
 use rayon::prelude::*;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-
-thread_local! {
-    /// Location of the last panic on this thread, set by the panic hook.
-    pub static LAST_PANIC: RefCell<Option<String>> = const { RefCell::new(None) };
-}
+use std::sync::{Mutex, PoisonError};
 
 /// Rank for exit-code precedence: 70 > 4 > 3 > 2 > 5 > 1 > 0.
 fn rank(code: i32) -> u8 {
@@ -66,6 +61,18 @@ pub fn run(args: &Args) -> i32 {
     {
         return usage_error(args, &format!("Unknown --language `{l}`"));
     }
+    if let Err(message) = config::check_flags(args) {
+        return config_error(
+            args,
+            ConfigIssue {
+                code: Code::E020,
+                path: PathBuf::from("<args>"),
+                message,
+                at: None,
+                source: None,
+            },
+        );
+    }
     if args.stdin_mode() {
         if !args.paths.is_empty() {
             return usage_error(args, "Paths cannot be combined with --stdin");
@@ -77,16 +84,32 @@ pub fn run(args: &Args) -> i32 {
 }
 
 fn usage_error(args: &Args, msg: &str) -> i32 {
-    let f = FileReport {
-        path: "<args>".into(),
+    print_diagnostics(args, &[run_error("<args>", Code::E021, msg)]);
+    3
+}
+
+/// A run-level error that is not tied to a file.
+fn run_error(path: &str, code: Code, msg: &str) -> FileReport {
+    FileReport {
+        path: path.into(),
         language: None,
         changed: false,
         status: Status::Error,
-        diagnostics: vec![Reported::at_start(Code::E021, msg)],
+        diagnostics: vec![Reported::at_start(code, msg)],
         source: None,
-    };
+    }
+}
+
+/// E021 for a command line that clap rejected, in a format other than human.
+pub fn report_usage_error(format: DiagFormat, msg: &str) {
+    write_diagnostics(format, 200, false, &[run_error("<args>", Code::E021, msg)]);
+}
+
+/// A panic outside the core: X002 in the requested format, exit 70.
+pub fn internal_error(args: &Args, msg: &str) -> i32 {
+    let f = run_error("<internal>", Code::X002, &format!("Internal error: {msg}"));
     print_diagnostics(args, &[f]);
-    3
+    70
 }
 
 fn version(args: &Args) -> i32 {
@@ -164,15 +187,19 @@ impl<'a> Configs<'a> {
                 code: Code::E020,
                 path: PathBuf::from("<args>"),
                 message: d.message,
+                at: None,
+                source: None,
             })?;
             return Ok((o, None));
         };
-        let mut cache = self.loaded.lock().expect("lock");
+        let mut cache = self.loaded.lock().unwrap_or_else(PoisonError::into_inner);
         let entry = cache.entry(path.clone()).or_insert_with(|| {
             let text = std::fs::read_to_string(&path).map_err(|e| ConfigIssue {
                 code: Code::E020,
                 path: path.clone(),
                 message: format!("Cannot read config: {e}"),
+                at: None,
+                source: None,
             })?;
             let file = config::parse(&text, &path)?;
             let opts = config::options(&file, self.args, &path)?;
@@ -183,7 +210,7 @@ impl<'a> Configs<'a> {
 
     /// W101 reports for unknown keys, one per config file.
     fn warnings(&self) -> Vec<FileReport> {
-        let cache = self.loaded.lock().expect("lock");
+        let cache = self.loaded.lock().unwrap_or_else(PoisonError::into_inner);
         let mut out: Vec<FileReport> = cache
             .iter()
             .filter_map(|(p, r)| r.as_ref().ok().map(|(_, f)| (p, f)))
@@ -207,13 +234,17 @@ impl<'a> Configs<'a> {
 }
 
 fn config_error(args: &Args, issue: ConfigIssue) -> i32 {
+    let mut d = Reported::at_start(issue.code, issue.message);
+    if let Some(p) = issue.at {
+        d.range = ReportedRange { start: p, end: p };
+    }
     let f = FileReport {
         path: issue.path.display().to_string(),
         language: None,
         changed: false,
         status: Status::Error,
-        diagnostics: vec![Reported::at_start(issue.code, issue.message)],
-        source: None,
+        diagnostics: vec![d],
+        source: issue.source,
     };
     print_diagnostics(args, &[f]);
     3
@@ -226,11 +257,46 @@ fn hint_from_args(args: &Args) -> Option<LanguageHint> {
     })
 }
 
-fn annotate_panic(diags: &mut [Reported]) {
-    let loc = LAST_PANIC.with(|p| p.borrow_mut().take());
-    if let Some(loc) = loc {
+/// `format_lines` of the core, with the diagnostics completed for users.
+pub(crate) fn format_source(
+    input: &[u8],
+    hint: &LanguageHint,
+    opts: &Options,
+    lines: &[(u32, u32)],
+) -> FormatResult {
+    let mut r = crate::panic::in_core(|| origami_core::format_lines(input, hint, opts, lines));
+    complete(input, &mut r.diagnostics);
+    r
+}
+
+/// `explain` of the core, with the diagnostics completed for users.
+fn explain_source(
+    input: &[u8],
+    hint: &LanguageHint,
+    opts: &Options,
+    lines: &[(u32, u32)],
+) -> Explained {
+    let mut e = crate::panic::in_core(|| origami_core::explain(input, hint, opts, lines));
+    complete(input, &mut e.result.diagnostics);
+    e
+}
+
+/// Adds the panic location to X002 and the position of the first invalid
+/// byte to E005 (the core reports E005 at the start).
+fn complete(input: &[u8], diags: &mut [Reported]) {
+    if let Some(loc) = crate::panic::take_core_panic() {
         for d in diags.iter_mut().filter(|d| d.code == Code::X002) {
             d.message = format!("{} (at {loc})", d.message);
+        }
+    }
+    if diags.iter().any(|d| d.code == Code::E005) {
+        let body = input.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(input);
+        if let Err(e) = std::str::from_utf8(body) {
+            let valid = std::str::from_utf8(&body[..e.valid_up_to()]).unwrap_or_default();
+            let p = report::position(valid, valid.len());
+            for d in diags.iter_mut().filter(|d| d.code == Code::E005) {
+                d.range = ReportedRange { start: p, end: p };
+            }
         }
     }
 }
@@ -288,15 +354,15 @@ fn stdin_mode(args: &Args) -> i32 {
         None => LanguageHint::None,
     });
     let (r, view) = if args.review {
-        let e = explain(&input, &hint, &opts, &ranges);
+        let e = explain_source(&input, &hint, &opts, &ranges);
         let path = name.as_deref().unwrap_or("<stdin>");
         let color = report::color_enabled(report::Stream::Stdout);
         let view = report::review::render(path, &input, &e, color);
         (e.result, Some(view))
     } else {
-        (format_lines(&input, &hint, &opts, &ranges), None)
+        (format_source(&input, &hint, &opts, &ranges), None)
     };
-    let mut report = FileReport {
+    let report = FileReport {
         path: name.unwrap_or_else(|| "<stdin>".into()),
         language: r.language,
         changed: r.changed,
@@ -304,7 +370,6 @@ fn stdin_mode(args: &Args) -> i32 {
         diagnostics: r.diagnostics,
         source: (r.status == Status::Error).then(|| String::from_utf8_lossy(&input).into_owned()),
     };
-    annotate_panic(&mut report.diagnostics);
     let success = matches!(report.status, Status::Formatted | Status::Unchanged);
     if success
         && !args.check_mode()
@@ -406,15 +471,14 @@ fn path_mode(args: &Args) -> i32 {
         let hint = LanguageHint::Path(display.clone());
         let mut diff = None;
         let r = if args.review {
-            let e = explain(&input, &hint, opts, ranges);
+            let e = explain_source(&input, &hint, opts, ranges);
             let view = report::review::render(&display, &input, &e, color);
             diff = Some(view).filter(|v| !v.is_empty());
             e.result
         } else {
-            format_lines(&input, &hint, opts, ranges)
+            format_source(&input, &hint, opts, ranges)
         };
-        let mut diagnostics = r.diagnostics;
-        annotate_panic(&mut diagnostics);
+        let diagnostics = r.diagnostics;
         if let (true, Some(out)) = (r.changed, &r.output) {
             if args.check_mode() {
                 if args.diff {
@@ -462,13 +526,27 @@ fn path_mode(args: &Args) -> i32 {
 }
 
 fn print_diagnostics(args: &Args, files: &[FileReport]) {
+    write_diagnostics(
+        args.diag_format(),
+        args.max_diagnostics,
+        args.check_mode(),
+        files,
+    );
+}
+
+fn write_diagnostics(
+    format: DiagFormat,
+    max_diagnostics: usize,
+    check: bool,
+    files: &[FileReport],
+) {
     let run = Run {
         files,
-        max_diagnostics: args.max_diagnostics,
-        check: args.check_mode(),
+        max_diagnostics,
+        check,
     };
     let mut err = std::io::stderr().lock();
-    let _ = match args.diag_format() {
+    let _ = match format {
         DiagFormat::Human => report::human::write(&run, &mut err),
         DiagFormat::Json => report::json::write(&run, &mut err),
         DiagFormat::Sarif => report::sarif::write(&run, &mut err),

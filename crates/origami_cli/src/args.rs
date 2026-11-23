@@ -18,7 +18,8 @@ pub enum CaseArg {
     Lower,
 }
 
-#[derive(Debug, Parser)]
+/// `Default` is a command line without flags (as the MCP server uses it).
+#[derive(Debug, Default, Parser)]
 #[command(
     name = "origami",
     about = "Layout-only formatter for ABAP and the CDS family (DDLS, DDLX, DCL, BDEF, SRVD)",

@@ -25,7 +25,7 @@
       "required": ["path", "language", "changed", "status", "diagnostics"],
       "additionalProperties": false,
       "properties": {
-        "path": { "type": "string", "description": "File path, `<stdin>`, `<args>`, or a config file path." },
+        "path": { "type": "string", "description": "File path, `<stdin>`, `<args>`, `<internal>`, or a config file path." },
         "language": {
           "enum": ["abap", "ddls", "ddlx", "dcl", "bdef", "srvd", null]
         },
