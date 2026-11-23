@@ -8,6 +8,11 @@
 //!    length) and check again. Units still over 255 are printed opaque; if a
 //!    new overlong line remains even then, the whole file stays as written.
 //! 5. If the comparison still fails, report X001.
+//! 6. A unit left as written can change what a second run sees (it now
+//!    starts a line, its neighbours moved), so a second run could lay it out
+//!    differently. When units were left as written, the output is formatted
+//!    again until it is stable (at most twice), and a new output is used only
+//!    if it still matches the input token for token (idempotency).
 
 use crate::options::Options;
 use origami_syntax::{
@@ -36,6 +41,20 @@ pub fn run(
     opts: &Options,
     identity: bool,
     explain: bool,
+) -> Checked {
+    run_at(src, lang, opts, identity, explain, 0)
+}
+
+/// Rounds of step 6 (formatting the output again).
+const MAX_SETTLE: u8 = 2;
+
+fn run_at(
+    src: &SourceText,
+    lang: Language,
+    opts: &Options,
+    identity: bool,
+    explain: bool,
+    round: u8,
 ) -> Checked {
     let empty = BTreeSet::new();
     let done = |result, quarantine, opaque, whole_file_fallback| Checked {
@@ -99,6 +118,24 @@ pub fn run(
         ));
     }
     result.stats.quarantined = quarantine.len() as u32;
+    if !whole_file_fallback && round < MAX_SETTLE {
+        let again = run_at(
+            &SourceText::from_normalized(result.output.clone()),
+            lang,
+            opts,
+            identity,
+            false,
+            round + 1,
+        );
+        let failed = again.result.has_error();
+        let settled = again.result.output;
+        if !failed && settled != result.output {
+            let (bad, long) = problems(src, lang, &result, &settled);
+            if bad.is_empty() && long.is_empty() {
+                result.output = settled;
+            }
+        }
+    }
     done(result, quarantine, opaque, whole_file_fallback)
 }
 
