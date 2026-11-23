@@ -298,6 +298,10 @@ fn verbatim_units_keep_inner_spacing() {
     assert_eq!(out, "aa    bb\n");
 }
 
+/// Catches quadratic printing, not small slowdowns: 5x the input should take
+/// about 5x the time (a quadratic printer: 25x). Shared CI runners are noisy,
+/// so each size is printed several times and the fastest run counts, and the
+/// bound leaves room for noise while staying far below 25.
 #[test]
 fn printing_is_linear_in_size() {
     let make = |n: usize| {
@@ -315,17 +319,18 @@ fn printing_is_linear_in_size() {
             docs.push(b::group(vec![t(k)]));
         }
         let doc = b::concat(docs);
-        let start = std::time::Instant::now();
-        let _ = print(
-            &doc,
-            &SourceText::from_normalized(src.clone()),
-            &ts,
-            &opts(120),
-        );
-        start.elapsed().as_secs_f64()
+        let text = SourceText::from_normalized(src.clone());
+        let o = opts(120);
+        (0..5)
+            .map(|_| {
+                let start = std::time::Instant::now();
+                let _ = print(&doc, &text, &ts, &o);
+                start.elapsed().as_secs_f64()
+            })
+            .fold(f64::INFINITY, f64::min)
     };
     let _ = time(1_000); // warm up
     let small = time(10_000);
     let large = time(50_000);
-    assert!(large / small < 7.0, "50k/10k time ratio {}", large / small);
+    assert!(large / small < 12.0, "50k/10k time ratio {}", large / small);
 }
