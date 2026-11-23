@@ -3,7 +3,10 @@
 //! one line, non-key select-list elements aligned under the names of key
 //! elements. Letter case is never changed. Inside a unit, the author's line
 //! breaks are kept and re-indented, and runs of spaces shrink to one. Units
-//! nested deeper than `MAX_NESTING` are printed byte for byte (W004).
+//! nested deeper than `MAX_NESTING` are printed byte for byte (W004). In a DDLS
+//! query, `where`, `group by`, `having`, `union`, `except` and `intersect`
+//! each start a unit, so a line break before them (CDS-CLAUSE-001) is always
+//! there and their continuation lines keep their position relative to them.
 
 use crate::kinds::*;
 use origami_layout::{Doc, builder as b};
@@ -29,6 +32,53 @@ pub struct CdsUnit {
     /// Extra indent (in indent steps) for non-key elements in a block with
     /// key elements.
     extra: u32,
+}
+
+/// Whether token `k` starts a clause of a DDLS query after the select list
+/// (CDS-CLAUSE-001): `where`, `group by`, `having`, `union`, `except` or
+/// `intersect`, not glued to the token before.
+fn is_clause_start(text: &str, toks: &[origami_syntax::Token], k: usize) -> bool {
+    let word = |k: usize| {
+        toks.get(k)
+            .filter(|t| t.kind == IDENT && !t.glued)
+            .map(|t| t.text(text))
+    };
+    let Some(w) = word(k) else { return false };
+    ["where", "having", "union", "except", "intersect"]
+        .iter()
+        .any(|c| w.eq_ignore_ascii_case(c))
+        || (w.eq_ignore_ascii_case("group")
+            && word(k + 1).is_some_and(|b| b.eq_ignore_ascii_case("by")))
+}
+
+/// The layout of a clause unit that starts with `group` and whose `by` is on
+/// a later line: `by` moves up behind `group`, and the continuation lines
+/// keep their position relative to `by`. Otherwise the unit as written.
+fn clause_doc(text: &str, stream: &TokenStream, u: &CdsUnit, blank: bool) -> Doc {
+    let toks = &stream.tokens;
+    let (first, last) = (TokenIndex(u.first as u32), TokenIndex(u.last as u32));
+    let by = u.first + 1;
+    let join = by <= u.last
+        && toks[u.first].text(text).eq_ignore_ascii_case("group")
+        && toks[by].text(text).eq_ignore_ascii_case("by")
+        && {
+            let gap = &text[toks[u.first].end as usize..toks[by].start as usize];
+            gap.contains('\n') && gap.chars().all(|c| matches!(c, ' ' | '\t' | '\n' | '\r'))
+        };
+    if !join {
+        return b::unknown(first, last, blank);
+    }
+    let group = if blank {
+        b::token_keep_blank(first)
+    } else {
+        b::token(first)
+    };
+    let by = TokenIndex(by as u32);
+    b::concat(vec![
+        group,
+        b::keep(stream, by),
+        b::unknown(by, last, false),
+    ])
 }
 
 /// Index after the annotation value starting at `k` (after the colon).
@@ -176,6 +226,14 @@ pub fn units(text: &str, stream: &TokenStream, lang: Language) -> Vec<CdsUnit> {
                         if matches!(k, RBRACE) || (matches!(k, AT | AT_LT) && j > i) {
                             break;
                         }
+                        // A query clause after the select list starts a unit.
+                        if lang == Language::Ddls
+                            && depth == 0
+                            && j > i
+                            && is_clause_start(text, toks, j)
+                        {
+                            break;
+                        }
                         if k == LBRACE {
                             // A short block that the author wrote on one line,
                             // right after the previous token, stays part of
@@ -307,6 +365,10 @@ pub fn layout(
         let prev = id.checked_sub(1).map(|p| units[p].kind);
         let blank = id > 0 && prev != Some(Kind::Open) && u.kind != Kind::Close;
         let uid = id as UnitId;
+        let clause = lang == Language::Ddls
+            && u.kind == Kind::Element
+            && u.depth == 0
+            && is_clause_start(text, &stream.tokens, u.first);
         // Nested too deep: left as written, so neither the grammar's
         // recursion nor the layout grows with the nesting.
         let too_deep = nest[u.first..=u.last].iter().any(|&d| d > MAX_NESTING);
@@ -348,6 +410,16 @@ pub fn layout(
                     }
                     spans.extend(g.spans.into_inner());
                     d
+                }
+                None if clause => {
+                    if explain && id > 0 {
+                        spans.push(crate::grammar::G::span(
+                            u.first - 1,
+                            u.first,
+                            "CDS-CLAUSE-001",
+                        ));
+                    }
+                    clause_doc(text, stream, u, blank)
                 }
                 None => b::unknown(first, last, blank),
             }

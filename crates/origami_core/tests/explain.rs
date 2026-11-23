@@ -250,6 +250,21 @@ fn a_cds_header_clause_gets_cds_head_001() {
 }
 
 #[test]
+fn a_query_clause_gets_cds_clause_001_and_a_kept_break_gets_none() {
+    let e = run(
+        "zi_a.ddls.asddls",
+        "define view entity ZI_A as select from t\n{\n  key a\n} where a = 1 group by a\nhaving count(*) > 1\n",
+    );
+    let clauses = e
+        .notes
+        .iter()
+        .filter(|n| n.rule == Some("CDS-CLAUSE-001"))
+        .count();
+    // `where` and `group by` start lines; `having` already did.
+    assert_eq!(clauses, 2, "{:#?}\n{}", e.notes, e.output_text);
+}
+
+#[test]
 fn a_failed_parse_attempt_leaves_no_span() {
     // `READ ENTITIES` with an unknown addition fails in the EML parser and
     // falls back to the keyword-statement engine or the generic layout; no
