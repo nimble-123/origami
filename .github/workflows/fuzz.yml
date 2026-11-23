@@ -17,7 +17,7 @@ jobs:
       matrix:
         target: [format_abap, format_cds, format_lines, explain]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@nightly
       - uses: taiki-e/install-action@v2
         with:
@@ -28,7 +28,7 @@ jobs:
       # The corpus libFuzzer grew in earlier nights; every run saves a new
       # cache entry, and the newest one is restored.
       - name: Restore corpus
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: fuzz/corpus/${{ matrix.target }}
           key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -77,13 +77,13 @@ jobs:
           -max_total_time=3600 -timeout=10 -rss_limit_mb=2048 -max_len=65536
       - name: Save corpus
         if: always() && steps.fuzz.outcome != 'skipped'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: fuzz/corpus/${{ matrix.target }}
           key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Upload crash
         if: failure() && steps.fuzz.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-${{ matrix.target }}
           path: fuzz/artifacts/
@@ -108,7 +108,7 @@ jobs:
   idempotency:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - run: cargo xtask corpus fetch
       - run: cargo xtask idempotency
