@@ -16,6 +16,8 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 [![Rust 2024](https://img.shields.io/badge/Rust-2024-1A1B26?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![ABAP and CDS](https://img.shields.io/badge/ABAP%20%2B%20CDS-up%20to%20SAP__BASIS%208.16-1A1B26)](#supported-files)
 [![Homebrew](https://img.shields.io/badge/brew-nimble--123%2Ftap-34548A?logo=homebrew&logoColor=white)](#install)
+[![crates.io](https://img.shields.io/crates/v/abap-origami?color=34548A&logo=rust&logoColor=white&label=crates.io)](https://crates.io/crates/abap-origami)
+[![VS Code Marketplace](https://vsmarketplacebadges.dev/version-short/nimble-123.abap-origami.svg?label=VS%20Code&colorB=34548A)](https://marketplace.visualstudio.com/items?itemName=nimble-123.abap-origami)
 
 [Website](https://nimble-123.github.io/origami/) · [Playground](https://nimble-123.github.io/origami/#playground) · [Why origami](#why-origami) · [Install](#install) · [Use](#use) · [How it works](#how-it-works) · [Documentation](#documentation) · [License](#license)
 
