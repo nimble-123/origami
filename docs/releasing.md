@@ -33,8 +33,7 @@ repository.
 | `APPLE_CERT_P12`, `APPLE_CERT_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` | macOS signing and notarization (all five) | macOS binaries are not signed |
 | `WINDOWS_CERT_PFX`, `WINDOWS_CERT_PASSWORD` | Windows signing (both) | Windows binaries are not signed |
 | `CARGO_REGISTRY_TOKEN` | publishing to crates.io | crates are checked with a dry run but not published |
-| `VSCE_PAT` | VS Code Marketplace, publisher `origami-dev` | not published there |
-| `OVSX_PAT` | Open VSX, namespace `origami-dev` | not published there |
+| `OVSX_PAT` | Open VSX, namespace `nimble-123` | not published there |
 | `HOMEBREW_TAP_TOKEN` | the Homebrew formula in `nimble-123/homebrew-tap` | formula not updated |
 
 ### RELEASE_PLEASE_TOKEN
@@ -98,17 +97,31 @@ The six crate names are free at the time of writing. The workflow runs
 `cargo publish --workspace --dry-run` on every release, with or without the
 token, so manifest problems show up before the token exists.
 
-### VS Code Marketplace: VSCE_PAT
+### VS Code Marketplace: trusted publishing (no secret)
 
-1. Create an [Azure DevOps organization](https://dev.azure.com) with the
-   Microsoft account that will own the publisher.
-2. Create the publisher `origami-dev` at
+The extension is published as `nimble-123.abap-origami` with OIDC trusted
+publishing: the Marketplace trusts the `vscode-publish` job of `release.yml`,
+so no Marketplace token is stored. The job runs in the GitHub environment
+`vscode-marketplace` and calls `vsce publish --oidc`.
+
+1. Create the publisher `nimble-123` at
    [marketplace.visualstudio.com/manage](https://marketplace.visualstudio.com/manage/createpublisher).
-3. In Azure DevOps, create a personal access token: organization *All
-   accessible organizations*, scope *Marketplace > Manage*. See
-   [Publishing Extensions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#get-a-personal-access-token).
-4. Save it as `VSCE_PAT`. These tokens expire (at most a year); put the expiry
-   date in your calendar.
+2. On the publisher's *Trusted Publishing* tab, create a policy:
+
+   | Field | Value |
+   | --- | --- |
+   | Policy name | `origami release` |
+   | Provider | GitHub Actions |
+   | Repository owner | `nimble-123` |
+   | Repository | `origami` |
+   | Workflow | `release.yml` |
+   | Environment | `vscode-marketplace` |
+
+   See [Publish with OIDC trusted publishing](https://learn.microsoft.com/en-us/azure/devops/extend/publish/overview?view=azure-devops#publish-with-oidc-trusted-publishing).
+3. Optional: in the repository settings, give the `vscode-marketplace`
+   environment a deployment branch rule for release tags (`v*`) or required
+   reviewers. GitHub creates the environment on the first run if it does not
+   exist.
 
 ### Open VSX: OVSX_PAT
 
@@ -116,7 +129,7 @@ token, so manifest problems show up before the token exists.
    Eclipse Foundation publisher agreement in your profile.
 2. Create an access token at [open-vsx.org/user-settings/tokens](https://open-vsx.org/user-settings/tokens)
    and save it as `OVSX_PAT`.
-3. Create the namespace once: `npx ovsx@1.4.0 create-namespace origami-dev -p <token>`.
+3. Create the namespace once: `npx ovsx@1.4.0 create-namespace nimble-123 -p <token>`.
    See [Publishing Extensions](https://github.com/eclipse/openvsx/wiki/Publishing-Extensions).
 
 ### Homebrew tap: HOMEBREW_TAP_TOKEN

@@ -484,39 +484,35 @@ jobs:
     name: Publish the extension
     needs: release
     runs-on: ubuntu-latest
+    # The Marketplace publisher `nimble-123` trusts this workflow file in this
+    # environment (OIDC trusted publishing): no Marketplace token is stored.
+    environment: vscode-marketplace
     permissions:
       contents: read
+      id-token: write
     env:
       # Install scripts of the publishing tools do not run.
       npm_config_ignore_scripts: "true"
     steps:
       - id: tokens
         env:
-          HAVE_VSCE: ${{ secrets.VSCE_PAT != '' }}
           HAVE_OVSX: ${{ secrets.OVSX_PAT != '' }}
         run: |
-          echo "vsce=$HAVE_VSCE" >> "$GITHUB_OUTPUT"
           echo "ovsx=$HAVE_OVSX" >> "$GITHUB_OUTPUT"
-          [ "$HAVE_VSCE" = true ] || echo "::notice::VSCE_PAT is not set; not published to the VS Code Marketplace."
           [ "$HAVE_OVSX" = true ] || echo "::notice::OVSX_PAT is not set; not published to Open VSX."
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: steps.tokens.outputs.vsce == 'true' || steps.tokens.outputs.ovsx == 'true'
         with:
           node-version: 22
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        if: steps.tokens.outputs.vsce == 'true' || steps.tokens.outputs.ovsx == 'true'
         with:
           path: vsix
           pattern: vsix-*
           merge-multiple: true
-      - name: Publish to VS Code Marketplace
-        if: steps.tokens.outputs.vsce == 'true'
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - name: Publish to VS Code Marketplace (trusted publishing)
         run: |
           failed=0
           for f in vsix/*.vsix; do
-            npx --yes @vscode/vsce@4.1.1 publish --packagePath "$f" --pat "$VSCE_PAT" || failed=1
+            npx --yes @vscode/vsce@4.1.1 publish --packagePath "$f" --oidc || failed=1
           done
           exit $failed
       - name: Publish to Open VSX

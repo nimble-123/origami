@@ -3,7 +3,7 @@
   "displayName": "origami – ABAP & CDS formatter",
   "description": "Layout-only formatter for ABAP, CDS views, metadata extensions, access controls, behavior definitions and service definitions. Works on abapGit files and ADT for VS Code documents.",
   "version": "0.1.1",
-  "publisher": "origami-dev",
+  "publisher": "nimble-123",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",

@@ -105,8 +105,8 @@ Flags, exit codes, diagnostic codes and the JSON schema: [docs/CLI.md](docs/CLI.
 Install the `.vsix` from the release, then make origami the formatter:
 
 ```json
-"[abap]": { "editor.defaultFormatter": "origami-dev.abap-origami" },
-"[acds]": { "editor.defaultFormatter": "origami-dev.abap-origami" },
+"[abap]": { "editor.defaultFormatter": "nimble-123.abap-origami" },
+"[acds]": { "editor.defaultFormatter": "nimble-123.abap-origami" },
 "editor.formatOnSave": true,
 "editor.formatOnSaveMode": "modifications"
 ```
