@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.0](https://github.com/nimble-123/origami/compare/v0.1.1...v0.2.0) (2026-11-23)
+
+
+### Features
+
+* **site:** run the playground in a Web Worker; test wasm and the extension in CI ([#17](https://github.com/nimble-123/origami/issues/17)) ([9cda61c](https://github.com/nimble-123/origami/commit/9cda61c435c56f6a678cae2008ff87f755c2cdda))
+
+
+### Fixes
+
+* bound memory and time on deeply nested and huge input (W004) ([#27](https://github.com/nimble-123/origami/issues/27)) ([92086f8](https://github.com/nimble-123/origami/commit/92086f895ab12daed138d4b1222eaa7043449002))
+* **cli:** harden the CLI and the MCP server ([#21](https://github.com/nimble-123/origami/issues/21)) ([cbe2106](https://github.com/nimble-123/origami/commit/cbe21063c5cbd6e627f210781a22edf5a703d447))
+* idempotency at every setting, and a working nightly fuzz build ([#14](https://github.com/nimble-123/origami/issues/14)) ([7aad17a](https://github.com/nimble-123/origami/commit/7aad17a965b54171005d99c20ba50a043cc18bc4))
+* settle units left as written, and keep a mid-file U+FEFF off the first byte ([#22](https://github.com/nimble-123/origami/issues/22)) ([c6fee44](https://github.com/nimble-123/origami/commit/c6fee4449c7653b60d047153e372a9760a1dbde1))
+
 ## [0.1.1](https://github.com/nimble-123/origami/compare/v0.1.0...v0.1.1) (2026-11-23)
 
 

@@ -25,14 +25,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0       # only for --changed
-      - uses: nimble-123/origami@v0.1.1
+      - uses: nimble-123/origami@v0.2.0
         with:
           args: --check --changed origin/${{ github.base_ref }}
           sarif: "true"        # findings as code-scanning annotations
 ```
 
 Without `version`, the action downloads the release that matches the tag it
-is used at (`@v0.1.1`), else the latest release.
+is used at (`@v0.2.0`), else the latest release.
 
 ## GitLab CI
 
@@ -40,7 +40,7 @@ is used at (`@v0.1.1`), else the latest release.
 origami:
   image: debian:stable-slim
   variables:
-    ORIGAMI_VERSION: "0.1.1"
+    ORIGAMI_VERSION: "0.2.0"
     GIT_DEPTH: 0
   before_script:
     - apt-get update -qq && apt-get install -y -qq curl ca-certificates git
@@ -65,7 +65,7 @@ origami:
 
 ```yaml
 variables:
-  ORIGAMI_VERSION: "0.1.1"
+  ORIGAMI_VERSION: "0.2.0"
 
 steps:
   - checkout: self
@@ -89,8 +89,8 @@ cargo install --locked abap-origami   # once v1.0 is on crates.io
 origami --check
 ```
 
+<!-- x-release-please-end -->
+
 The JSON diagnostics (`--diagnostics json`, on stderr) follow
 [schemas/diagnostics.v1.json](../schemas/diagnostics.v1.json);
-`--diagnostics sarif` produces SARIF 0.1.1 for tools that read it.
-
-<!-- x-release-please-end -->
+`--diagnostics sarif` produces SARIF 2.1.0 for tools that read it.
