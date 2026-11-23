@@ -40,7 +40,7 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 
 ## Why origami
 
-- **Layout only.** Whitespace, line breaks, indentation and the case of ABAP keywords. origami never renames, reorders or rewrites a statement, so a formatted diff is easy to review.
+- **Layout only.** Whitespace, line breaks, indentation and letter case in ABAP: keywords in upper case, identifiers without a lower-case letter in lower case, as ABAP Cleaner does. origami never renames, reorders or rewrites a statement, so a formatted diff is easy to review.
 - **Checked, every time.** After formatting, origami lexes its own output and compares every token and comment with your file. If anything but layout differs, that statement is left as written. A file with a structural error is never touched.
 - **Explained.** `origami --review` shows the changes before anything is written, with a note on every line break origami adds: which rule, and at which column the line would have ended.
 - **Fast.** A median file takes 0.07 ms in process and 1.8 ms as a new process, start-up included; 99 % of files take under 4 ms. The whole 2,100-file test corpus takes 0.2 s. Fast enough for format-on-save, pre-commit hooks and agents ([benchmark](docs/benchmark.md)).
@@ -216,6 +216,7 @@ by origami, and every ABAP Cleaner rule next to origami's:
 - [Command line](docs/CLI.md): flags, exit codes, diagnostics, configuration
 - [CI](docs/ci.md) and [adopting origami in a team](docs/adoption.md)
 - [Performance](docs/benchmark.md): per-file latencies, cold and warm starts, agents, threads, ABAP Cleaner
+- [origami and ABAP Cleaner](https://nimble-123.github.io/origami/abap-cleaner.html): the same code formatted by both, and every ABAP Cleaner rule next to origami's ([how it is built](scripts/abap-cleaner-compare/README.md))
 - [Design](docs/designs/origami.md) and [line-break explanations](docs/designs/origami-explain-review.md)
 - [Visual design](docs/brand.md)
 

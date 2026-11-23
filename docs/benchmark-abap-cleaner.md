@@ -3,7 +3,9 @@
 > The current, generated measurements (per-file percentiles, cold and warm
 > starts, MCP, WebAssembly, thread scaling, ABAP Cleaner warm and cold) are in
 > [benchmark.md](benchmark.md). This page keeps the first comparison and
-> explains how ABAP Cleaner is run.
+> explains how ABAP Cleaner is run. The layout of both tools side by side, and
+> every ABAP Cleaner rule next to origami's rules, is on the
+> [comparison page](https://nimble-123.github.io/origami/abap-cleaner.html).
 
 Measured on 2026-11-21. Apple M4 (10 cores), macOS, Temurin JDK 27.0.1,
 ABAP Cleaner 1.29.2 (GitHub release), origami at commit `ae9dc0f`.

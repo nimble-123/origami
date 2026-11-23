@@ -30,6 +30,9 @@ origami                     # formats all supported files below .
 git commit -am "Format with origami"
 ```
 
+Code written in upper case gets a large first diff: origami writes ABAP
+identifiers without a lower-case letter in lower case (STYLE ABAP-CASE-002).
+
 Review the diff by sampling, not line by line: origami re-lexes its output
 and refuses to write a file if anything but whitespace, line breaks or
 letter case changed, and the corpus tests check the same on 1,800 public
