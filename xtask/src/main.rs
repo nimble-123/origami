@@ -1,7 +1,8 @@
 //! `cargo xtask <task>`: corpus fetch/run/bless, explain, freq, oracle, bench-check,
-//! release-diff, ci. Run from anywhere inside the repository.
+//! bench-compare, bench-matrix, release-diff, ci. Run from anywhere inside the repository.
 
 mod bench_check;
+mod bench_compare;
 mod bench_matrix;
 mod ci;
 mod corpus;
@@ -36,6 +37,8 @@ fn main() -> ExitCode {
         ["freq", n] => freq::run(n.parse().unwrap_or(40)),
         ["oracle"] => oracle::run(),
         ["bench-check", rest @ ..] => bench_check::run(rest),
+        ["bench-compare"] => bench_compare::run(),
+        ["bench-compare", "--report"] => bench_compare::report_only(),
         ["bench-matrix"] => bench_matrix::run(),
         ["bench-matrix", "--report"] => bench_matrix::report_only(),
         ["release-diff", rest @ ..] => release_diff::run(rest),
@@ -43,7 +46,7 @@ fn main() -> ExitCode {
         ["idempotency"] => idempotency::run(),
         ["ci", rest @ ..] => ci::run(rest),
         _ => Err(
-            "usage: cargo xtask <corpus fetch|corpus run [--hashes FILE]|corpus bless|explain FILE|explain --corpus|freq [N]|oracle|bench-check [hyperfine.json...]|bench-matrix [--report]|release-diff [tag]|stress [n] [seed]|idempotency|ci [--full]>"
+            "usage: cargo xtask <corpus fetch|corpus run [--hashes FILE]|corpus bless|explain FILE|explain --corpus|freq [N]|oracle|bench-check [hyperfine.json...]|bench-compare [--report]|bench-matrix [--report]|release-diff [tag]|stress [n] [seed]|idempotency|ci [--full]>"
                 .into(),
         ),
     };
