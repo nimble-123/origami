@@ -14,8 +14,8 @@ structural error.
 Set origami as the default formatter, for example in your user settings:
 
 ```json
-"[abap]": { "editor.defaultFormatter": "origami-dev.abap-origami" },
-"[acds]": { "editor.defaultFormatter": "origami-dev.abap-origami" },
+"[abap]": { "editor.defaultFormatter": "nimble-123.abap-origami" },
+"[acds]": { "editor.defaultFormatter": "nimble-123.abap-origami" },
 "editor.formatOnSave": true
 ```
 
