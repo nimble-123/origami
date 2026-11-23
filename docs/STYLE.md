@@ -276,10 +276,18 @@ under it, and each keyword's parameters hang behind the keyword, aligned under
 its first parameter. Keywords are never added or removed. The fallback of
 ABAP-CALL-001 applies.
 
+Approved by the maintainer, Nils Lutz, on 2026-11-23: a call with two or more
+parameter keywords is always broken this way, even when it would fit on one
+line (as ABAP Cleaner does). A call with one keyword stays on one line if it
+fits.
+
 ```abap
 lo_service->read( EXPORTING iv_id   = lv_id
                             iv_lang = sy-langu
                   IMPORTING es_data = ls_data ).
+lo_service->read( EXPORTING iv_id = lv_id
+                  IMPORTING es_data = ls_data ).
+lo_service->check( EXPORTING iv_id = lv_id ).
 ```
 
 ### ABAP-ALIGN-001: Align `=` in broken parameter lists (A1)
