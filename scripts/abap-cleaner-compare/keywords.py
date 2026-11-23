@@ -8,7 +8,11 @@ they recognize. A word that ABAP Cleaner upper-cases and origami leaves in
 lower case is a keyword origami's parser does not mark: it keeps its case
 today and would be lower-cased by a rule that re-cases identifiers.
 
-    ABAP_CLEANER_PLUGINS=… python3 scripts/abap-cleaner-compare/keywords.py [--top N]
+    ABAP_CLEANER_PLUGINS=… python3 scripts/abap-cleaner-compare/keywords.py [--upper] [--top N]
+
+With --upper the code is written in upper case instead. Then the count is
+the keywords that origami writes in lower case because it takes them for
+identifiers (ABAP-CASE-002).
 
 Writes target/keyword-gaps.tsv (word, occurrences, files, example line); it
 quotes corpus code, so it stays out of the repository. Prints a summary.
@@ -81,7 +85,12 @@ def pieces(line):
     return out
 
 
+UPPER = "--upper" in sys.argv
+
+
 def lower_code(src):
+    if UPPER:
+        return "\n".join("".join(t.upper() if c else t for c, t in pieces(l)) for l in src.split("\n"))
     return "\n".join("".join(t.lower() if c else t for c, t in pieces(l)) for l in src.split("\n"))
 
 

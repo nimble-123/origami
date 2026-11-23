@@ -231,6 +231,25 @@ lv_tax = mv_total * lv_rate.</code></pre></div>
                <span class="kw">OTHERS</span>    = <span class="num-lit">2</span>.</code></pre></div>
         </div>
       </section>
+      <section class="cmp" id="letter-case" aria-labelledby="letter-case-title">
+        <h3 id="letter-case-title">Letter case</h3>
+        <p>Both write keywords in upper case and identifiers without a lower-case letter in lower case; an identifier in mixed case keeps it. Literals and comments are never changed. The only difference here is the blank line ABAP Cleaner adds after the declarations.</p>
+        <div class="cmp-pane before"><div class="pane-label">Before</div><pre class="sheet code-block" tabindex="0"><code><span class="kw">DATA</span> LV_COUNT <span class="kw">TYPE</span> I.
+<span class="kw">DATA</span> lvOffset <span class="kw">TYPE</span> I <span class="kw">VALUE</span> <span class="num-lit">2</span>.
+LV_COUNT = <span class="kw">LINES</span>( MT_ITEMS ) + lvOffset.
+<span class="kw">MESSAGE</span> <span class="str">|COUNT: { LV_COUNT }|</span> <span class="kw">TYPE</span> <span class="str">&#x27;S&#x27;</span>. <span class="com">&quot; Total</span></code></pre></div>
+        <div class="cmp-pair">
+          <div class="cmp-pane "><div class="pane-label">ABAP Cleaner, layout rules</div><pre class="sheet code-block" tabindex="0"><code><span class="kw">DATA</span> lv_count <span class="kw">TYPE</span> i.
+<span class="kw">DATA</span> lvOffset <span class="kw">TYPE</span> i <span class="kw">VALUE</span> <span class="num-lit">2</span>.
+
+lv_count = lines( mt_items ) + lvOffset.
+<span class="kw">MESSAGE</span> <span class="str">|COUNT: { lv_count }|</span> <span class="kw">TYPE</span> <span class="str">&#x27;S&#x27;</span>. <span class="com">&quot; Total</span></code></pre></div>
+          <div class="cmp-pane ours"><div class="pane-label">origami</div><pre class="sheet code-block" tabindex="0"><code><span class="kw">DATA</span> lv_count <span class="kw">TYPE</span> i.
+<span class="kw">DATA</span> lvOffset <span class="kw">TYPE</span> i <span class="kw">VALUE</span> <span class="num-lit">2</span>.
+lv_count = lines( mt_items ) + lvOffset.
+<span class="kw">MESSAGE</span> <span class="str">|COUNT: { lv_count }|</span> <span class="kw">TYPE</span> <span class="str">&#x27;S&#x27;</span>. <span class="com">&quot; Total</span></code></pre></div>
+        </div>
+      </section>
       <section class="cmp" id="cds-view" aria-labelledby="cds-view-title">
         <h3 id="cds-view-title">CDS view entity</h3>
         <p>Both put each clause of the header and each element on its own line. ABAP Cleaner also aligns <code>as</code> aliases and adds blank lines between sections; origami lines up names after <code>key</code> and keeps single spaces.</p>
@@ -275,9 +294,9 @@ define view entity ZI_Travel
     <section id="rules" class="band" aria-labelledby="rules-title">
       <div class="section-head">
         <h2 id="rules-title">Every ABAP Cleaner rule</h2>
-        <p>ABAP Cleaner 1.29.2 has 100 rules. 53 of them change code, comments or names; origami never does that, it checks its own output token by token. Of the other 47, origami does 11 the same way and covers 23 with its own layout; 13 have no counterpart.</p>
+        <p>ABAP Cleaner 1.29.2 has 100 rules. 53 of them change code, comments or names; origami never does that, it checks its own output token by token. Of the other 47, origami does 12 the same way and covers 22 with its own layout; 13 have no counterpart.</p>
       </div>
-      <ul class="legend"><li><span class="badge yes">Same</span> origami does the same: <strong>11</strong></li><li><span class="badge own">Own layout</span> origami covers this with its own layout: <strong>23</strong></li><li><span class="badge no">No</span> layout rule origami does not have: <strong>13</strong></li><li><span class="badge goal">Not a goal</span> changes code, comments or names, which origami never does: <strong>53</strong></li></ul>
+      <ul class="legend"><li><span class="badge yes">Same</span> origami does the same: <strong>12</strong></li><li><span class="badge own">Own layout</span> origami covers this with its own layout: <strong>22</strong></li><li><span class="badge no">No</span> layout rule origami does not have: <strong>13</strong></li><li><span class="badge goal">Not a goal</span> changes code, comments or names, which origami never does: <strong>53</strong></li></ul>
       <div class="table-wrap" tabindex="0">
         <table class="rules">
           <caption class="sr-only">ABAP Cleaner rules and origami</caption>
@@ -351,7 +370,7 @@ define view entity ZI_Travel
 <tr><td><span class="rule-name">Standardize assertion parameter order</span><code class="rule-id">ASSERT_PARAMETER_ORDER</code></td><td class="num">225</td><td><span class="badge goal">Not a goal</span></td><td></td></tr>
 </tbody>
 <tbody><tr class="group"><th colspan="4" scope="rowgroup">Pretty printer</th></tr>
-<tr><td><span class="rule-name">Convert upper and lower case</span><code class="rule-id">UPPER_AND_LOWER_CASE</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-case-001">ABAP-CASE-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#gen-case-001">GEN-CASE-001</a> Keywords in upper case; identifiers keep their case (ABAP Cleaner lower-cases them unless they are mixed case).</td></tr>
+<tr><td><span class="rule-name">Convert upper and lower case</span><code class="rule-id">UPPER_AND_LOWER_CASE</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-case-001">ABAP-CASE-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-case-002">ABAP-CASE-002</a> Keywords in upper case; identifiers without lower-case letters in lower case, mixed case kept.</td></tr>
 <tr><td><span class="rule-name">Use CamelCase for known CDS names</span><code class="rule-id">CAMEL_CASE_NAME</code></td><td class="num">–</td><td><span class="badge goal">Not a goal</span></td><td>Changes the case of names.</td></tr>
 <tr><td><span class="rule-name">Use CamelCase in test class for CDS view</span><code class="rule-id">CAMEL_CASE_IN_CDS_TEST</code></td><td class="num">–</td><td><span class="badge goal">Not a goal</span></td><td>Changes the case of names.</td></tr>
 <tr><td><span class="rule-name">Indent lines</span><code class="rule-id">INSET</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-block-001">ABAP-BLOCK-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-class-001">ABAP-CLASS-001</a></td></tr>

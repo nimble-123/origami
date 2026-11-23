@@ -63,7 +63,12 @@ EXAMPLES = [
      "Same structure, two details: origami indents the parameter groups by "
      "four spaces, ABAP Cleaner by two and also aligns the keywords and "
      "<code>=</code> signs across groups."),
-    ("08-cds-view.asddls", "CDS view entity",
+    ("08-letter-case.abap", "Letter case",
+     "Both write keywords in upper case and identifiers without a lower-case "
+     "letter in lower case; an identifier in mixed case keeps it. Literals and "
+     "comments are never changed. The only difference here is the blank line "
+     "ABAP Cleaner adds after the declarations."),
+    ("09-cds-view.asddls", "CDS view entity",
      "Both put each clause of the header and each element on its own line. "
      "ABAP Cleaner also aligns <code>as</code> aliases and adds blank lines "
      "between sections; origami lines up names after <code>key</code> and "
@@ -92,8 +97,8 @@ MAP = {
         "One space before an end-of-line comment; the comment text is never changed."),
     "NEEDLESS_SPACES": ("yes", ["ABAP-COMMENT-002"],
         "Single spaces between tokens; hand-aligned end-of-line comments are not kept."),
-    "UPPER_AND_LOWER_CASE": ("own", ["ABAP-CASE-001", "GEN-CASE-001"],
-        "Keywords in upper case; identifiers keep their case (ABAP Cleaner lower-cases them unless they are mixed case)."),
+    "UPPER_AND_LOWER_CASE": ("yes", ["ABAP-CASE-001", "ABAP-CASE-002"],
+        "Keywords in upper case; identifiers without lower-case letters in lower case, mixed case kept."),
     "INSET": ("yes", ["ABAP-BLOCK-001", "ABAP-CLASS-001"], ""),
     "ALIGN_ABAP_DOC": ("no", [], "ABAP Doc comments are copied as written."),
     "ALIGN_METHODS_DECLARATION": ("own", ["ABAP-METHODS-001"],
