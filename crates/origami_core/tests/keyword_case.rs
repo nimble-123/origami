@@ -334,13 +334,20 @@ ENDLOOP.
         (
             r#"select carrid, cast( fltime as char( 6 ) ) as t from spfli into table @data(t).
 "#,
-            r#"SELECT carrid, CAST( fltime AS CHAR( 6 ) ) AS t FROM spfli INTO TABLE @DATA(t).
+            r#"SELECT carrid,
+       CAST( fltime AS CHAR( 6 ) ) AS t
+    FROM spfli
+    INTO TABLE @DATA(t).
 "#,
         ),
         (
             r#"select carrid, max( price ) as max_price from sflight group by carrid into table @data(t).
 "#,
-            r#"SELECT carrid, MAX( price ) AS max_price FROM sflight GROUP BY carrid INTO TABLE @DATA(t).
+            r#"SELECT carrid,
+       MAX( price ) AS max_price
+    FROM sflight
+    GROUP BY carrid
+    INTO TABLE @DATA(t).
 "#,
         ),
         (
@@ -352,7 +359,10 @@ ENDLOOP.
         (
             r#"select carrid, case when price > 100 then @abap_true else @abap_false end as high from sflight into table @data(t).
 "#,
-            r#"SELECT carrid, CASE WHEN price > 100 THEN @abap_true ELSE @abap_false END AS high FROM sflight INTO TABLE @DATA(t).
+            r#"SELECT carrid,
+       CASE WHEN price > 100 THEN @abap_true ELSE @abap_false END AS high
+    FROM sflight
+    INTO TABLE @DATA(t).
 "#,
         ),
         (
@@ -634,7 +644,8 @@ fn rarer_statements() {
     from sflight
     into table @data(t).
 "#,
-            r#"SELECT carrid, SUM( price ) OVER( PARTITION BY carrid ORDER BY fldate ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) AS s
+            r#"SELECT carrid,
+       SUM( price ) OVER( PARTITION BY carrid ORDER BY fldate ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) AS s
     FROM sflight
     INTO TABLE @DATA(t).
 "#,

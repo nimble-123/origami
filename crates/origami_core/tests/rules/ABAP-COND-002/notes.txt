@@ -1,0 +1,6 @@
+2: ABAP-COND-002: each WHEN branch on its own line, because the conditional expression would end at column 207 (limit 120)
+5: ABAP-COND-002: each WHEN branch on its own line
+7: ABAP-COND-002: each WHEN branch on its own line
+10: ABAP-COND-002: each WHEN branch on its own line
+15: ABAP-COND-002: each WHEN branch on its own line
+15: ABAP-COND-002: each WHEN branch on its own line, because the line would end at column 124 (limit 120)

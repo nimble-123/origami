@@ -136,15 +136,20 @@ pub fn layout(
     explain: bool,
 ) -> Laid {
     let mut commented = vec![false; stream.tokens.len() + 1];
+    let mut eol_commented = vec![false; stream.tokens.len() + 1];
     for t in &stream.trivia {
-        if t.is_comment() && t.position == TriviaPosition::Leading {
-            commented[t.anchor.0 as usize] = true;
+        if t.is_comment() {
+            match t.position {
+                TriviaPosition::Leading => commented[t.anchor.0 as usize] = true,
+                TriviaPosition::Trailing => eol_commented[t.anchor.0 as usize] = true,
+            }
         }
     }
     let mut ctx = Ctx {
         text,
         stream,
         commented: &commented,
+        eol_commented: &eol_commented,
         keywords: Vec::new(),
         explain,
         rule_spans: Vec::new(),

@@ -39,9 +39,9 @@ Approved by the maintainer, Nils Lutz, on 2026-11-22, together with the
 origami introduces, one note per broken construct and cause. A break that was
 already in the input gets no note. A note names its cause:
 
-* **Width:** the construct (or the line that holds its end) would end past
-  the line width; the note gives the column it would end at, measured with
-  the construct printed on one line.
+* **Width:** the construct (or the line that holds its end, or its widest
+  line) would end past the line width; the note gives the column it would
+  end at, measured with the construct printed on one line.
 * **Rule:** the rule always breaks there (for example ABAP-STMT-001).
 * **Comment:** an end-of-line comment inside the construct forces the break.
 
@@ -638,6 +638,58 @@ A condition that does not fit breaks before `AND` and `OR` at the outermost
 level, at the continuation indent. Parenthesized sub-conditions stay flat when
 they fit.
 
+### ABAP-COND-002: COND and SWITCH expressions
+Milestone: M4
+Explanation: each WHEN branch on its own line
+
+Approved by the maintainer, Nils Lutz, on 2026-11-23 (ABAP Cleaner
+"Align conditional expressions" with its default options). A `COND` or
+`SWITCH` body hangs behind `#(` (or `type(`), with the fallback of
+ABAP-CALL-001. `LET … IN` and the `SWITCH` operand come first; when the
+expression breaks, the `WHEN` lines follow below them, aligned.
+
+* **One `WHEN`:** on one line if it fits, else `WHEN`, `THEN` and `ELSE`
+  below each other.
+* **Several `WHEN` (tabular):** always one `WHEN … THEN …` per line, even if
+  the whole expression would fit on one line; `THEN` and the values are
+  aligned, and the `ELSE` value lines up with the `THEN` values.
+* **Complex:** if a line of the tabular layout does not fit, `THEN` ends the
+  `WHEN` line and each value goes on its own line, one level deeper than
+  `WHEN`; `ELSE` gets its own line too.
+
+A condition that breaks follows ABAP-COND-001 at the continuation indent of
+its `WHEN`. `THROW` is a value like any other. A body the parser does not
+understand keeps its line breaks.
+
+```abap
+lv_sign = COND #( WHEN iv_negative = abap_true THEN -1 ELSE 1 ).
+lv_currency = COND #( WHEN ls_amounts-betrw <> 0 THEN ls_amounts-waers
+                      WHEN ls_amounts-betr2 <> 0 THEN ls_amounts-hwae2
+                      ELSE                            gc_default_currency ).
+lv_text = SWITCH string( sy-index
+                         WHEN 1 THEN 'one'
+                         WHEN 2 THEN 'two'
+                         ELSE        THROW cx_overflow( ) ).
+lv_label = COND #( WHEN io_object->get_sub_object( )->get_number( ) <= if_object_boundaries=>co_maximum_number THEN
+                     io_object->get_sub_object( )->get_number( )
+                   WHEN io_object->is_empty( ) THEN
+                     `empty`
+                   ELSE
+                     if_object_boundaries=>co_maximum_number ).
+```
+
+Deviations from ABAP Cleaner, so that the output depends only on the code
+and stays within the line width:
+
+* A `COND` with one `WHEN` that fits is joined onto one line; ABAP Cleaner
+  keeps it on one line only if it was written that way.
+* The tabular layout is used only if every line fits, the `ELSE` line
+  included; ABAP Cleaner sometimes keeps it with a longer `ELSE` line.
+* A comment or a nested `COND`/`SWITCH` inside a `WHEN` condition rules out
+  the tabular layout (ABAP Cleaner aligns around the comment).
+* Values are indented one level (`indent`, default 2 spaces) instead of
+  always 2 spaces.
+
 ### ABAP-SQL-001: ABAP SQL
 Milestone: M1
 Explanation: each clause on its own line
@@ -684,12 +736,60 @@ ABAP-SQL-001.
 ```abap
 WITH +carriers AS ( SELECT carrid, carrname FROM scarr ),
      +seats AS (
-       SELECT carrid, connid, SUM( seatsocc ) AS seats
+       SELECT carrid,
+              connid,
+              SUM( seatsocc ) AS seats
            FROM sflight
            GROUP BY carrid, connid
      )
 SELECT * FROM +seats INTO TABLE @DATA(result).
 ```
+
+### ABAP-SQL-003: Field lists
+Milestone: M4
+Explanation: one field per line
+
+Approved by the maintainer, Nils Lutz, on 2026-11-23 (ABAP Cleaner
+"Align SELECT lists", without "derive from majority"). This applies to the
+field lists after `SELECT` (behind `SINGLE`, `DISTINCT`, …), `FIELDS`,
+`GROUP BY` and `ORDER BY`, and to `INTO ( … )`, in `SELECT`, `WITH` and
+`OPEN CURSOR` and in subqueries.
+
+* A list with a complex field always has one field per line, aligned under
+  the first field, and the `AS` of its aliases aligned. A field is complex
+  when it has an alias (`AS`) or, in `ORDER BY`, `ASCENDING`, `DESCENDING`
+  or `NULLS …` (not aligned), or when it is more than one name: a function
+  or expression (`SUM( x )`, `@( … )`, `CASE … END`, `a + b`) or a column
+  with a table alias (`tabalias~col`, `tabalias~*`). Names, literals, host
+  variables (`@lv_x`, `@ls_s-comp`) and paths (`\_assoc-field`) are simple.
+* A list with simple fields only stays on one line if it fits, otherwise it
+  has one field per line, aligned under the first field. The targets of
+  `INTO ( … )` are always treated this way.
+
+A list on several lines breaks the statement: every clause starts its own
+line (ABAP-SQL-001). Without commas (classic syntax) every operand is a
+field. A comment inside a field keeps the single space before `AS`.
+
+```abap
+SELECT carrid, connid, fldate FROM sflight INTO TABLE @DATA(lt_flights).
+SELECT t1~carrid,
+       t1~connid          AS connection,
+       SUM( t2~seatsocc ) AS seats
+    FROM spfli AS t1
+    INNER JOIN sflight AS t2 ON t1~carrid = t2~carrid
+    GROUP BY t1~carrid,
+             t1~connid
+    ORDER BY t1~carrid DESCENDING,
+             t1~connid
+    INTO TABLE @DATA(lt_seats).
+```
+
+Deviations from ABAP Cleaner: a list of simple fields that does not fit
+gets one field per line (ABAP Cleaner's "one line" style wraps it at the
+line width instead), a `SELECT` written on one line is formatted like
+any other (ABAP Cleaner leaves it alone), and a space before a comma inside
+`INTO ( … )` stays, as for every comma inside brackets (ABAP-SPACE-001;
+ABAP Cleaner removes it).
 ### ABAP-COMMENT-002: End-of-line comments
 Milestone: M1
 

@@ -1049,7 +1049,9 @@ impl<'c, 'a> Printer<'c, 'a> {
 
         let seed = self.out[line_start..].to_string();
         let start = seed.len();
-        let start_col = self.column();
+        // Characters already on the line; pending indentation is written by
+        // the trial itself, so it must not be counted here too.
+        let start_col = self.col;
         let mut trial = Printer {
             ctx: self.ctx,
             out: seed,

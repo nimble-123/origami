@@ -197,6 +197,20 @@ fn choice_takes_the_second_doc_when_the_first_overflows() {
 }
 
 #[test]
+fn choice_after_a_line_break_counts_the_indentation_once() {
+    // `yyyy z` at indent 2 ends at column 8: the first doc fits.
+    let out = render("x yyyy z", 8, |ts| {
+        let first = b::concat(vec![t(1), b::sep(ts, TokenIndex(2)), t(2)]);
+        let second = b::concat(vec![t(1), b::hard(ts, TokenIndex(2)), t(2)]);
+        b::concat(vec![
+            t(0),
+            b::indent(vec![b::hard(ts, TokenIndex(1)), b::choice(first, second)]),
+        ])
+    });
+    assert_eq!(out, "x\n  yyyy z\n");
+}
+
+#[test]
 fn fill_breaks_only_before_parts_that_do_not_fit() {
     let out = render("head aa bbbbbbbbbb cc", 14, |ts| {
         b::concat(vec![
