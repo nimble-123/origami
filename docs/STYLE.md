@@ -134,9 +134,23 @@ configured case (default upper). This includes constructor operators (`VALUE`,
 (`lines( )`, `xsdbool( )`), built-in types (`i`, `string`), `me`, `abap_true`,
 literals and comments keep their case.
 
+Approved by the maintainer, Nils Lutz, on 2026-11-23: a keyword is
+upper-cased wherever it stands in a recognized statement, as ABAP Cleaner
+does. This includes the words of RAP derived types (`TYPE TABLE FOR READ
+RESULT`, `TYPE RESPONSE FOR MAPPED LATE`), inline `FIELD-SYMBOL( )`,
+`OTHERS` in `WHEN OTHERS` and `EXCEPTIONS`, logical expressions inside
+function arguments and constructor bodies, table keys (`[ KEY k COMPONENTS …
+]`), format options of string templates (`{ d DATE = ISO }`), text symbols
+with a numeric ID (`TEXT-001`), and in ABAP SQL the aggregate functions
+(`COUNT( )`, `SUM( )`, `MIN( )`, `MAX( )`, `AVG( )`) and `CAST( … AS CHAR( n )
+)`. Other SQL functions (`length( )`, `substring( )`) are built-in functions
+and keep their case.
+
 ```abap
 before: data(lv_count) = lines( mt_items ).
 after:  DATA(lv_count) = lines( mt_items ).
+before: loop at mt_items assigning field-symbol(<ls_item>) where status is initial.
+after:  LOOP AT mt_items ASSIGNING FIELD-SYMBOL(<ls_item>) WHERE status IS INITIAL.
 ```
 
 ### ABAP-STMT-001: One statement per line
@@ -276,10 +290,18 @@ under it, and each keyword's parameters hang behind the keyword, aligned under
 its first parameter. Keywords are never added or removed. The fallback of
 ABAP-CALL-001 applies.
 
+Approved by the maintainer, Nils Lutz, on 2026-11-23: a call with two or more
+parameter keywords is always broken this way, even when it would fit on one
+line (as ABAP Cleaner does). A call with one keyword stays on one line if it
+fits.
+
 ```abap
 lo_service->read( EXPORTING iv_id   = lv_id
                             iv_lang = sy-langu
                   IMPORTING es_data = ls_data ).
+lo_service->read( EXPORTING iv_id = lv_id
+                  IMPORTING es_data = ls_data ).
+lo_service->check( EXPORTING iv_id = lv_id ).
 ```
 
 ### ABAP-ALIGN-001: Align `=` in broken parameter lists (A1)
