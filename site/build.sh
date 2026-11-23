@@ -10,7 +10,7 @@ rustup target add wasm32-unknown-unknown >/dev/null 2>&1 || true
 cargo build --release -p origami_wasm --target wasm32-unknown-unknown
 rm -rf site/dist
 mkdir -p site/dist/assets
-cp site/index.html site/abap-cleaner.html site/style.css site/app.js site/dist/
+cp site/index.html site/abap-cleaner.html site/style.css site/app.js site/worker.js site/dist/
 cp target/wasm32-unknown-unknown/release/origami_wasm.wasm site/dist/origami.wasm
 for f in logo logo-dark pipeline pipeline-dark benchmark benchmark-dark latency latency-dark review-demo review-demo-dark; do
   cp "docs/assets/$f.svg" site/dist/assets/
