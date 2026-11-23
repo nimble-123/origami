@@ -134,11 +134,12 @@ def main():
         shutil.copytree(low, ori, dirs_exist_ok=True)
         run = subprocess.run([str(ORIGAMI), "--no-config", "--diagnostics", "json", str(ori)],
                              capture_output=True, text=True)
-        # Lines of statements without grammar (W003), which keep their case.
+        # Lines of statements without grammar (W003) and units left as written
+        # (W002), which keep their case.
         w003 = collections.defaultdict(set)
         for f in json.loads(run.stderr)["files"]:
             for d in f["diagnostics"]:
-                if d["code"] == "W003":
+                if d["code"] in ("W002", "W003"):
                     r = d["range"]
                     w003[Path(f["path"]).name].update(range(r["start"]["line"] - 1, r["end"]["line"]))
         lst = tmp / "files.txt"
@@ -182,7 +183,7 @@ def main():
         f"{w}\t{k}\t{len(gap_files[w])}\t{examples[w]}" for w, k in gaps.most_common()]
     (ROOT / "target" / "keyword-gaps.tsv").write_text("\n".join(rows) + "\n")
     print(f"{compared} of {len(files)} files compared")
-    print(f"not counted: {skipped['W003']} in statements without grammar (W003), "
+    print(f"not counted: {skipped['W003']} in statements without grammar or left as written (W003, W002), "
           f"{skipped['embedded']} in macros, AMDP and EXEC SQL (copied as written)")
     print(f"keywords of recognized statements that origami leaves as written: "
           f"{sum(gaps.values())} occurrences of {len(gaps)} words")
