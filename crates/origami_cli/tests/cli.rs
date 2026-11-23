@@ -911,3 +911,264 @@ fn mcp_format_files_stays_below_the_working_directory() {
         "lv_b = 2.\n"
     );
 }
+
+#[test]
+fn usage_errors_follow_the_diagnostics_format() {
+    let out = origami()
+        .args(["--diagnostics", "json", "--bogus"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    let doc = json_of(&out.stderr);
+    validate(&doc);
+    assert_eq!(doc["files"][0]["path"], "<args>");
+    assert_eq!(doc["files"][0]["diagnostics"][0]["code"], "E021");
+    let msg = doc["files"][0]["diagnostics"][0]["message"]
+        .as_str()
+        .unwrap();
+    assert!(msg.contains("--bogus"), "{msg}");
+    // From the environment.
+    let out = origami()
+        .env("ORIGAMI_DIAGNOSTICS", "json")
+        .args(["--line-width", "abc"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    assert_eq!(
+        json_of(&out.stderr)["files"][0]["diagnostics"][0]["code"],
+        "E021"
+    );
+    // Human output stays clap's own.
+    let out = origami().arg("--bogus").output().unwrap();
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Usage:"));
+}
+
+#[test]
+fn bad_option_flags_name_the_flag() {
+    let d = dir();
+    write(d.path(), "origami.toml", "line_width = 100\n");
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--stdin", "--language", "abap", "--line-width", "10"])
+        .args(["--diagnostics", "agent"])
+        .write_stdin("REPORT z.\n")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("ERROR <args>:1:1 E020 --line-width 10"),
+        "{err}"
+    );
+    assert!(
+        err.contains("Fix the flag value on the command line."),
+        "{err}"
+    );
+    assert!(!err.contains("origami.toml"), "{err}");
+}
+
+#[test]
+fn toml_errors_are_reported_where_they_are() {
+    let d = dir();
+    write(d.path(), "origami.toml", "line_width = 100\n\nfoo = [\n");
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--stdin", "--language", "abap", "--diagnostics", "json"])
+        .write_stdin("REPORT z.\n")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    let doc = json_of(&out.stderr);
+    validate(&doc);
+    let d0 = &doc["files"][0]["diagnostics"][0];
+    assert_eq!(d0["code"], "E020");
+    assert_eq!(d0["range"]["start"]["line"], 3);
+    assert_eq!(d0["range"]["start"]["column"], 8);
+}
+
+#[test]
+fn invalid_utf8_is_reported_at_the_first_bad_byte() {
+    let out = origami()
+        .args(["--stdin", "--language", "abap", "--diagnostics", "json"])
+        .write_stdin(&b"\xEF\xBB\xBFREPORT z.\r\nWRITE '\xC3\xA4\xFF'.\n"[..])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let doc = json_of(&out.stderr);
+    validate(&doc);
+    let d0 = &doc["files"][0]["diagnostics"][0];
+    assert_eq!(d0["code"], "E005");
+    // Line 2, after `WRITE 'ä`; the offset counts LF line breaks, no BOM.
+    assert_eq!(d0["range"]["start"]["line"], 2);
+    assert_eq!(d0["range"]["start"]["column"], 9);
+    assert_eq!(d0["range"]["start"]["offset"], 19);
+}
+
+/// Runs `origami --mcp` on the messages and returns the replies.
+fn mcp_session(cwd: &Path, env: &[(&str, &str)], messages: &[String]) -> Vec<serde_json::Value> {
+    let mut cmd = origami();
+    cmd.current_dir(cwd).arg("--mcp");
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    let out = cmd
+        .write_stdin(messages.join("\n"))
+        .timeout(std::time::Duration::from_secs(60))
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    String::from_utf8(out.stdout)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect()
+}
+
+fn tool_call(id: u32, name: &str, arguments: serde_json::Value) -> String {
+    serde_json::json!({"jsonrpc": "2.0", "id": id, "method": "tools/call",
+        "params": {"name": name, "arguments": arguments}})
+    .to_string()
+}
+
+#[test]
+fn mcp_rejects_bad_line_ranges() {
+    let d = dir();
+    let call = |id, lines| {
+        tool_call(
+            id,
+            "format",
+            serde_json::json!({"source": "x   =   1.\n", "language": "abap", "lines": lines}),
+        )
+    };
+    let replies = mcp_session(
+        d.path(),
+        &[],
+        &[
+            call(
+                1,
+                serde_json::json!([[4_294_967_297_u64, 4_294_967_298_u64]]),
+            ),
+            call(2, serde_json::json!([[0, 1]])),
+            call(3, serde_json::json!([[2, 1]])),
+            call(4, serde_json::json!([[1, 1]])),
+        ],
+    );
+    for r in &replies[..3] {
+        assert_eq!(r["error"]["code"], -32602, "{r}");
+    }
+    assert_eq!(replies[3]["result"]["content"][0]["text"], "x = 1.\n");
+}
+
+#[test]
+fn mcp_rejects_too_long_messages_and_keeps_serving() {
+    let d = dir();
+    let big = tool_call(
+        7,
+        "format",
+        serde_json::json!({"source": "x".repeat(17 * 1024 * 1024)}),
+    );
+    let ping = r#"{"jsonrpc":"2.0","id":8,"method":"ping"}"#.to_string();
+    let replies = mcp_session(d.path(), &[], &[big, ping]);
+    assert_eq!(replies.len(), 2);
+    assert_eq!(replies[0]["id"], 7);
+    assert_eq!(replies[0]["error"]["code"], -32600);
+    assert!(
+        replies[0]["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("16 MiB")
+    );
+    assert_eq!(replies[1]["id"], 8);
+}
+
+#[test]
+fn mcp_tool_calls_time_out() {
+    let d = dir();
+    let replies = mcp_session(
+        d.path(),
+        &[("ORIGAMI_MCP_TIMEOUT", "0")],
+        &[tool_call(
+            1,
+            "format",
+            serde_json::json!({"source": "x = 1.\n"}),
+        )],
+    );
+    assert_eq!(replies[0]["id"], 1);
+    assert_eq!(replies[0]["error"]["code"], -32001, "{}", replies[0]);
+}
+
+/// A call that blocks on a named pipe: cancelled, or timed out, while the
+/// server keeps answering.
+#[cfg(unix)]
+#[test]
+fn mcp_blocked_calls_can_be_cancelled_and_time_out() {
+    let d = dir();
+    let fifo = d.path().join("z.prog.abap");
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let blocked = |id| {
+        tool_call(
+            id,
+            "format_files",
+            serde_json::json!({"paths": ["z.prog.abap"]}),
+        )
+    };
+    let ping = |id: u32| format!(r#"{{"jsonrpc":"2.0","id":{id},"method":"ping"}}"#);
+    let cancel = r#"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1}}"#;
+    // Cancelled: no reply for it.
+    let replies = mcp_session(d.path(), &[], &[blocked(1), cancel.to_string(), ping(2)]);
+    assert_eq!(replies.len(), 1, "{replies:?}");
+    assert_eq!(replies[0]["id"], 2);
+    // Timed out: an error, after the ping that came in meanwhile.
+    let replies = mcp_session(
+        d.path(),
+        &[("ORIGAMI_MCP_TIMEOUT", "0.3")],
+        &[blocked(1), ping(2)],
+    );
+    assert_eq!(replies.len(), 2, "{replies:?}");
+    assert_eq!(replies[0]["id"], 2);
+    assert_eq!(replies[1]["id"], 1);
+    assert_eq!(replies[1]["error"]["code"], -32001);
+}
+
+#[test]
+fn mcp_format_files_caps_the_result() {
+    let d = dir();
+    // 40 files with a diff of about 4 KB each: more than the budget.
+    let source: String = (0..100).map(|i| format!("lv_{i}   =   {i}.\n")).collect();
+    for i in 0..40 {
+        write(d.path(), &format!("src/z{i:02}.prog.abap"), &source);
+    }
+    let replies = mcp_session(
+        d.path(),
+        &[],
+        &[tool_call(
+            1,
+            "format_files",
+            serde_json::json!({"paths": ["src"]}),
+        )],
+    );
+    let r = &replies[0]["result"];
+    let s = &r["structuredContent"];
+    assert_eq!(s["changed"], 40);
+    assert_eq!(s["truncated"], true);
+    let files = s["files"].as_array().unwrap();
+    assert_eq!(files.len() + s["omitted"].as_u64().unwrap() as usize, 40);
+    assert!(files[0].get("diff").is_some());
+    assert_eq!(files.last().unwrap()["diff_omitted"], true);
+    let text = r["content"][0]["text"].as_str().unwrap();
+    assert!(
+        text.starts_with("40 file(s) processed, 40 would change"),
+        "{text}"
+    );
+    assert!(
+        text.contains("call format_files again with `paths`"),
+        "{text}"
+    );
+    assert!(replies[0].to_string().len() < 160 * 1024);
+}

@@ -79,11 +79,29 @@ write `--changed=REF path…` or put the paths first (`origami src/
 | Tool | Arguments | Result |
 |---|---|---|
 | `format` | `source`, optional `filename`, `language`, `lines` (`[[start, end]]`) | formatted text; `structuredContent`: `source`, `changed`, `status`, `diagnostics`. A structural error returns `isError: true` and the diagnostics. |
-| `format_files` | optional `paths`, `write` (default false), `changed` (git revision) | summary and unified diffs; `structuredContent.files`: per file `path`, `status`, `changed`, `diagnostics`, `diff` |
+| `format_files` | optional `paths`, `write` (default false), `changed` (git revision) | summary and unified diffs; `structuredContent.files`: per file `path`, `status`, `changed`, `diagnostics`, `diff` (or `diff_omitted: true`); `truncated` and `omitted` when the result was shortened |
 
 Configuration discovery, the self-check and the diagnostic codes are the same
 as on the command line. Nothing is written unless `format_files` gets
 `"write": true`.
+
+Limits:
+
+* A message may be at most 16 MiB long (one line); a longer one gets the
+  JSON-RPC error -32600 and the server reads on.
+* `lines` must be pairs `[start, end]` with 1 <= start <= end <= 2^32 - 1;
+  anything else is the JSON-RPC error -32602 (invalid params).
+* Tool calls run one at a time, each with a deadline of 30 s
+  (`ORIGAMI_MCP_TIMEOUT` sets it in seconds). A call that misses it gets the
+  JSON-RPC error -32001 and is cancelled; with `"write": true`, files
+  already rewritten stay rewritten. Other requests (`ping`, `tools/list`)
+  are answered while a call runs. `notifications/cancelled` cancels a call;
+  it then gets no reply.
+* A `format_files` result carries about 100 KB of file entries and diffs.
+  Beyond that, the remaining changed files are listed with
+  `diff_omitted: true`, then not at all (`omitted` counts them);
+  `truncated` is true and the text says to call again with fewer `paths`.
+  The counts (`changed`, `errors`) always cover every file.
 
 `format_files` works only below the server's working directory. A path that
 resolves outside it (absolute, through `..`, or through a symbolic link) makes
@@ -147,7 +165,12 @@ zcl_travel.clas.abap  (1 change, 1 note)
 
 In a multi-file run every file is processed, and the highest code in this order
 wins: **70 > 4 > 3 > 2 > 5 > 1 > 0**. Configuration and usage errors (E020,
-E021) abort before any file is processed.
+E021) abort before any file is processed. A usage error found while parsing
+the command line is reported in the requested diagnostics format
+(`--diagnostics` or `ORIGAMI_DIAGNOSTICS`); with human output it is the
+parser's own message. A panic outside a file's formatting (option handling,
+reporting, the MCP server) ends the run with exit 70 and one X002 diagnostic
+for the path `<internal>`.
 
 | Code | Meaning |
 |---|---|

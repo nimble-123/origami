@@ -1,10 +1,10 @@
 //! Config discovery and merging: defaults, then `origami.toml`, then flags.
 
 use crate::args::{Args, CaseArg};
-use origami_core::{Case, Code, Edition, Options};
+use origami_core::{Case, Code, Edition, Options, Position};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 
 pub const FILE_NAME: &str = "origami.toml";
 
@@ -25,6 +25,10 @@ pub struct ConfigIssue {
     pub code: Code,
     pub path: PathBuf,
     pub message: String,
+    /// Where in the config file, if known (else line 1, column 1).
+    pub at: Option<Position>,
+    /// The config text, for a code frame.
+    pub source: Option<String>,
 }
 
 pub fn parse(text: &str, path: &Path) -> Result<FileConfig, ConfigIssue> {
@@ -32,10 +36,14 @@ pub fn parse(text: &str, path: &Path) -> Result<FileConfig, ConfigIssue> {
         code: Code::E020,
         path: path.to_path_buf(),
         message: m,
+        at: None,
+        source: None,
     };
-    let table: toml::Table = text
-        .parse()
-        .map_err(|e| issue(format!("Invalid TOML: {e}")))?;
+    let table: toml::Table = text.parse().map_err(|e: toml::de::Error| ConfigIssue {
+        at: e.span().map(|s| crate::report::position(text, s.start)),
+        source: Some(text.to_string()),
+        ..issue(format!("Invalid TOML: {}", e.message().trim_end()))
+    })?;
     let mut c = FileConfig::default();
     for (k, v) in &table {
         let wrong = |t: &str| issue(format!("`{k}` must be {t}"));
@@ -88,6 +96,8 @@ pub fn options(file: &FileConfig, args: &Args, path: &Path) -> Result<Options, C
         code: Code::E020,
         path: path.to_path_buf(),
         message: m,
+        at: None,
+        source: None,
     };
     let mut o = Options::default();
     if let Some(e) = &file.style_edition {
@@ -128,6 +138,25 @@ pub fn options(file: &FileConfig, args: &Args, path: &Path) -> Result<Options, C
     Ok(o)
 }
 
+/// Checks the option flags on their own, so that an error names the flag.
+pub fn check_flags(args: &Args) -> Result<(), String> {
+    let check = |flag: &str, value: String, set: &dyn Fn(&mut Options)| {
+        let mut o = Options::default();
+        set(&mut o);
+        o.validate()
+            .map_err(|d| format!("{flag} {value} is out of range ({})", d.message))
+    };
+    if let Some(w) = args.line_width {
+        check("--line-width", w.to_string(), &|o| o.lang.line_width = w)?;
+    }
+    if let Some(i) = args.indent_width {
+        check("--indent-width", i.to_string(), &|o| {
+            o.lang.indent_width = i
+        })?;
+    }
+    Ok(())
+}
+
 pub fn apply_flags(o: &mut Options, args: &Args) {
     if let Some(w) = args.line_width {
         o.lang.line_width = w;
@@ -156,7 +185,12 @@ impl Resolver {
     /// Walks up from `dir`, checking each directory including the one that
     /// contains `.git`, and stops after it.
     pub fn discover(&self, dir: &Path) -> Option<PathBuf> {
-        if let Some(hit) = self.by_dir.lock().expect("lock").get(dir) {
+        if let Some(hit) = self
+            .by_dir
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(dir)
+        {
             return hit.clone();
         }
         let mut found = None;
@@ -174,7 +208,7 @@ impl Resolver {
         }
         self.by_dir
             .lock()
-            .expect("lock")
+            .unwrap_or_else(PoisonError::into_inner)
             .insert(dir.to_path_buf(), found.clone());
         found
     }

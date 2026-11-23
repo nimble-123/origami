@@ -49,7 +49,11 @@ fn line(prefix: &str, f: &FileReport, d: &Reported) -> String {
         d.message.trim_end_matches('.')
     );
     s.push('.');
-    let h = hint(d.code);
+    let h = match d.code {
+        // The value came from a flag, not from origami.toml.
+        Code::E020 if f.path == "<args>" => "Fix the flag value on the command line.",
+        code => hint(code),
+    };
     if !h.is_empty() {
         s.push(' ');
         s.push_str(h);
