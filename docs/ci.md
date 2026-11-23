@@ -89,8 +89,8 @@ cargo install --locked abap-origami   # once v1.0 is on crates.io
 origami --check
 ```
 
+<!-- x-release-please-end -->
+
 The JSON diagnostics (`--diagnostics json`, on stderr) follow
 [schemas/diagnostics.v1.json](../schemas/diagnostics.v1.json);
-`--diagnostics sarif` produces SARIF 0.2.0 for tools that read it.
-
-<!-- x-release-please-end -->
+`--diagnostics sarif` produces SARIF 2.1.0 for tools that read it.
