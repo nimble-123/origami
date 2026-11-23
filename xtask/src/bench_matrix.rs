@@ -30,7 +30,7 @@ use std::process::{Command, Stdio};
 use std::time::Instant;
 
 /// Nearest-rank percentile of sorted values.
-fn pct(sorted: &[f64], p: f64) -> f64 {
+pub(crate) fn pct(sorted: &[f64], p: f64) -> f64 {
     if sorted.is_empty() {
         return f64::NAN;
     }
@@ -39,7 +39,7 @@ fn pct(sorted: &[f64], p: f64) -> f64 {
 }
 
 /// p50, p95, p99, max and mean (milliseconds) of samples in milliseconds.
-fn summary(mut v: Vec<f64>) -> Value {
+pub(crate) fn summary(mut v: Vec<f64>) -> Value {
     v.sort_by(|a, b| a.total_cmp(b));
     let mean = v.iter().sum::<f64>() / v.len().max(1) as f64;
     json!({
@@ -52,22 +52,22 @@ fn summary(mut v: Vec<f64>) -> Value {
     })
 }
 
-fn round(x: f64) -> f64 {
+pub(crate) fn round(x: f64) -> f64 {
     (x * 1000.0).round() / 1000.0
 }
 
-fn ms(since: Instant) -> f64 {
+pub(crate) fn ms(since: Instant) -> f64 {
     since.elapsed().as_secs_f64() * 1000.0
 }
 
-struct Source {
-    path: PathBuf,
-    bytes: Vec<u8>,
-    lines: usize,
-    abap: bool,
+pub(crate) struct Source {
+    pub(crate) path: PathBuf,
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) lines: usize,
+    pub(crate) abap: bool,
 }
 
-fn sources() -> Result<Vec<Source>, String> {
+pub(crate) fn sources() -> Result<Vec<Source>, String> {
     let m = manifest()?;
     let mut out = Vec::new();
     for r in &m.repo {
@@ -89,7 +89,7 @@ fn sources() -> Result<Vec<Source>, String> {
     Ok(out)
 }
 
-fn binary() -> Result<PathBuf, String> {
+pub(crate) fn binary() -> Result<PathBuf, String> {
     let b = root().join("target/release/origami");
     if b.is_file() {
         Ok(b)
@@ -98,23 +98,36 @@ fn binary() -> Result<PathBuf, String> {
     }
 }
 
+/// `format` in process, per source: the median of three runs, in ms.
+pub(crate) fn format_times(src: &[Source]) -> Vec<f64> {
+    let opts = Options::default();
+    src.iter()
+        .map(|s| {
+            let hint = LanguageHint::Path(s.path.to_string_lossy().into_owned());
+            let mut runs = [0.0; 3];
+            for r in &mut runs {
+                let t = Instant::now();
+                std::hint::black_box(format(&s.bytes, &hint, &opts));
+                *r = ms(t);
+            }
+            runs.sort_by(|a, b| a.total_cmp(b));
+            runs[1]
+        })
+        .collect()
+}
+
 /// Per file in process: the median of three runs per file.
 fn in_process(src: &[Source]) -> (Value, Value, Value) {
     let opts = Options::default();
-    let mut f = Vec::new();
+    let f = format_times(src);
+    let per_line = f
+        .iter()
+        .zip(src)
+        .map(|(t, s)| t * 1000.0 / s.lines.max(1) as f64)
+        .collect();
     let mut e = Vec::new();
-    let mut per_line = Vec::new();
     for s in src {
         let hint = LanguageHint::Path(s.path.to_string_lossy().into_owned());
-        let mut runs = [0.0; 3];
-        for r in &mut runs {
-            let t = Instant::now();
-            std::hint::black_box(format(&s.bytes, &hint, &opts));
-            *r = ms(t);
-        }
-        runs.sort_by(|a, b| a.total_cmp(b));
-        f.push(runs[1]);
-        per_line.push(runs[1] * 1000.0 / s.lines.max(1) as f64);
         let t = Instant::now();
         std::hint::black_box(explain(&s.bytes, &hint, &opts, &[]));
         e.push(ms(t));
@@ -131,23 +144,41 @@ fn representative(src: &[Source]) -> Vec<&Source> {
     vec![at(50.0), at(95.0), abap[abap.len() - 1]]
 }
 
+/// Wall times in ms of `runs` calls of `cmd` (rebuilt for each call), after
+/// `warmups` unmeasured calls.
+pub(crate) fn wall_times(
+    cmd: impl Fn() -> Command,
+    warmups: usize,
+    runs: usize,
+) -> Result<Vec<f64>, String> {
+    let mut v = Vec::new();
+    for i in 0..warmups + runs {
+        let t = Instant::now();
+        cmd()
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map_err(|e| e.to_string())?;
+        if i >= warmups {
+            v.push(ms(t));
+        }
+    }
+    Ok(v)
+}
+
 fn cold(bin: &Path, files: &[&Source], runs: usize) -> Result<Value, String> {
     let mut rows = Vec::new();
     for s in files {
-        let mut v = Vec::new();
-        for i in 0..runs + 2 {
-            let t = Instant::now();
-            Command::new(bin)
-                .args(["--no-config", "--check", "--diagnostics", "json"])
-                .arg(&s.path)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-                .map_err(|e| e.to_string())?;
-            if i >= 2 {
-                v.push(ms(t));
-            }
-        }
+        let v = wall_times(
+            || {
+                let mut c = Command::new(bin);
+                c.args(["--no-config", "--check", "--diagnostics", "json"])
+                    .arg(&s.path);
+                c
+            },
+            2,
+            runs,
+        )?;
         rows.push(json!({ "lines": s.lines, "time": summary(v) }));
     }
     Ok(Value::Array(rows))
@@ -239,37 +270,24 @@ const [module, list] = process.argv.slice(1);
 
 /// Wall time of a whole-corpus run; the first run warms the file cache.
 fn project(bin: &Path, args: &[&str], runs: usize) -> Result<Value, String> {
-    let mut v = Vec::new();
-    for i in 0..runs + 1 {
-        let t = Instant::now();
-        Command::new(bin)
-            .args(["--no-config"])
-            .args(args)
-            .arg(root().join("corpus/repos"))
-            .env_remove("CLAUDECODE")
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map_err(|e| e.to_string())?;
-        if i > 0 {
-            v.push(ms(t));
-        }
-    }
+    let v = wall_times(
+        || {
+            let mut c = Command::new(bin);
+            c.args(["--no-config"])
+                .args(args)
+                .arg(root().join("corpus/repos"))
+                .env_remove("CLAUDECODE");
+            c
+        },
+        1,
+        runs,
+    )?;
     Ok(summary(v))
 }
 
-/// Peak resident memory in MB of one whole-corpus run (macOS `time -l`).
-fn peak_rss(bin: &Path) -> Option<f64> {
-    let out = Command::new("/usr/bin/time")
-        .arg("-l")
-        .arg(bin)
-        .args(["--no-config", "--check", "-j", "10"])
-        .arg(root().join("corpus/repos"))
-        .stdout(Stdio::null())
-        .output()
-        .ok()?;
-    let err = String::from_utf8_lossy(&out.stderr);
-    let bytes: f64 = err
+/// Peak resident memory in MB from the stderr of macOS `/usr/bin/time -l`.
+pub(crate) fn rss_from_time(stderr: &str) -> Option<f64> {
+    let bytes: f64 = stderr
         .lines()
         .find(|l| l.contains("maximum resident set size"))?
         .split_whitespace()
@@ -279,21 +297,41 @@ fn peak_rss(bin: &Path) -> Option<f64> {
     Some(round(bytes / 1_048_576.0))
 }
 
-fn abap_cleaner(src: &[Source], median: &Source) -> Result<Option<Value>, String> {
-    let Ok(plugins) = std::env::var("ABAP_CLEANER_PLUGINS") else {
-        return Ok(None);
-    };
+/// Peak resident memory in MB of one run of `cmd` under `/usr/bin/time -l`.
+pub(crate) fn peak_rss(cmd: &Command) -> Option<f64> {
+    let out = Command::new("/usr/bin/time")
+        .arg("-l")
+        .arg(cmd.get_program())
+        .args(cmd.get_args())
+        .stdout(Stdio::null())
+        .output()
+        .ok()?;
+    rss_from_time(&String::from_utf8_lossy(&out.stderr))
+}
+
+/// Compiles the ABAP Cleaner harness (Bench.java with Compare.java, which
+/// holds the layout-only profile) into target/bench/acb and returns the
+/// class path.
+pub(crate) fn compile_abap_cleaner_bench(plugins: &str) -> Result<String, String> {
     let classes = root().join("target/bench/acb");
-    let cp = format!("{}:{plugins}/*", classes.display());
     let status = Command::new("javac")
         .args(["-cp", &format!("{plugins}/*"), "-d"])
         .arg(&classes)
         .arg(root().join("scripts/abap-cleaner-bench/Bench.java"))
+        .arg(root().join("scripts/abap-cleaner-compare/Compare.java"))
         .status()
         .map_err(|e| e.to_string())?;
     if !status.success() {
         return Err("javac failed".into());
     }
+    Ok(format!("{}:{plugins}/*", classes.display()))
+}
+
+fn abap_cleaner(src: &[Source], median: &Source) -> Result<Option<Value>, String> {
+    let Ok(plugins) = std::env::var("ABAP_CLEANER_PLUGINS") else {
+        return Ok(None);
+    };
+    let cp = compile_abap_cleaner_bench(&plugins)?;
     let list = root().join("target/bench/abap-files.txt");
     let abap: Vec<String> = src
         .iter()
@@ -343,7 +381,7 @@ fn abap_cleaner(src: &[Source], median: &Source) -> Result<Option<Value>, String
     })))
 }
 
-fn machine() -> Value {
+pub(crate) fn machine() -> Value {
     let sysctl = |k: &str| {
         Command::new("sysctl")
             .args(["-n", k])
@@ -408,7 +446,11 @@ pub fn run() -> Result<(), String> {
         "json": project(&bin, &["--check", "--diagnostics", "json"], 5)?,
         "review": project(&bin, &["--review"], 5)?,
     });
-    let rss = peak_rss(&bin);
+    let mut rss_cmd = Command::new(&bin);
+    rss_cmd
+        .args(["--no-config", "--check", "-j", "10"])
+        .arg(root().join("corpus/repos"));
+    let rss = peak_rss(&rss_cmd);
     eprintln!("  ABAP Cleaner …");
     let acb = abap_cleaner(&src, reps[0])?;
 
@@ -433,7 +475,7 @@ pub fn run() -> Result<(), String> {
     Ok(())
 }
 
-fn today() -> String {
+pub(crate) fn today() -> String {
     Command::new("date")
         .arg("+%Y-%m-%d")
         .output()
@@ -441,7 +483,7 @@ fn today() -> String {
         .unwrap_or_default()
 }
 
-fn f(v: &Value) -> String {
+pub(crate) fn f(v: &Value) -> String {
     match v.as_f64() {
         Some(x) if x >= 100.0 => format!("{x:.0}"),
         Some(x) if x >= 10.0 => format!("{x:.1}"),

@@ -1,4 +1,6 @@
 // Benchmark harness for docs/benchmark-abap-cleaner.md (not built by cargo).
+// Compile together with ../abap-cleaner-compare/Compare.java, which defines
+// the layout-only profile.
 import com.sap.adt.abapcleaner.base.ABAP;
 import com.sap.adt.abapcleaner.parser.ParseParams;
 import com.sap.adt.abapcleaner.programbase.*;
@@ -6,9 +8,11 @@ import com.sap.adt.abapcleaner.rulebase.*;
 import java.nio.file.*;
 import java.util.*;
 
-// Usage: Bench <default|essential|parse> <file-list> <passes> [per-file-out]
+// Usage: Bench <default|essential|layout|parse> <file-list> <passes> [per-file-out]
+// layout: Compare.layoutProfile(), the default profile reduced to layout rules.
 // With per-file-out, the last pass writes one line per file:
-// "<microseconds>\t<path>" (used by `cargo xtask bench-matrix`).
+// "<microseconds>\t<path>\t<1 if ABAP Cleaner reported an error, else 0>"
+// (used by `cargo xtask bench-matrix` and `cargo xtask bench-compare`).
 public class Bench {
   public static void main(String[] a) throws Exception {
     Program.initialize(null, "");
@@ -17,7 +21,11 @@ public class Bench {
     int passes = Integer.parseInt(a[2]);
     List<String> codes = new ArrayList<>();
     for (String f : files) codes.add(Files.readString(Path.of(f)));
-    Profile profile = mode.equals("essential") ? Profile.createEssential() : Profile.createDefault();
+    Profile profile = switch (mode) {
+      case "essential" -> Profile.createEssential();
+      case "layout" -> Compare.layoutProfile();
+      default -> Profile.createDefault();
+    };
     StringBuilder perFile = new StringBuilder();
     for (int p = 1; p <= passes; p++) {
       long t0 = System.nanoTime();
@@ -30,9 +38,11 @@ public class Bench {
         Job job = Job.createForSingleCodeDocument(
             ParseParams.createForWholeCode(files.get(i), codes.get(i), ABAP.NEWEST_RELEASE), cp);
         Task t = job.run();
-        if (t.getParseError() != null || t.getCleanupError() != null || t.getCheckError() != null) errors++;
+        boolean failed = t.getParseError() != null || t.getCleanupError() != null || t.getCheckError() != null;
+        if (failed) errors++;
         lines += t.getLineCountInCleanupRange();
-        perFile.append((System.nanoTime() - f0) / 1_000).append('\t').append(files.get(i)).append('\n');
+        perFile.append((System.nanoTime() - f0) / 1_000).append('\t').append(files.get(i))
+            .append('\t').append(failed ? 1 : 0).append('\n');
       }
       long ms = (System.nanoTime() - t0) / 1_000_000;
       System.out.printf("abapcleaner %s pass %d: %d files, %d lines, %d ms, %d with errors%n",
