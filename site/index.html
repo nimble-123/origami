@@ -21,6 +21,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script src="keywords.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -106,7 +107,10 @@
       <div class="pg">
         <div class="pg-pane">
           <label class="pane-label" for="pg-input">Your code</label>
-          <textarea id="pg-input" class="sheet code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+          <div class="editor">
+            <pre id="pg-highlight" class="sheet code" aria-hidden="true"></pre>
+            <textarea id="pg-input" class="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+          </div>
         </div>
         <div class="pg-pane">
           <div class="pane-label">
