@@ -193,6 +193,8 @@ format that ends with a `NEXT:` line.
   </picture>
 </div>
 
+Measured again on 2026-11-23 on the 1,920 ABAP files alone: ABAP Cleaner 11.31 s with its default profile and 7.45 s with only its layout rules; origami 0.93 s on one thread (12 times faster than the default profile) and 0.20 s on ten. Cold and warm, per statement, method, file and project: [docs/benchmark-abap-cleaner.md](docs/benchmark-abap-cleaner.md).
+
 ABAP Cleaner applies about 100 cleanup rules, several of which change code;
 origami only changes layout. The numbers compare the time to process the same
 files, not the same work. Per-file latencies (p50, p95, p99), cold and warm starts, MCP, WebAssembly and thread scaling: [docs/benchmark.md](docs/benchmark.md).

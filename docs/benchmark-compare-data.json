@@ -1,0 +1,389 @@
+{
+  "cold": {
+    "file": {
+      "default": {
+        "peak_rss_mb": 182.938,
+        "time": {
+          "max": 388.822,
+          "mean": 357.271,
+          "n": 8,
+          "p50": 353.868,
+          "p95": 388.822,
+          "p99": 388.822
+        }
+      },
+      "layout": {
+        "peak_rss_mb": 150.906,
+        "time": {
+          "max": 333.361,
+          "mean": 306.496,
+          "n": 8,
+          "p50": 300.197,
+          "p95": 333.361,
+          "p99": 333.361
+        }
+      },
+      "origami": {
+        "peak_rss_mb": 4.094,
+        "time": {
+          "max": 2.121,
+          "mean": 2.019,
+          "n": 20,
+          "p50": 2.011,
+          "p95": 2.109,
+          "p99": 2.121
+        }
+      }
+    },
+    "method": {
+      "default": {
+        "peak_rss_mb": 141.516,
+        "time": {
+          "max": 325.608,
+          "mean": 293.869,
+          "n": 8,
+          "p50": 290.27,
+          "p95": 325.608,
+          "p99": 325.608
+        }
+      },
+      "layout": {
+        "peak_rss_mb": 120.266,
+        "time": {
+          "max": 273.117,
+          "mean": 257.654,
+          "n": 8,
+          "p50": 256.788,
+          "p95": 273.117,
+          "p99": 273.117
+        }
+      },
+      "origami": {
+        "peak_rss_mb": 3.547,
+        "time": {
+          "max": 2.213,
+          "mean": 1.847,
+          "n": 20,
+          "p50": 1.771,
+          "p95": 2.177,
+          "p99": 2.213
+        }
+      }
+    },
+    "statement": {
+      "default": {
+        "peak_rss_mb": 124.234,
+        "time": {
+          "max": 306.451,
+          "mean": 257.753,
+          "n": 8,
+          "p50": 249.567,
+          "p95": 306.451,
+          "p99": 306.451
+        }
+      },
+      "layout": {
+        "peak_rss_mb": 122.344,
+        "time": {
+          "max": 305.106,
+          "mean": 252.007,
+          "n": 8,
+          "p50": 243.886,
+          "p95": 305.106,
+          "p99": 305.106
+        }
+      },
+      "origami": {
+        "peak_rss_mb": 3.328,
+        "time": {
+          "max": 2.081,
+          "mean": 1.84,
+          "n": 20,
+          "p50": 1.796,
+          "p95": 2.058,
+          "p99": 2.081
+        }
+      }
+    }
+  },
+  "date": "2026-11-23",
+  "inputs": {
+    "file": {
+      "count": 1920,
+      "lines_max": 6837,
+      "lines_median": 90,
+      "lines_p95": 897,
+      "lines_total": 467586,
+      "median_input": {
+        "lines": 90,
+        "path": "corpus/repos/abap2xlsx-demos/src/demo030/zcl_excel_demo30.clas.abap"
+      }
+    },
+    "method": {
+      "count": 486,
+      "lines_max": 912,
+      "lines_median": 11,
+      "lines_p95": 89,
+      "lines_total": 11791,
+      "median_input": {
+        "lines": 11,
+        "path": "target/bench/compare/method/0465.prog.abap"
+      }
+    },
+    "project": {
+      "count": 1920,
+      "lines_total": 467586
+    },
+    "statement": {
+      "count": 481,
+      "lines_max": 12,
+      "lines_median": 1,
+      "lines_p95": 5,
+      "lines_total": 822,
+      "median_input": {
+        "lines": 1,
+        "path": "target/bench/compare/statement/0044.prog.abap"
+      }
+    }
+  },
+  "machine": {
+    "abap_cleaner": "1.29.2",
+    "commit": "84f0095",
+    "cores": "10",
+    "cpu": "Apple M4",
+    "jdk": "OpenJDK Runtime Environment Temurin-27.0.1.1+4 (build 27.0.1.1+4)",
+    "jvm_flags": "-Xmx1g per input and cold, -Xmx2g for the project; default garbage collector",
+    "memory_gb": 16.0,
+    "os": "macos",
+    "os_version": "27.2.1"
+  },
+  "project": {
+    "default": {
+      "cold_ms": 12881.925,
+      "notes": [],
+      "pass_ms": [
+        12665.0,
+        11313.0,
+        11314.0
+      ],
+      "peak_rss_mb": 737.313,
+      "warm_ms": 11314.0,
+      "xmx": "2g"
+    },
+    "layout": {
+      "cold_ms": 8889.739,
+      "notes": [],
+      "pass_ms": [
+        8682.0,
+        7441.0,
+        7446.0
+      ],
+      "peak_rss_mb": 819.391,
+      "warm_ms": 7446.0,
+      "xmx": "2g"
+    },
+    "origami": {
+      "cold_ms": 190.434,
+      "peak_rss_mb": 59.641,
+      "warm": {
+        "max": 221.39,
+        "mean": 197.083,
+        "n": 5,
+        "p50": 201.413,
+        "p95": 221.39,
+        "p99": 221.39
+      }
+    },
+    "origami_j1": {
+      "cold_ms": 959.517,
+      "peak_rss_mb": 31.891,
+      "warm": {
+        "max": 952.025,
+        "mean": 936.53,
+        "n": 5,
+        "p50": 932.153,
+        "p95": 952.025,
+        "p99": 952.025
+      }
+    }
+  },
+  "warm": {
+    "file": {
+      "default": {
+        "error_inputs": [
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0002.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0003.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0004.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0005.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0006.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0007.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_fg.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_mi.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_retry.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_ztvarvc/zadf_ztvarvc.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zehubpolicy.fugr.screen_9000.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zo365_sdk/zo365_fg.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zgroup_values.fugr.screen_9101.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zgroup_values.fugr.screen_9102.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9002.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9003.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9004.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9010.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9011.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9050.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9089.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9090.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest_screen.prog.screen_0100.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zssf_con/z_register.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zssf_con/zssf_fg.fugr.screen_0001.abap",
+          "corpus/repos/abap2xlsx-demos/src/demo041/zdemo_excel41.prog.screen_9000.abap"
+        ],
+        "errors": 29,
+        "peak_rss_mb": 427.141,
+        "time_us": {
+          "max": 227096.0,
+          "mean": 5986.783,
+          "n": 1920,
+          "p50": 2006.0,
+          "p95": 22203.0,
+          "p99": 57071.0
+        }
+      },
+      "layout": {
+        "error_inputs": [
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0002.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0003.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0004.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0005.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0006.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_config_view/zadf_configfg.fugr.screen_0007.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_fg.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_mi.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_retry.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zadf_ztvarvc/zadf_ztvarvc.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zehubpolicy.fugr.screen_9000.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zadf/zo365_sdk/zo365_fg.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zgroup_values.fugr.screen_9101.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zgroup_values.fugr.screen_9102.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9002.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9003.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9004.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9010.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9011.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9050.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9089.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest.fugr.screen_9090.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zrest/zrest_screen.prog.screen_0100.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zssf_con/z_register.fugr.screen_0001.abap",
+          "corpus/repos/ABAP-SDK-for-Azure/src/zssf_con/zssf_fg.fugr.screen_0001.abap",
+          "corpus/repos/abap2xlsx-demos/src/demo041/zdemo_excel41.prog.screen_9000.abap"
+        ],
+        "errors": 29,
+        "peak_rss_mb": 475.563,
+        "time_us": {
+          "max": 137592.0,
+          "mean": 3974.592,
+          "n": 1920,
+          "p50": 1330.0,
+          "p95": 14966.0,
+          "p99": 41238.0
+        }
+      },
+      "origami": {
+        "errors": 0,
+        "time_us": {
+          "max": 69918.541,
+          "mean": 448.071,
+          "n": 1920,
+          "p50": 110.208,
+          "p95": 1351.291,
+          "p99": 4891.625
+        }
+      }
+    },
+    "method": {
+      "default": {
+        "error_inputs": [],
+        "errors": 0,
+        "peak_rss_mb": 362.047,
+        "time_us": {
+          "max": 35564.0,
+          "mean": 877.84,
+          "n": 486,
+          "p50": 355.0,
+          "p95": 3272.0,
+          "p99": 6906.0
+        }
+      },
+      "layout": {
+        "error_inputs": [],
+        "errors": 0,
+        "peak_rss_mb": 451.359,
+        "time_us": {
+          "max": 20581.0,
+          "mean": 511.609,
+          "n": 486,
+          "p50": 225.0,
+          "p95": 1995.0,
+          "p99": 3324.0
+        }
+      },
+      "origami": {
+        "errors": 0,
+        "time_us": {
+          "max": 1512.958,
+          "mean": 38.819,
+          "n": 486,
+          "p50": 17.416,
+          "p95": 149.208,
+          "p99": 260.916
+        }
+      }
+    },
+    "statement": {
+      "default": {
+        "error_inputs": [],
+        "errors": 0,
+        "peak_rss_mb": 238.922,
+        "time_us": {
+          "max": 2704.0,
+          "mean": 164.056,
+          "n": 481,
+          "p50": 124.0,
+          "p95": 353.0,
+          "p99": 713.0
+        }
+      },
+      "layout": {
+        "error_inputs": [],
+        "errors": 0,
+        "peak_rss_mb": 227.797,
+        "time_us": {
+          "max": 1364.0,
+          "mean": 110.927,
+          "n": 481,
+          "p50": 81.0,
+          "p95": 245.0,
+          "p99": 428.0
+        }
+      },
+      "origami": {
+        "errors": 0,
+        "time_us": {
+          "max": 77.042,
+          "mean": 5.048,
+          "n": 481,
+          "p50": 3.583,
+          "p95": 11.875,
+          "p99": 24.375
+        }
+      }
+    }
+  }
+}
