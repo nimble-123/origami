@@ -24,10 +24,11 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 > [!NOTE]
 > origami is pre-release (0.1). All six languages are formatted by grammar,
 > every file of a 2,100-file test corpus passes the self-check and is
-> idempotent, and the abaplint lexer finds no token changes. Still open:
-> signed builds and the VS Code Marketplace listing (both wait for
-> maintainer accounts), publishing to crates.io, and feedback from teams using
-> it daily. Please [open an issue](https://github.com/nimble-123/origami/issues)
+> idempotent at 80 combinations of line width, indent and keyword case, and
+> the abaplint lexer finds no token changes. From the next release, origami
+> is also published to crates.io and the VS Code Marketplace. Still open:
+> signed builds (they wait for signing certificates), Open VSX, and feedback
+> from teams using it daily. Please [open an issue](https://github.com/nimble-123/origami/issues)
 > with any line origami formats in a way you would not.
 
 <div align="center">
@@ -42,7 +43,7 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 ## Why origami
 
 - **Layout only.** Whitespace, line breaks, indentation and letter case in ABAP: keywords in upper case, identifiers without a lower-case letter in lower case, as ABAP Cleaner does. origami never renames, reorders or rewrites a statement, so a formatted diff is easy to review.
-- **Checked, every time.** After formatting, origami lexes its own output and compares every token and comment with your file. If anything but layout differs, that statement is left as written. A file with a structural error is never touched.
+- **Checked, every time.** After formatting, origami lexes its own output and compares every token and comment with your file. If anything but layout differs, that statement is left as written. A file with a structural error is never touched, and very deep nesting (over 100 levels) or a file over 8 MB is left as written too (W004), so time and memory stay bounded.
 - **Explained.** `origami --review` shows the changes before anything is written, with a note on every line break origami adds: which rule, and at which column the line would have ended.
 - **Fast.** A median file takes 0.07 ms in process and 1.8 ms as a new process, start-up included; 99 % of files take under 4 ms. The whole 2,100-file test corpus takes 0.2 s. Fast enough for format-on-save, pre-commit hooks and agents ([benchmark](docs/benchmark.md)).
 - **Fits how SAP teams work.** abapGit repositories, ADT for VS Code documents, `--changed` for brownfield code, a GitHub Action, and an MCP server for AI agents.
@@ -64,7 +65,7 @@ A formatter for ABAP and CDS that changes layout and nothing else, checks its ow
 
 ```sh
 brew install nimble-123/tap/origami        # macOS and Linux
-cargo install abap-origami                 # crates.io: not published yet
+cargo install abap-origami                 # crates.io, from the next release
 ```
 
 Release binaries for macOS, Linux and Windows, each with a `.sha256` file, and
@@ -105,8 +106,8 @@ Flags, exit codes, diagnostic codes and the JSON schema: [docs/CLI.md](docs/CLI.
 Install the `.vsix` from the release, then make origami the formatter:
 
 ```json
-"[abap]": { "editor.defaultFormatter": "origami-dev.abap-origami" },
-"[acds]": { "editor.defaultFormatter": "origami-dev.abap-origami" },
+"[abap]": { "editor.defaultFormatter": "nimble-123.abap-origami" },
+"[acds]": { "editor.defaultFormatter": "nimble-123.abap-origami" },
 "editor.formatOnSave": true,
 "editor.formatOnSaveMode": "modifications"
 ```
@@ -216,6 +217,8 @@ by origami, and every ABAP Cleaner rule next to origami's:
 - [Invariants](docs/INVARIANTS.md): what "layout only" means and how it is checked
 - [Command line](docs/CLI.md): flags, exit codes, diagnostics, configuration
 - [CI](docs/ci.md) and [adopting origami in a team](docs/adoption.md)
+- [Releasing](docs/releasing.md): how a release is built, signed and published, and how to verify a download
+- [Security policy](SECURITY.md) and [contributing](CONTRIBUTING.md)
 - [Performance](docs/benchmark.md): per-file latencies, cold and warm starts, agents, threads, ABAP Cleaner
 - [origami and ABAP Cleaner](https://nimble-123.github.io/origami/abap-cleaner.html): the same code formatted by both, and every ABAP Cleaner rule next to origami's ([how it is built](scripts/abap-cleaner-compare/README.md))
 - [Design](docs/designs/origami.md) and [line-break explanations](docs/designs/origami-explain-review.md)
@@ -224,13 +227,16 @@ by origami, and every ABAP Cleaner rule next to origami's:
 ## Development
 
 ```sh
-cargo test --workspace
-cargo test -p origami_core --features fault-injection
-cargo xtask corpus fetch && cargo xtask corpus run   # real-world corpus
-cargo xtask explain --corpus                         # line-break notes
-cargo xtask oracle                                   # abaplint lexer cross-check
+cargo xtask corpus fetch                             # once: the real-world corpus
+cargo xtask ci                                       # the whole pre-PR chain, stops at the first failure
+cargo xtask ci --full                                # also: idempotency at 80 settings (minutes)
+cargo +nightly fuzz run format_abap                  # fuzzing (also format_cds, format_lines, explain)
 sh site/build.sh && python3 -m http.server -d site/dist   # website
 ```
+
+`cargo xtask ci` runs fmt, clippy, the tests, the corpus, the line-break
+notes, the abaplint cross-check and the mutation stress test; each step is
+also its own command (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 Contributions start with an issue. A change to the output needs a rule in
 [STYLE.md](docs/STYLE.md) first; see "How rules work" there.

@@ -99,8 +99,8 @@ Install the VS Code extension and make it the default formatter, because ADT
 for VS Code registers its own formatter for the same languages:
 
 ```json
-"[abap]": { "editor.defaultFormatter": "origami-dev.abap-origami" },
-"[acds]": { "editor.defaultFormatter": "origami-dev.abap-origami" },
+"[abap]": { "editor.defaultFormatter": "nimble-123.abap-origami" },
+"[acds]": { "editor.defaultFormatter": "nimble-123.abap-origami" },
 "editor.formatOnSave": true
 ```
 

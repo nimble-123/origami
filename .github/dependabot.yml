@@ -37,6 +37,16 @@ updates:
     groups:
       npm-vscode:
         patterns: ["*"]
+    ignore:
+      # Tied to the minimum VS Code version (`engines.vscode`); vsce rejects
+      # a package whose @types/vscode is newer. Raise both together by hand.
+      - dependency-name: "@types/vscode"
+      # Should match the Node version that ships with that VS Code.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # A new TypeScript major waits until typescript-eslint supports it.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /tools/abaplint-oracle
