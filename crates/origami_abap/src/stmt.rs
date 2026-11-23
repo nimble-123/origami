@@ -226,6 +226,9 @@ impl<'c, 'a> P<'c, 'a> {
     /// Format options of the embedded expressions of a string template
     /// `from..=to` (`{ d DATE = ISO }`, `{ n WIDTH = 10 ALIGN = RIGHT }`).
     fn mark_template_options(&mut self, from: usize, to: usize) {
+        self.mark_phrases(from + 1, to);
+        // Constructor bodies inside embedded expressions (`{ COND #( … ) }`).
+        self.mark_ctor_keywords(from + 1, to, false);
         let part = |k: u16| matches!(k, TEMPLATE_HEAD | TEMPLATE_MIDDLE | TEMPLATE_TAIL);
         let mut depth = 0i32;
         for k in from + 1..to {
@@ -233,6 +236,22 @@ impl<'c, 'a> P<'c, 'a> {
                 LPAREN | LBRACKET => depth += 1,
                 RPAREN | RBRACKET => depth -= 1,
                 _ => {}
+            }
+            if self.kind(k) == WORD && !self.glued(k) {
+                let t = self.text(k).as_bytes();
+                // Text symbol `TEXT-001`.
+                let text_symbol = t.len() == 8
+                    && t[..5].eq_ignore_ascii_case(b"text-")
+                    && t[5..].iter().all(|b| b.is_ascii_digit());
+                // Constructor operator `CONV type( … )`.
+                let ctor = CTOR_OPS.contains(&self.upper(k).as_str())
+                    && self.kind(k + 1) == WORD
+                    && !self.glued(k + 1)
+                    && self.kind(k + 2) == LPAREN
+                    && self.glued(k + 2);
+                if text_symbol || ctor {
+                    self.c.keywords.push(k);
+                }
             }
             let starts_expr = part(self.kind(k - 1));
             // Options follow the expression, outside its brackets.
@@ -254,10 +273,83 @@ impl<'c, 'a> P<'c, 'a> {
         }
     }
 
+    /// Keywords in arguments kept as written: an exception with a message
+    /// (`zcx_x( MESSAGE e005(zmsg) WITH a )`, `zcx_x( USING MESSAGE )`) and
+    /// fixed phrases.
+    fn mark_raw_args(&mut self, lp: usize, rp: usize) {
+        let k = lp + 1;
+        if self.is(k, "USING") && self.is(k + 1, "MESSAGE") {
+            self.c.keywords.extend([k, k + 1]);
+        } else if self.is(k, "MESSAGE") && self.message_spec(k + 1) {
+            self.c.keywords.push(k);
+            let mut depth = 0i32;
+            for j in k + 1..rp {
+                match self.kind(j) {
+                    LPAREN | LBRACKET => depth += 1,
+                    RPAREN | RBRACKET => depth -= 1,
+                    WORD if depth == 0
+                        && !self.glued(j)
+                        && matches!(self.upper(j).as_str(), "ID" | "TYPE" | "NUMBER" | "WITH") =>
+                    {
+                        self.c.keywords.push(j);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        self.mark_phrases(lp + 1, rp);
+    }
+
+    /// A message after `MESSAGE`: `ID …`, or a short form `e005(zmsg)`.
+    fn message_spec(&self, k: usize) -> bool {
+        if self.is(k, "ID") {
+            return true;
+        }
+        let t = self.text(k).as_bytes();
+        self.kind(k) == WORD
+            && t.len() == 4
+            && b"aeiswxAEISWX".contains(&t[0])
+            && t[1..].iter().all(u8::is_ascii_digit)
+            && self.glued(k + 1)
+            && self.kind(k + 1) == LPAREN
+    }
+
+    /// Fixed keyword phrases that are keywords wherever they stand:
+    /// `GROUP SIZE`, `GROUP INDEX`, `IS [NOT] INITIAL|BOUND|ASSIGNED|SUPPLIED`,
+    /// `IS [NOT] INSTANCE OF`.
+    pub(crate) fn mark_phrases(&mut self, from: usize, to: usize) {
+        for j in from..to {
+            if self.kind(j) != WORD || self.glued(j) {
+                continue;
+            }
+            if self.is(j, "GROUP") && (self.is(j + 1, "SIZE") || self.is(j + 1, "INDEX")) {
+                self.c.keywords.extend([j, j + 1]);
+            }
+            if self.is(j, "IS") {
+                let mut n = j + 1;
+                if self.is(n, "NOT") {
+                    n += 1;
+                }
+                let tail = match self.upper(n).as_str() {
+                    "INITIAL" | "BOUND" | "ASSIGNED" | "SUPPLIED" => 1,
+                    "INSTANCE" if self.is(n + 1, "OF") => 2,
+                    _ => 0,
+                };
+                if tail > 0 {
+                    self.c.keywords.extend(j..n + tail);
+                }
+            }
+        }
+    }
+
     /// Keywords of a table expression `[ KEY name COMPONENTS … ]` or
     /// `[ KEY name INDEX … ]` between `open` and `close`.
     fn mark_table_expr(&mut self, open: usize, close: usize) {
-        let k = open + 1;
+        let mut k = open + 1;
+        if self.is(k, "TABLE") && self.is(k + 1, "KEY") {
+            self.c.keywords.push(k);
+            k += 1;
+        }
         if k + 2 < close && self.is(k, "KEY") && self.kind(k + 1) == WORD && !self.glued(k + 1) {
             self.c.keywords.push(k);
             if self.is(k + 2, "COMPONENTS") || self.is(k + 2, "INDEX") {
@@ -383,6 +475,7 @@ impl<'c, 'a> P<'c, 'a> {
                     ])),
                     _ => {
                         self.c.reset_spans(mark);
+                        self.mark_phrases(i + 1, close);
                         docs.push(self.raw(i, close))
                     }
                 }
@@ -517,6 +610,7 @@ impl<'c, 'a> P<'c, 'a> {
             Some(d) => Some(d),
             None => {
                 self.c.reset(saved_kw);
+                self.mark_raw_args(lp, rp);
                 Some(self.raw(lp, rp))
             }
         }
@@ -731,18 +825,53 @@ impl<'c, 'a> P<'c, 'a> {
         let mut i = from;
         while i < to {
             let k = self.kind(i);
+            if k == TEMPLATE_HEAD {
+                let mut depth = 0;
+                let mut j = i;
+                while j < to {
+                    match self.kind(j) {
+                        TEMPLATE_HEAD => depth += 1,
+                        TEMPLATE_TAIL => {
+                            depth -= 1;
+                            if depth == 0 {
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                    j += 1;
+                }
+                if j < to {
+                    self.mark_template_options(i, j);
+                }
+                prev = None;
+                i = j + 1;
+                continue;
+            }
             if matches!(k, LPAREN | LBRACKET) {
                 let Some(close) = self.matching(i).filter(|&c| c < to) else {
                     return;
                 };
+                // The type may be qualified: `FILTER lcl=>tt_type( … )`.
+                let mut ty = i.saturating_sub(1);
+                while ty >= from + 2
+                    && self.kind(ty - 1) == SELECTOR
+                    && self.glued(ty - 1)
+                    && self.glued(ty)
+                {
+                    ty -= 2;
+                }
                 let ctor = k == LPAREN
-                    && i >= from + 2
+                    && ty >= from + 1
                     && self.glued(i)
-                    && !self.glued(i - 1)
-                    && self.kind(i - 2) == WORD
-                    && CTOR_OPS.contains(&self.upper(i - 2).as_str());
+                    && !self.glued(ty)
+                    && self.kind(ty - 1) == WORD
+                    && CTOR_OPS.contains(&self.upper(ty - 1).as_str());
                 if ctor && words {
-                    self.c.keywords.push(i - 2);
+                    self.c.keywords.push(ty - 1);
+                }
+                if k == LBRACKET {
+                    self.mark_table_expr(i, close);
                 }
                 if !ctor && words && k == LPAREN && self.is(i + 1, "LINES") && self.is(i + 2, "OF")
                 {
@@ -752,6 +881,9 @@ impl<'c, 'a> P<'c, 'a> {
                 // A plain bracket (not a call) inside a constructor body:
                 // a sub-condition or term, same keywords.
                 let call = i > from && self.glued(i) && self.kind(i - 1) == WORD;
+                if call && k == LPAREN {
+                    self.mark_raw_args(i, close);
+                }
                 self.mark_ctor_keywords(i + 1, close, ctor || (words && k == LPAREN && !call));
                 prev = None;
                 i = close + 1;
@@ -773,7 +905,7 @@ impl<'c, 'a> P<'c, 'a> {
                             (_, "NOT" | "THROW")
                                 | ("IN", "GROUP" | "FOR")
                                 | ("MAPPING", "FROM" | "TO")
-                                | ("EXCEPT", "IN")
+                                | ("EXCEPT", "IN" | "WHERE" | "USING")
                                 | ("FOR", "GROUPS")
                         )
                 });
@@ -784,8 +916,12 @@ impl<'c, 'a> P<'c, 'a> {
                         self.text(i - 1),
                         "=" | "<>" | "<" | ">" | "<=" | ">=" | "+" | "-" | "*" | "/" | "&&" | "?="
                     );
-                // `MAPPING FROM ENTITY`, `MAPPING TO ENTITY`, `USING CONTROL`
+                // `MAPPING FROM ENTITY`, `MAPPING TO ENTITY`, `USING CONTROL`,
+                // `GROUP SIZE`, `IS INSTANCE OF`
                 let paired = match w.as_str() {
+                    "GROUP" if self.is(i + 1, "SIZE") || self.is(i + 1, "INDEX") => true,
+                    "SIZE" | "INDEX" if prev.as_deref() == Some("GROUP") => true,
+                    "INSTANCE" => matches!(prev.as_deref(), Some("IS" | "NOT")) && self.is(i + 1, "OF"),
                     "ENTITY" => matches!(prev.as_deref(), Some("FROM" | "TO")),
                     "CONTROL" => prev.as_deref() == Some("USING"),
                     _ => false,
@@ -1033,7 +1169,7 @@ impl<'c, 'a> P<'c, 'a> {
 }
 
 /// Constructor operators whose body may hold keywords.
-const CTOR_OPS: &[&str] = &[
+pub(crate) const CTOR_OPS: &[&str] = &[
     "VALUE",
     "CORRESPONDING",
     "REDUCE",

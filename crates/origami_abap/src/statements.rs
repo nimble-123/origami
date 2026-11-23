@@ -127,6 +127,19 @@ pub fn parse(p: &mut P) -> Option<Doc> {
             {
                 continue;
             }
+            // `LOOP AT GROUP grp …` is not `LOOP AT itab …`.
+            if spec.lead == ["LOOP", "AT"]
+                && p.is(start + 2, "GROUP")
+                && p.kind(start + 3) == WORD
+                && !p.glued(start + 3)
+                && !matches!(
+                    p.upper(start + 3).as_str(),
+                    "INTO" | "ASSIGNING" | "REFERENCE" | "TRANSPORTING" | "WHERE" | "USING" | "FROM"
+                        | "TO" | "GROUP" | "CASTING"
+                )
+            {
+                continue;
+            }
             if matches_words(p, start, spec.lead) {
                 let saved = p.c.mark();
                 if let Some(d) = keyword_statement(p, spec) {
@@ -139,6 +152,19 @@ pub fn parse(p: &mut P) -> Option<Doc> {
     }
     p.assignment_or_call()
 }
+
+/// Words that are keywords even as the only operand of their statement
+/// (`WHEN OTHERS.`, `LOOP AT SCREEN.`), where another word would be a name.
+const FIRST_OPERAND_KEYWORDS: &[(&[&str], &str)] = &[
+    (&["SELECT"], "SINGLE"),
+    (&["SELECT"], "DISTINCT"),
+    (&["WHEN"], "OTHERS"),
+    (&["LOOP", "AT"], "SCREEN"),
+    (&["MODIFY"], "SCREEN"),
+    (&["AT", "SELECTION-SCREEN"], "OUTPUT"),
+    (&["SELECTION-SCREEN"], "SKIP"),
+    (&["SELECTION-SCREEN"], "ULINE"),
+];
 
 /// How the parts between keywords are parsed.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -228,7 +254,9 @@ static SPECS: &[Spec] = &[
             "BY DATABASE FUNCTION",
             "BY DATABASE GRAPH WORKSPACE",
             "FOR",
+            "HDB",
             "LANGUAGE",
+            "SQLSCRIPT",
             "OPTIONS",
             "READ-ONLY",
             "DETERMINISTIC",
@@ -311,7 +339,9 @@ static SPECS: &[Spec] = &[
         ..spec(&["LOOP", "AT"])
     },
     Spec {
-        words: &[],
+        clauses: &["INTO", "ASSIGNING", "REFERENCE INTO", "WHERE", "GROUP BY"],
+        words: &["CASTING", "ELSE", "UNASSIGN", "ASCENDING", "DESCENDING", "WITHOUT", "MEMBERS", "AS"],
+        logical_clauses: LOGIC_WHERE,
         bare: false,
         ..spec(&["LOOP", "AT", "GROUP"])
     },
@@ -343,6 +373,13 @@ static SPECS: &[Spec] = &[
             "UNASSIGN",
             "TABLE",
             "ACCEPTING DUPLICATE KEYS",
+            // `INSERT REPORT prog FROM itab STATE 'I'`, `INSERT TEXTPOOL …`
+            "REPORT",
+            "TEXTPOOL",
+            "STATE",
+            "LANGUAGE",
+            "EXTENSION TYPE",
+            "PROGRAM TYPE",
         ],
         bare: false,
         ..spec(&["INSERT"])
@@ -516,7 +553,7 @@ static SPECS: &[Spec] = &[
     },
     Spec {
         clauses: &["TYPE", "EXPORTING", "MESSAGE"],
-        words: &["RESUMABLE", "WITH", "NEW", "ID", "NUMBER"],
+        words: &["RESUMABLE", "WITH", "NEW", "ID", "NUMBER", "USING MESSAGE"],
         bare: false,
         ..spec(&["RAISE", "EXCEPTION"])
     },
@@ -574,6 +611,11 @@ static SPECS: &[Spec] = &[
             "TABLE",
             "ADJACENT",
             "DUPLICATES",
+            // `DELETE REPORT prog`, `DELETE TEXTPOOL prog LANGUAGE l`
+            "REPORT",
+            "TEXTPOOL",
+            "LANGUAGE",
+            "STATE",
             "ALL",
             "FIELDS",
             "WITH",
@@ -599,7 +641,15 @@ static SPECS: &[Spec] = &[
         ..spec(&["MODIFY"])
     },
     Spec {
-        words: &["ABSTRACT", "METHODS", "FINAL", "ALL", "DATA", "VALUES"],
+        words: &[
+            "ABSTRACT",
+            "METHODS",
+            "FINAL",
+            "ALL",
+            "DATA",
+            "VALUES",
+            "PARTIALLY IMPLEMENTED",
+        ],
         bare: false,
         ..spec(&["INTERFACES"])
     },
@@ -872,6 +922,7 @@ static SPECS: &[Spec] = &[
             "UPDATE",
             "INDICATORS",
             "NULL",
+            "STRUCTURE",
         ],
         logical_clauses: &["WHERE", "HAVING"],
         bare: false,
@@ -984,6 +1035,8 @@ static SPECS: &[Spec] = &[
             "BLOCKS",
             "NESTING LEVEL",
             "LINES",
+            "SKIP",
+            "ULINE",
         ],
         bare: false,
         ..spec(&["SELECTION-SCREEN"])
@@ -1170,6 +1223,7 @@ static SPECS: &[Spec] = &[
             "OUTPUT-LENGTH",
             "HELP-ID",
             "EDIT MASK",
+            "INTO",
         ],
         bare: false,
         ..spec(&["DESCRIBE", "FIELD"])
@@ -1260,6 +1314,18 @@ static SPECS: &[Spec] = &[
             "LINE-SIZE",
             "LINE-COUNT",
             "SELECTION-TABLE",
+            // `WITH p EQ v`, `WITH s BETWEEN a AND b`
+            "EQ",
+            "NE",
+            "CP",
+            "NP",
+            "GT",
+            "GE",
+            "LT",
+            "LE",
+            "BETWEEN",
+            "AND",
+            "NOT",
         ],
         bare: false,
         ..spec(&["SUBMIT"])
@@ -2311,6 +2377,10 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
         // A word equal to the keyword just before it is a name
         // (`MATCH COUNT count`, `REPORTED reported`).
         let repeated = prev_kw.as_deref() == Some(p.upper(i).as_str());
+        // A first operand followed by the same word is a name
+        // (`CREATE OBJECT type TYPE cl_x`).
+        let repeated = repeated
+            || (Some(i) == first_operand && p.kind(i + 1) == WORD && p.upper(i) == p.upper(i + 1));
         let n_clause = if repeated {
             0
         } else {
@@ -2325,12 +2395,9 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
         // statement follows it (`ASSIGN structure TO <fs>`).
         // `SELECT SINGLE FROM …` / `SELECT DISTINCT FROM …` (strict syntax,
         // field list in FIELDS): these words are never names.
-        let select_modifier = (spec.lead == ["SELECT"]
-            && matches!(p.upper(i).as_str(), "SINGLE" | "DISTINCT"))
-            || (spec.lead == ["WHEN"] && p.is(i, "OTHERS"))
-            || (spec.lead == ["LOOP", "AT"] && p.is(i, "SCREEN"))
-            || (spec.lead == ["MODIFY"] && p.is(i, "SCREEN"))
-            || (spec.lead == ["AT", "SELECTION-SCREEN"] && p.is(i, "OUTPUT"));
+        let select_modifier = FIRST_OPERAND_KEYWORDS
+            .iter()
+            .any(|(lead, w)| spec.lead == *lead && p.is(i, w));
         if n_word == 1
             && Some(i) == first_operand
             && !select_modifier
@@ -2436,6 +2503,7 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
                     return None;
                 };
                 let close = p.matching(open).filter(|&c| c < p.end)?;
+                p.mark_phrases(open + 1, close);
                 current.push(p.raw(i, close));
                 p.pos = close + 1;
             }
@@ -2696,7 +2764,7 @@ const SQL_WORDS: &[&str] = &[
 
 /// SQL functions written as keywords when a bracket follows (`COUNT( * )`,
 /// `CAST( … )`); other SQL functions are written like built-in functions.
-const SQL_FUNCTIONS: &[&str] = &["COUNT", "SUM", "MIN", "MAX", "AVG", "CAST"];
+const SQL_FUNCTIONS: &[&str] = &["COUNT", "SUM", "MIN", "MAX", "AVG", "CAST", "OVER"];
 
 /// Dictionary types in `CAST( … AS CHAR( 6 ) )`.
 const SQL_TYPES: &[&str] = &[
@@ -2743,9 +2811,17 @@ fn mark_sql_keywords(p: &mut P, from: usize, to: usize) {
                     true
                 }
                 "GROUP" | "ORDER" => p.is(k + 1, "BY"),
-                "BY" => k > from && (p.is(k - 1, "GROUP") || p.is(k - 1, "ORDER")),
+                "BY" => {
+                    k > from && (p.is(k - 1, "GROUP") || p.is(k - 1, "ORDER") || p.is(k - 1, "PARTITION"))
+                }
                 "LEFT" | "RIGHT" => p.is(k + 1, "OUTER") || p.is(k + 1, "JOIN"),
                 "CROSS" => p.is(k + 1, "JOIN"),
+                // Window functions: `OVER( PARTITION BY … ORDER BY … ROWS
+                // BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW )`
+                "PARTITION" => p.is(k + 1, "BY"),
+                "ROWS" | "UNBOUNDED" | "PRECEDING" | "FOLLOWING" => true,
+                "CURRENT" => p.is(k + 1, "ROW"),
+                "ROW" => k > from && p.is(k - 1, "CURRENT"),
                 "ALL" => k > from && p.is(k - 1, "UNION"),
                 _ => SQL_WORDS.contains(&w.as_str()),
             }
@@ -2819,6 +2895,7 @@ const DECL_KW: &[&str] = &[
     "HEADER",
     "SECONDARY",
     "OPTIONAL",
+    "INDICATORS",
 ];
 
 /// Keywords whose next word is always an operand (a name or a type).

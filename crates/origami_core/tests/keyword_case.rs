@@ -18,6 +18,8 @@ fn check(cases: &[(&str, &str)]) {
     }
 }
 
+
+
 #[test]
 fn rap_derived_types() {
     check(&[
@@ -331,6 +333,103 @@ ENDCLASS.
 "#),
         (r#"x = value #( for groups group of wa in itab group by wa-a ( lines of value #( for m in group group ( m ) ) ) ).
 "#, r#"x = VALUE #( FOR GROUPS group OF wa IN itab GROUP BY wa-a ( LINES OF VALUE #( FOR m IN GROUP group ( m ) ) ) ).
+"#),
+    ]);
+}
+
+#[test]
+fn rarer_statements() {
+    check(&[
+        (r#"selection-screen skip.
+"#, r#"SELECTION-SCREEN SKIP.
+"#),
+        (r#"selection-screen uline.
+"#, r#"SELECTION-SCREEN ULINE.
+"#),
+        (r#"interfaces zif_x partially implemented.
+"#, r#"INTERFACES zif_x PARTIALLY IMPLEMENTED.
+"#),
+        (r#"submit zprog with p_a eq p_a with s_b between 1 and 5 and return.
+"#, r#"SUBMIT zprog WITH p_a EQ p_a WITH s_b BETWEEN 1 AND 5 AND RETURN.
+"#),
+        (r#"describe field <item> into td.
+"#, r#"DESCRIBE FIELD <item> INTO td.
+"#),
+        (r#"select a from t into table @data(r) indicators null structure nulls.
+"#, r#"SELECT a FROM t INTO TABLE @DATA(r) INDICATORS NULL STRUCTURE nulls.
+"#),
+        (r#"raise exception type zcx_x using message.
+"#, r#"RAISE EXCEPTION TYPE zcx_x USING MESSAGE.
+"#),
+        (r#"select carrid, sum( price ) over( partition by carrid order by fldate rows between unbounded preceding and current row ) as s
+    from sflight
+    into table @data(t).
+"#, r#"SELECT carrid, SUM( price ) OVER( PARTITION BY carrid ORDER BY fldate ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW ) AS s
+    FROM sflight
+    INTO TABLE @DATA(t).
+"#),
+        (r#"x = filter #( itab except where a >= 3 ).
+"#, r#"x = FILTER #( itab EXCEPT WHERE a >= 3 ).
+"#),
+        (r#"x = filter #( itab except using key sk where a >= 3 ).
+"#, r#"x = FILTER #( itab EXCEPT USING KEY sk WHERE a >= 3 ).
+"#),
+        (r#"create object type type cl_abap_elemdescr.
+"#, r#"CREATE OBJECT type TYPE cl_abap_elemdescr.
+"#),
+        (r#"x = |{ text-003 } { conv string( y ) }|.
+"#, r#"x = |{ TEXT-003 } { CONV string( y ) }|.
+"#),
+        (r#"x = itab[ table key primary_key components id = 1 ]-name.
+"#, r#"x = itab[ TABLE KEY primary_key COMPONENTS id = 1 ]-name.
+"#),
+        (r#"x = cond #( when a = 1 then 1 else throw zcx_x( message e005(zmsg) with a ) ).
+"#, r#"x = COND #( WHEN a = 1 THEN 1 ELSE THROW zcx_x( MESSAGE e005(zmsg) WITH a ) ).
+"#),
+        (r#"x = cond #( when a = 1 then 1 else throw zcx_x( using message ) ).
+"#, r#"x = COND #( WHEN a = 1 THEN 1 ELSE THROW zcx_x( USING MESSAGE ) ).
+"#),
+        (r#"loop at itab into data(wa) group by ( key = wa-a gi = group index gs = group size ) into data(grp).
+endloop.
+"#, r#"LOOP AT itab INTO DATA(wa) GROUP BY ( key = wa-a gi = GROUP INDEX gs = GROUP SIZE ) INTO DATA(grp).
+ENDLOOP.
+"#),
+        (r#"x = cond #( when a = 1 then |{ d date = iso }| else `` ).
+"#, r#"x = COND #( WHEN a = 1 THEN |{ d DATE = ISO }| ELSE `` ).
+"#),
+        (r#"insert report lv_prog from lt_src state 'I'.
+"#, r#"INSERT REPORT lv_prog FROM lt_src STATE 'I'.
+"#),
+        (r#"delete report lv_prog.
+"#, r#"DELETE REPORT lv_prog.
+"#),
+        (r#"types ind_wa type zs_x with indicators comp_ind.
+"#, r#"TYPES ind_wa TYPE zs_x WITH INDICATORS comp_ind.
+"#),
+        (r#"x = value #( for w in itab where ( oref is instance of zcl_x ) ( w ) ).
+"#, r#"x = VALUE #( FOR w IN itab WHERE ( oref IS INSTANCE OF zcl_x ) ( w ) ).
+"#),
+        (r#"x = |{ boolc( a is not initial ) }|.
+"#, r#"x = |{ boolc( a IS NOT INITIAL ) }|.
+"#),
+        (r#"x = |{ cond #( when a is not initial then `x` else `y` ) }|.
+"#, r#"x = |{ COND #( WHEN a IS NOT INITIAL THEN `x` ELSE `y` ) }|.
+"#),
+        (r#"loop at group grp into data(member).
+endloop.
+"#, r#"LOOP AT GROUP grp INTO DATA(member).
+ENDLOOP.
+"#),
+        (r#"loop at group into data(wa).
+endloop.
+"#, r#"LOOP AT group INTO DATA(wa).
+ENDLOOP.
+"#),
+        (r#"x = value #( itab[ key id a = 1 ] optional ).
+"#, r#"x = VALUE #( itab[ KEY id a = 1 ] OPTIONAL ).
+"#),
+        (r#"x = filter lcl=>tt_flights( itab using key sk where a = 1 ).
+"#, r#"x = FILTER lcl=>tt_flights( itab USING KEY sk WHERE a = 1 ).
 "#),
     ]);
 }
