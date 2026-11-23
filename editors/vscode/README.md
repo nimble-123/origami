@@ -6,7 +6,7 @@ behavior definitions (BDEF) and service definitions (SRVD).
 
 It works on abapGit files on disk and on the documents of SAP's ADT for VS Code.
 origami changes layout only. After every run it checks that only whitespace,
-line breaks and keyword case changed, and it never touches a document with a
+line breaks and letter case changed, and it never touches a document with a
 structural error.
 
 ## Setup

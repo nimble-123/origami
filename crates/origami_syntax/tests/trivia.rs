@@ -10,6 +10,7 @@ fn tok(start: u32, end: u32) -> Token {
         end,
         glued: false,
         keyword: false,
+        ident: false,
     }
 }
 

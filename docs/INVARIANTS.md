@@ -16,7 +16,7 @@ equal when all of these hold:
 
 | # | Rule | Test |
 |---|---|---|
-| 1.1 | Same number of tokens, same kinds, same texts. Only tokens a parser marked as keywords may differ in letter case. | `crates/origami_syntax/tests/compare.rs` |
+| 1.1 | Same number of tokens, same kinds, same texts. Only tokens a parser marked as keywords or (ABAP) identifiers may differ in letter case. | `crates/origami_syntax/tests/compare.rs` |
 | 1.2 | Same `glued` flag on every token: two tokens that touch in the input touch in the output, and two tokens separated by whitespace stay separated. | `compare.rs`, `crates/origami_abap/tests/lexer.rs::glued_flags` |
 | 1.3 | Same comments: same text, same syntax (`*`, `"`, `"!`, `"#EC`, `//`/`--`, `/* */`), same placement (own line / end of line), attached to the same token in the same position. | `compare.rs`, `crates/origami_syntax/tests/trivia.rs` |
 | 1.4 | Verbatim regions (AMDP, `EXEC SQL`, macro bodies) are single opaque tokens, so rule 1.1 compares them byte for byte. | `lexer.rs::verbatim_regions` |

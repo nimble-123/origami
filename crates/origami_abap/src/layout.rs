@@ -18,6 +18,9 @@ pub struct Laid {
     pub diagnostics: Vec<Diagnostic>,
     pub unknown: u32,
     pub keywords: Vec<usize>,
+    /// Token ranges of recognized statements; their non-keyword words are
+    /// identifiers.
+    pub parsed: Vec<std::ops::Range<usize>>,
     /// Rule spans (only when `explain`).
     pub rule_spans: Vec<RuleSpan>,
 }
@@ -57,6 +60,7 @@ pub fn layout(
         rule_spans: Vec::new(),
     };
     let mut docs = Vec::with_capacity(statements.len());
+    let mut parsed_ranges = Vec::new();
     let mut diagnostics = Vec::new();
     let mut unknown = 0;
     let mut prev_role = None;
@@ -94,6 +98,7 @@ pub fn layout(
             match parsed {
                 Some(d) => {
                     mark_ctor(&mut ctx);
+                    parsed_ranges.push(st.tokens.clone());
                     d
                 }
                 None => {
@@ -126,6 +131,7 @@ pub fn layout(
         diagnostics,
         unknown,
         keywords: ctx.keywords,
+        parsed: parsed_ranges,
         rule_spans: ctx.rule_spans,
     }
 }

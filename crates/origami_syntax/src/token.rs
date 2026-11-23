@@ -18,8 +18,12 @@ pub struct Token {
     /// the previous token. The printer never changes it.
     pub glued: bool,
     /// Set only by a parser, for tokens consumed as keywords of a recognized
-    /// statement. Only these tokens may be re-cased.
+    /// statement. These tokens may be re-cased.
     pub keyword: bool,
+    /// Set only by a parser, for identifier tokens of a recognized statement
+    /// (ABAP). The printer writes them in lower case when they contain no
+    /// lower-case letter, so they may be re-cased too.
+    pub ident: bool,
 }
 
 impl Token {
