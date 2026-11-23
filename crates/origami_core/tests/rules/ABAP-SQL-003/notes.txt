@@ -1,0 +1,11 @@
+2: ABAP-SQL-003: one field per line, because the field list would end at column 137 (limit 120)
+2: ABAP-SQL-001: each clause on its own line, because the statement would end at column 176 (limit 120)
+17: ABAP-SQL-003: one field per line
+17: ABAP-SQL-001: each clause on its own line
+22: ABAP-SQL-003: one field per line
+24: ABAP-SQL-003: one field per line
+27: ABAP-SQL-001: each clause on its own line
+28: ABAP-SQL-003: one field per line
+31: ABAP-SQL-003: one field per line
+31: ABAP-SQL-001: each clause on its own line
+36: ABAP-SQL-001: each clause on its own line, because the statement would end at column 122 (limit 120)

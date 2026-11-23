@@ -118,6 +118,11 @@ pub const RULE_PHRASES: &[(RuleId, &str, &str)] = &[
         "condition split before AND, OR",
         "condition",
     ),
+    (
+        "ABAP-COND-002",
+        "each WHEN branch on its own line",
+        "conditional expression",
+    ),
     ("ABAP-DECL-001", "one declaration per line", "declaration"),
     ("ABAP-CHAIN-001", "one item per line", "chain"),
     ("ABAP-ALIGN-005", "one test method per line", "chain"),
@@ -134,6 +139,7 @@ pub const RULE_PHRASES: &[(RuleId, &str, &str)] = &[
         "FORM signature",
     ),
     ("ABAP-SQL-001", "each clause on its own line", "statement"),
+    ("ABAP-SQL-003", "one field per line", "field list"),
     (
         "ABAP-SQL-002",
         "each common table expression on its own line",
@@ -271,6 +277,21 @@ fn line_length(text: &str, stream: &TokenStream, k: usize) -> u32 {
     let line_start = text[..at].rfind('\n').map_or(0, |i| i + 1);
     let line_end = text[at..].find('\n').map_or(text.len(), |i| at + i);
     text[line_start..line_end].trim_end().chars().count() as u32
+}
+
+/// Length of the widest line that holds tokens `first..=last` (`starts`:
+/// which tokens start a line).
+fn widest_line(
+    text: &str,
+    stream: &TokenStream,
+    starts: &[bool],
+    first: usize,
+    last: usize,
+) -> Option<u32> {
+    (first..=last)
+        .filter(|&k| k == first || starts[k])
+        .map(|k| line_length(text, stream, k))
+        .max()
 }
 
 /// The end-of-line comment that trails token `k` in `text`, if any.
@@ -429,6 +450,20 @@ fn notes(parts: &Parts, opts: &Options) -> Vec<Located> {
                         (
                             BreakCause::Width {
                                 column: line,
+                                limit,
+                                scope: Scope::Line,
+                            },
+                            rule,
+                        )
+                    } else if let Some(widest) =
+                        widest_line(&wide, &wide_stream, &wide_start, first, last)
+                            .filter(|&w| w > limit as u32)
+                    {
+                        // A layout that is chosen only when every line fits
+                        // (ABAP-COND-002): its widest line does not.
+                        (
+                            BreakCause::Width {
+                                column: widest,
                                 limit,
                                 scope: Scope::Line,
                             },

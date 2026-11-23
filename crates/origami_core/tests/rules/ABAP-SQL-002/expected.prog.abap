@@ -1,6 +1,8 @@
 WITH +carriers AS ( SELECT carrid, carrname FROM scarr ),
      +seats AS (
-       SELECT carrid, connid, sum( seatsocc ) AS seats
+       SELECT carrid,
+              connid,
+              sum( seatsocc ) AS seats
            FROM sflight
            WHERE carrid BETWEEN 'AA' AND 'LH'
            GROUP BY carrid, connid

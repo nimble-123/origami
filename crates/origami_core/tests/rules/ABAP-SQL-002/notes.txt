@@ -1,3 +1,4 @@
 1: ABAP-SQL-002: each common table expression on its own line
-2: ABAP-SQL-002: each common table expression on its own line, because the query would end at column 138 (limit 120)
-10: ABAP-SQL-001: each clause on its own line, because the statement would end at column 129 (limit 120)
+2: ABAP-SQL-002: each common table expression on its own line
+3: ABAP-SQL-003: one field per line
+12: ABAP-SQL-001: each clause on its own line, because the statement would end at column 129 (limit 120)

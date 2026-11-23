@@ -15,6 +15,8 @@ pub struct Ctx<'a> {
     pub stream: &'a TokenStream,
     /// Tokens with a leading own-line comment (they end alignment segments).
     pub commented: &'a [bool],
+    /// Tokens followed by an end-of-line comment.
+    pub eol_commented: &'a [bool],
     /// Tokens recognized as keywords.
     pub keywords: Vec<usize>,
     /// Record rule spans (explanations requested).
@@ -602,7 +604,11 @@ impl<'c, 'a> P<'c, 'a> {
                         docs.push(self.t(k));
                     }
                     self.pos = type_end;
-                    let body = self.parens(true)?;
+                    let body = if w == "COND" || w == "SWITCH" {
+                        self.cond_parens(w == "SWITCH")?
+                    } else {
+                        self.parens(true)?
+                    };
                     docs.push(body);
                     self.last_call = true;
                 } else if (w == "-" || w == "+") && i + 1 < self.end {
@@ -712,6 +718,283 @@ impl<'c, 'a> P<'c, 'a> {
                 Some(self.raw(lp, rp))
             }
         }
+    }
+
+    /// The body `( … )` of `COND` or `SWITCH` at `self.pos` (ABAP-COND-002);
+    /// a body it does not understand falls back to [`Self::parens`].
+    fn cond_parens(&mut self, switch: bool) -> Option<Doc> {
+        let lp = self.pos;
+        let rp = self.matching(lp)?;
+        if self.glued(lp + 1) || rp == lp + 1 {
+            return self.parens(true);
+        }
+        let saved = self.c.mark();
+        let parsed = {
+            let mut inner = P {
+                c: &mut *self.c,
+                pos: lp + 1,
+                end: rp,
+                first: self.first,
+                blank: false,
+                last_call: false,
+                period_at: rp,
+            };
+            inner.cond_body(lp, rp, switch)
+        };
+        match parsed {
+            Some(d) => {
+                self.pos = rp + 1;
+                Some(d)
+            }
+            None => {
+                self.c.reset(saved);
+                self.parens(true)
+            }
+        }
+    }
+
+    /// Whether a comment is attached inside `from..=to`: an end-of-line
+    /// comment after `from..to`, or an own-line comment before
+    /// `from + 1..=to`.
+    pub(crate) fn has_comment(&self, from: usize, to: usize) -> bool {
+        (from..to).any(|k| self.c.eol_commented[k]) || (from + 1..=to).any(|k| self.c.commented[k])
+    }
+
+    /// Width of `from..=to` printed by [`Self::flat`].
+    pub(crate) fn flat_width(&self, from: usize, to: usize) -> usize {
+        (from..=to)
+            .map(|k| self.text(k).chars().count() + usize::from(k > from && !self.glued(k)))
+            .sum()
+    }
+
+    /// `count` spaces before token `i` (which must not be glued).
+    pub(crate) fn spaces(&self, i: usize, count: usize) -> Doc {
+        b::concat((0..count).map(|_| self.sp(i)).collect())
+    }
+
+    /// `LET name = value … IN` at `self.pos`.
+    fn let_expr(&mut self) -> Option<Doc> {
+        let l = self.pos;
+        let lead = self.kw(l);
+        self.pos += 1;
+        let mut defs = Vec::new();
+        while !self.is(self.pos, "IN") {
+            let name = self.pos;
+            if !self.is_named_row(name) || self.glued(name) {
+                return None;
+            }
+            self.pos = name + 2;
+            let value = self.expr()?;
+            if !defs.is_empty() {
+                defs.push(self.ln(name));
+            }
+            defs.push(b::concat(vec![
+                self.t(name),
+                self.sp(name + 1),
+                self.t(name + 1),
+                self.sp(name + 2),
+                value,
+            ]));
+        }
+        let i = self.pos;
+        let tail = self.kw(i);
+        self.pos += 1;
+        Some(b::group(vec![
+            lead,
+            self.sp(l + 1),
+            b::hang(defs),
+            self.sp(i),
+            tail,
+        ]))
+    }
+
+    /// A `THEN` or `ELSE` value: an expression or `THROW [RESUMABLE|SHORTDUMP]
+    /// cx( … )`.
+    fn cond_value(&mut self) -> Option<Doc> {
+        let i = self.pos;
+        if !self.is(i, "THROW") {
+            return self.expr();
+        }
+        let mut docs = vec![self.kw(i)];
+        self.pos += 1;
+        if self.is(self.pos, "RESUMABLE") || self.is(self.pos, "SHORTDUMP") {
+            docs.push(self.sp(self.pos));
+            docs.push(self.kw(self.pos));
+            self.pos += 1;
+        }
+        docs.push(self.sp(self.pos));
+        docs.push(self.operand()?);
+        Some(b::concat(docs))
+    }
+
+    /// `COND` / `SWITCH` body between `lp` and `rp` (ABAP-COND-002). One
+    /// `WHEN`: on one line if it fits, else `WHEN`, `THEN` and `ELSE` below
+    /// each other. Several: one `WHEN … THEN …` per line with `THEN` and the
+    /// values aligned (tabular), or, if that does not fit, `THEN` at the end
+    /// of the `WHEN` line and each value on its own line, one level deeper.
+    /// `LET … IN` and the `SWITCH` operand come first.
+    fn cond_body(&mut self, lp: usize, rp: usize, switch: bool) -> Option<Doc> {
+        struct Branch {
+            when: usize,
+            then: usize,
+            cond: Doc,
+            value: Doc,
+        }
+        // Parts before the first `WHEN`: (first token, doc).
+        let mut lead: Vec<(usize, Doc)> = Vec::new();
+        if self.is(self.pos, "LET") {
+            let at = self.pos;
+            lead.push((at, self.let_expr()?));
+        }
+        if switch {
+            let at = self.pos;
+            lead.push((at, self.expr()?));
+        }
+        let mut branches = Vec::new();
+        while self.is(self.pos, "WHEN") {
+            let when = self.pos;
+            self.c.keywords.push(when);
+            self.pos += 1;
+            let cond = if switch {
+                self.expr()?
+            } else {
+                self.logical()?
+            };
+            let then = self.pos;
+            if !self.is(then, "THEN") {
+                return None;
+            }
+            self.c.keywords.push(then);
+            self.pos += 1;
+            let value = self.cond_value()?;
+            branches.push(Branch {
+                when,
+                then,
+                cond: b::shared(cond),
+                value: b::shared(value),
+            });
+        }
+        let mut otherwise = None;
+        if self.is(self.pos, "ELSE") {
+            let e = self.pos;
+            self.c.keywords.push(e);
+            self.pos += 1;
+            otherwise = Some((e, b::shared(self.cond_value()?)));
+        }
+        if branches.is_empty() || !self.at_end() {
+            return None;
+        }
+        self.c.span(lp, rp, "ABAP-COND-002");
+
+        let content = if branches.len() == 1 {
+            // One line if it fits; else every part below the previous one.
+            let br = &branches[0];
+            let mut docs = Vec::new();
+            for (at, d) in &lead {
+                if !docs.is_empty() {
+                    docs.push(self.ln(*at));
+                }
+                docs.push(d.clone());
+            }
+            if !docs.is_empty() {
+                docs.push(self.ln(br.when));
+            }
+            docs.extend([
+                self.t(br.when),
+                self.sp(br.when + 1),
+                b::cont(vec![br.cond.clone()]),
+                self.ln(br.then),
+                self.t(br.then),
+                self.sp(br.then + 1),
+                b::cont(vec![br.value.clone()]),
+            ]);
+            if let Some((e, v)) = &otherwise {
+                docs.extend([
+                    self.ln(*e),
+                    self.t(*e),
+                    self.sp(e + 1),
+                    b::cont(vec![v.clone()]),
+                ]);
+            }
+            b::group(docs)
+        } else {
+            let mut head = Vec::new();
+            for (at, d) in &lead {
+                if !head.is_empty() {
+                    head.push(self.hl(*at));
+                }
+                head.push(d.clone());
+            }
+            let first_when = branches[0].when;
+            if !head.is_empty() {
+                head.push(self.hl(first_when));
+            }
+            // Complex: `WHEN cond THEN`, the value one level deeper.
+            let mut complex = Vec::new();
+            for (n, br) in branches.iter().enumerate() {
+                if n > 0 {
+                    complex.push(self.hl(br.when));
+                }
+                complex.extend([
+                    self.t(br.when),
+                    self.sp(br.when + 1),
+                    b::cont(vec![br.cond.clone()]),
+                    self.sp(br.then),
+                    self.t(br.then),
+                    b::indent(vec![self.hl(br.then + 1), br.value.clone()]),
+                ]);
+            }
+            if let Some((e, v)) = &otherwise {
+                complex.extend([
+                    self.hl(*e),
+                    self.t(*e),
+                    b::indent(vec![self.hl(e + 1), v.clone()]),
+                ]);
+            }
+            let complex = b::concat(complex);
+            // Tabular: `WHEN cond` printed flat, so its width is known; a
+            // comment or a nested COND/SWITCH there rules it out.
+            let tabular_ok = branches.iter().all(|br| {
+                !self.has_comment(br.when, br.then + 1)
+                    && !(br.when + 1..br.then).any(|k| self.is(k, "COND") || self.is(k, "SWITCH"))
+            });
+            let body = if tabular_ok {
+                let widths: Vec<usize> = branches
+                    .iter()
+                    .map(|br| self.flat_width(br.when, br.then - 1))
+                    .collect();
+                let max = widths.iter().copied().max().unwrap_or(0);
+                let mut tab = Vec::new();
+                for (n, br) in branches.iter().enumerate() {
+                    if n > 0 {
+                        tab.push(self.hl(br.when));
+                    }
+                    tab.extend([
+                        self.flat(br.when, br.then - 1),
+                        self.spaces(br.then, max - widths[n] + 1),
+                        self.t(br.then),
+                        self.sp(br.then + 1),
+                        b::cont(vec![br.value.clone()]),
+                    ]);
+                }
+                if let Some((e, v)) = &otherwise {
+                    // The ELSE value lines up with the THEN values.
+                    tab.extend([
+                        self.hl(*e),
+                        self.t(*e),
+                        self.spaces(e + 1, max + 2),
+                        b::cont(vec![v.clone()]),
+                    ]);
+                }
+                b::choice(b::concat(tab), complex)
+            } else {
+                complex
+            };
+            head.push(body);
+            b::concat(head)
+        };
+        let content = b::shared(content);
+        Some(self.hanging(lp, rp, content.clone(), content))
     }
 
     /// `( … )` with hanging content and the fallback after `(`.
@@ -1401,6 +1684,7 @@ mod tests {
             text: "",
             stream: &stream,
             commented: &[],
+            eol_commented: &[],
             keywords: vec![1],
             explain: true,
             rule_spans: Vec::new(),

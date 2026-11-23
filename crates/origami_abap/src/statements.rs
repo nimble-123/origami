@@ -2406,6 +2406,12 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
     let mut mode = spec.after_lead;
     let mut prev_kw: Option<String> = None;
     let mut in_exceptions = false;
+    // ABAP-SQL-003: a field list follows `SELECT` (after `SINGLE`,
+    // `DISTINCT`, …), `FIELDS`, `GROUP BY` and `ORDER BY`; `INTO ( … )`.
+    let select = spec.commas && spec.lead.first() == Some(&"SELECT");
+    let mut list_next = select && p.pos > 0 && p.is(p.pos - 1, "SELECT");
+    let mut order_by = false;
+    let mut into_next = false;
     while !p.at_end() {
         let i = p.pos;
         // `EXCEPTIONS … OTHERS = n`; `EVENTS e EXPORTING VALUE(p) …`
@@ -2469,6 +2475,9 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
                     && matches_words(p, i, &c.split(' ').collect::<Vec<_>>())
             });
             in_exceptions = phrase == Some(&"EXCEPTIONS");
+            list_next = select && matches!(phrase, Some(&("FIELDS" | "GROUP BY" | "ORDER BY")));
+            order_by = phrase == Some(&"ORDER BY");
+            into_next = select && phrase == Some(&"INTO");
             mode = if phrase.is_some_and(|c| spec.logical_clauses.contains(c)) {
                 Operands::Logical
             } else {
@@ -2485,7 +2494,31 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
             }
             p.pos = i + n_word;
             prev_kw = Some(p.upper(i + n_word - 1));
+            into_next = false;
             continue;
+        }
+        let (list_here, into_here) = (
+            std::mem::take(&mut list_next),
+            std::mem::take(&mut into_next),
+        );
+        if list_here || into_here {
+            let saved = p.c.mark();
+            let list = if into_here {
+                into_list(p, spec, i)
+            } else {
+                select_list(p, spec, i, order_by)
+            };
+            match list {
+                Some(d) => {
+                    current.push(gap(p, i, skip));
+                    current.push(d);
+                    continue;
+                }
+                None => {
+                    p.c.reset(saved);
+                    p.pos = i;
+                }
+            }
         }
         if spec.commas && p.kind(i) == COMMA {
             current.push(gap(p, i, skip));
@@ -2624,6 +2657,302 @@ fn spec_chain(p: &mut P, spec: &Spec, head: Doc) -> Option<Doc> {
         p.sp(colon + 1),
         b::hang(docs),
         p.period(),
+    ]))
+}
+
+/// One field of an ABAP SQL field list (ABAP-SQL-003).
+struct ListItem {
+    first: usize,
+    /// Last token of the field without its additions.
+    field_end: usize,
+    field: Vec<Doc>,
+    /// `AS alias`: the `AS` token.
+    alias: Option<usize>,
+    /// `AS alias`, `ASCENDING`, `NULLS FIRST`, … (first token, docs).
+    adds: Option<(usize, Vec<Doc>)>,
+    comma: Option<usize>,
+}
+
+/// Field list from `from` up to the next clause of a SELECT (ABAP-SQL-003):
+/// with simple fields only on one line if it fits, else one field per line,
+/// aligned under the first; with a complex field always one field per line,
+/// `AS` aligned. `None` (nothing consumed) for a list of fewer than two
+/// fields or one this parser does not understand.
+fn select_list(p: &mut P, spec: &Spec, from: usize, order_by: bool) -> Option<Doc> {
+    // The list ends at the next clause at bracket depth 0.
+    let mut depth = 0i32;
+    let mut to = from;
+    let mut has_comma = false;
+    while to < p.end {
+        if depth == 0 && to > from && phrase_at(p, to, spec.clauses) > 0 {
+            break;
+        }
+        match p.kind(to) {
+            LPAREN | LBRACKET => depth += 1,
+            RPAREN | RBRACKET => depth -= 1,
+            COMMA if depth == 0 => has_comma = true,
+            COLON | PRAGMA => return None,
+            _ => {}
+        }
+        to += 1;
+    }
+    let end = p.end;
+    p.end = to;
+    p.pos = from;
+    let items = list_items(p, spec, has_comma, order_by);
+    p.end = end;
+    let items = items.filter(|items| items.len() >= 2)?;
+    p.pos = to;
+    p.c.span(from, to - 1, "ABAP-SQL-003");
+
+    // Complex: an addition, a `~`, or more than one glued run of tokens.
+    let simple = |it: &ListItem| {
+        it.adds.is_none()
+            && (it.first + 1..=it.field_end).all(|k| p.glued(k))
+            && !(it.first..=it.field_end).any(|k| {
+                let tilde = p.kind(k) == SELECTOR && p.text(k) == "~";
+                tilde
+                    || matches!(
+                        p.kind(k),
+                        LPAREN | RPAREN | LBRACKET | RBRACKET | LBRACE | RBRACE | TEMPLATE_HEAD
+                    )
+            })
+    };
+    let complex = !items.iter().all(simple);
+    let comma = |p: &P, it: &ListItem| match it.comma {
+        Some(c) => b::concat(vec![p.sp(c), p.t(c)]),
+        None => b::empty(),
+    };
+    if !complex {
+        let mut docs = Vec::new();
+        for (n, it) in items.into_iter().enumerate() {
+            if n > 0 {
+                docs.push(p.ln(it.first));
+            }
+            let c = comma(p, &it);
+            docs.push(b::concat(it.field));
+            docs.push(c);
+        }
+        return Some(b::group(vec![b::hang(docs)]));
+    }
+    // `AS` lines up when every field is printed flat (no comment inside).
+    let align = items.iter().any(|it| it.alias.is_some())
+        && items
+            .iter()
+            .all(|it| !p.has_comment(it.first, it.field_end + 1));
+    let max = items
+        .iter()
+        .map(|it| p.flat_width(it.first, it.field_end))
+        .max()
+        .unwrap_or(0);
+    let mut rows = Vec::new();
+    for (n, it) in items.into_iter().enumerate() {
+        if n > 0 {
+            rows.push(p.hl(it.first));
+        }
+        let c = comma(p, &it);
+        if align {
+            rows.push(p.flat(it.first, it.field_end));
+        } else {
+            rows.push(b::concat(it.field));
+        }
+        if let Some((at, adds)) = it.adds {
+            let pad = match it.alias {
+                Some(_) if align => max - p.flat_width(it.first, it.field_end) + 1,
+                _ => 1,
+            };
+            rows.push(p.spaces(at, pad));
+            rows.push(b::concat(adds));
+        }
+        rows.push(c);
+    }
+    Some(b::hang(rows))
+}
+
+/// The fields of a list from `p.pos` to `p.end`. Without commas (classic
+/// syntax) each operand is a field.
+fn list_items(p: &mut P, spec: &Spec, has_comma: bool, order_by: bool) -> Option<Vec<ListItem>> {
+    let mut items = Vec::new();
+    while !p.at_end() {
+        let first = p.pos;
+        let mut field = Vec::new();
+        while !p.at_end() {
+            let i = p.pos;
+            let addition = p.is(i, "AS")
+                || p.is(i, "NULLS")
+                || (order_by && (p.is(i, "ASCENDING") || p.is(i, "DESCENDING")));
+            if p.kind(i) == COMMA || (addition && !p.glued(i)) || (!has_comma && !field.is_empty())
+            {
+                break;
+            }
+            if !field.is_empty() {
+                field.push(p.sp(i));
+            }
+            let n_word = phrase_at(p, i, spec.words);
+            if n_word > 0 {
+                if !has_comma {
+                    return None;
+                }
+                for k in 0..n_word {
+                    if k > 0 {
+                        field.push(p.sp(i + k));
+                    }
+                    field.push(p.kw(i + k));
+                }
+                p.pos = i + n_word;
+                continue;
+            }
+            if p.kind(i) == WORD && matches!(p.text(i), "*" | "=" | "<>" | "<" | ">" | "<=" | ">=")
+            {
+                field.push(p.t(i));
+                p.pos = i + 1;
+                continue;
+            }
+            let saved = p.c.mark();
+            match p.expr() {
+                Some(d) => field.push(d),
+                None => {
+                    // Brackets the expression parser does not know stay as
+                    // written (as in `spec_body`).
+                    p.c.reset(saved);
+                    p.pos = i;
+                    let open = if matches!(p.kind(i), LPAREN | LBRACKET) {
+                        i
+                    } else if p.kind(i) == WORD
+                        && p.glued(i + 1)
+                        && matches!(p.kind(i + 1), LPAREN | LBRACKET)
+                    {
+                        i + 1
+                    } else {
+                        return None;
+                    };
+                    let close = p.matching(open).filter(|&c| c < p.end)?;
+                    p.mark_phrases(open + 1, close);
+                    field.push(p.raw(i, close));
+                    p.pos = close + 1;
+                }
+            }
+        }
+        if field.is_empty() {
+            return None;
+        }
+        let field_end = p.pos - 1;
+        let mut alias = None;
+        let mut adds = None;
+        let a = p.pos;
+        if p.is(a, "AS") {
+            if a + 1 >= p.end || p.kind(a + 1) != WORD {
+                return None;
+            }
+            alias = Some(a);
+            adds = Some((a, vec![p.kw(a), p.sp(a + 1), p.t(a + 1)]));
+            p.pos = a + 2;
+        } else {
+            let mut docs = Vec::new();
+            while !p.at_end()
+                && p.kind(p.pos) == WORD
+                && !p.glued(p.pos)
+                && matches!(
+                    p.upper(p.pos).as_str(),
+                    "ASCENDING" | "DESCENDING" | "NULLS" | "FIRST" | "LAST"
+                )
+            {
+                let k = p.pos;
+                if !docs.is_empty() {
+                    docs.push(p.sp(k));
+                }
+                docs.push(if p.is(k, "ASCENDING") || p.is(k, "DESCENDING") {
+                    p.kw(k)
+                } else {
+                    p.t(k)
+                });
+                p.pos += 1;
+            }
+            if !docs.is_empty() {
+                adds = Some((a, docs));
+            }
+        }
+        let comma = if p.kind(p.pos) == COMMA {
+            let c = p.pos;
+            p.pos += 1;
+            if p.at_end() {
+                return None;
+            }
+            Some(c)
+        } else {
+            if has_comma && !p.at_end() {
+                return None;
+            }
+            None
+        };
+        items.push(ListItem {
+            first,
+            field_end,
+            field,
+            alias,
+            adds,
+            comma,
+        });
+    }
+    Some(items)
+}
+
+/// `INTO ( a, b, … )` at `lp` (ABAP-SQL-003): on one line if it fits, else
+/// one target per line, aligned under the first.
+fn into_list(p: &mut P, spec: &Spec, lp: usize) -> Option<Doc> {
+    if p.kind(lp) != LPAREN || p.glued(lp) || p.is(lp + 1, "SELECT") {
+        return None;
+    }
+    let rp = p.matching(lp).filter(|&c| c < p.end)?;
+    if rp + 1 < p.end && phrase_at(p, rp + 1, spec.clauses) == 0 {
+        return None;
+    }
+    let end = p.end;
+    p.end = rp;
+    p.pos = lp + 1;
+    let mut items = Vec::new();
+    let ok = loop {
+        if p.at_end() {
+            break true;
+        }
+        let first = p.pos;
+        let Some(d) = p.expr() else { break false };
+        let comma = if p.kind(p.pos) == COMMA {
+            p.pos += 1;
+            Some(p.pos - 1)
+        } else if p.at_end() {
+            None
+        } else {
+            break false;
+        };
+        let mut docs = vec![d];
+        if let Some(c) = comma {
+            if p.at_end() {
+                break false;
+            }
+            docs.extend([p.sp(c), p.t(c)]);
+        }
+        items.push((first, b::concat(docs)));
+    };
+    p.end = end;
+    if !ok || items.len() < 2 {
+        return None;
+    }
+    p.pos = rp + 1;
+    p.c.span(lp, rp, "ABAP-SQL-003");
+    let mut docs = Vec::new();
+    for (n, (first, d)) in items.into_iter().enumerate() {
+        if n > 0 {
+            docs.push(p.ln(first));
+        }
+        docs.push(d);
+    }
+    Some(b::group(vec![
+        p.t(lp),
+        p.sp(lp + 1),
+        b::hang(docs),
+        p.sp(rp),
+        p.t(rp),
     ]))
 }
 
