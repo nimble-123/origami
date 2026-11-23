@@ -13,17 +13,17 @@ members = [
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "0.1.0" # x-release-please-version
+version = "0.1.1" # x-release-please-version
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.94"
 
 [workspace.dependencies]
-origami_syntax = { path = "crates/origami_syntax", version = "0.1.0" } # x-release-please-version
-origami_layout = { path = "crates/origami_layout", version = "0.1.0" } # x-release-please-version
-origami_abap = { path = "crates/origami_abap", version = "0.1.0" } # x-release-please-version
-origami_cds = { path = "crates/origami_cds", version = "0.1.0" } # x-release-please-version
-origami_core = { path = "crates/origami_core", version = "0.1.0" } # x-release-please-version
+origami_syntax = { path = "crates/origami_syntax", version = "0.1.1" } # x-release-please-version
+origami_layout = { path = "crates/origami_layout", version = "0.1.1" } # x-release-please-version
+origami_abap = { path = "crates/origami_abap", version = "0.1.1" } # x-release-please-version
+origami_cds = { path = "crates/origami_cds", version = "0.1.1" } # x-release-please-version
+origami_core = { path = "crates/origami_core", version = "0.1.1" } # x-release-please-version
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
