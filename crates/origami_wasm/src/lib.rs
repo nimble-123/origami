@@ -75,13 +75,29 @@ pub fn review_json(source: &str, cds: bool, width: u16, indent: u8, lower: bool)
     .to_string()
 }
 
-/// A buffer of `len` bytes for JavaScript to fill.
+/// The size of the allocation behind a buffer of `len` bytes: at least one
+/// byte, so that every buffer has a real allocation.
+fn alloc_len(len: usize) -> usize {
+    len.max(1)
+}
+
+/// A zeroed buffer of `len` bytes for JavaScript to fill. Buffers are boxed
+/// slices, so the allocation is exactly `len.max(1)` bytes and [`dealloc`]
+/// can rebuild it from the pointer and length alone.
 #[unsafe(no_mangle)]
 pub extern "C" fn alloc(len: usize) -> *mut u8 {
-    let mut v = Vec::<u8>::with_capacity(len.max(1));
-    let p = v.as_mut_ptr();
-    std::mem::forget(v);
-    p
+    Box::into_raw(vec![0u8; alloc_len(len)].into_boxed_slice()).cast::<u8>()
+}
+
+/// Takes ownership of a buffer from [`alloc`] or [`review`] again.
+///
+/// # Safety
+/// `ptr` and `len` must come from `alloc(len)` or from `review` /
+/// `result_len`, and the buffer must not be used afterwards.
+unsafe fn take_buffer(ptr: *mut u8, len: usize) -> Box<[u8]> {
+    // SAFETY: the caller passes a pointer and length from `alloc` or
+    // `review`; both leak a `Box<[u8]>` of exactly `alloc_len(len)` bytes.
+    unsafe { Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, alloc_len(len))) }
 }
 
 /// Frees a buffer from [`alloc`] or [`review`].
@@ -91,9 +107,8 @@ pub extern "C" fn alloc(len: usize) -> *mut u8 {
 /// `result_len`, and the buffer must not be used afterwards.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dealloc(ptr: *mut u8, len: usize) {
-    // SAFETY: the caller passes a pointer and capacity from `alloc` or
-    // `review`, which both leak a Vec<u8> of exactly that capacity.
-    drop(unsafe { Vec::from_raw_parts(ptr, 0, len.max(1)) });
+    // SAFETY: forwarded from the caller.
+    drop(unsafe { take_buffer(ptr, len) });
 }
 
 /// Length of the last result of [`review`].
@@ -117,22 +132,25 @@ pub unsafe extern "C" fn review(
     lower: u32,
 ) -> *mut u8 {
     // SAFETY: `ptr` comes from `alloc(len)` and JavaScript wrote `len` bytes.
-    let input = unsafe { Vec::from_raw_parts(ptr, len, len.max(1)) };
-    let source = String::from_utf8_lossy(&input);
+    let input = unsafe { take_buffer(ptr, len) };
+    let source = String::from_utf8_lossy(&input[..len]);
     let width = u16::try_from(width).unwrap_or(120);
     let indent = u8::try_from(indent).unwrap_or(2);
-    let out = review_json(&source, cds != 0, width, indent, lower != 0).into_bytes();
-    let mut out = std::mem::ManuallyDrop::new(out);
-    out.shrink_to_fit();
-    // `dealloc(ptr, result_len())` frees it: shrink_to_fit makes capacity
-    // equal to the length for u8 buffers.
-    RESULT_LEN.with(|l| l.set(out.capacity()));
-    out.as_mut_ptr()
+    let mut out = review_json(&source, cds != 0, width, indent, lower != 0).into_bytes();
+    if out.is_empty() {
+        // Not reachable (the JSON is never empty); keeps `alloc_len` honest.
+        out.push(b' ');
+    }
+    // A boxed slice has capacity == length, which `dealloc(ptr, result_len())`
+    // relies on.
+    let out = out.into_boxed_slice();
+    RESULT_LEN.with(|l| l.set(out.len()));
+    Box::into_raw(out).cast::<u8>()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::review_json;
+    use super::{alloc, dealloc, result_len, review, review_json};
 
     #[test]
     fn formats_and_explains() {
@@ -151,5 +169,51 @@ mod tests {
         assert_eq!(v["status"], "error");
         assert_eq!(v["diagnostics"][0]["code"], "E003");
         assert!(v["output"].is_null());
+    }
+
+    /// Runs the FFI the way the page does: alloc, write, review, read, dealloc.
+    fn ffi_review(source: &[u8], cds: u32) -> serde_json::Value {
+        let ptr = alloc(source.len());
+        // SAFETY: `alloc(len)` returns at least `len` writable bytes.
+        unsafe { std::ptr::copy_nonoverlapping(source.as_ptr(), ptr, source.len()) };
+        // SAFETY: `ptr` comes from `alloc(source.len())` and holds those bytes.
+        let res = unsafe { review(ptr, source.len(), cds, 120, 2, 0) };
+        let len = result_len();
+        // SAFETY: `review` returns `result_len()` initialized bytes at `res`.
+        let json = unsafe { std::slice::from_raw_parts(res, len) }.to_vec();
+        // SAFETY: `res` and `len` come from `review` / `result_len`.
+        unsafe { dealloc(res, len) };
+        serde_json::from_slice(&json).unwrap()
+    }
+
+    #[test]
+    fn ffi_round_trip() {
+        let v = ffi_review(b"lv_a = 1. lv_b = 2.\n", 0);
+        assert_eq!(v["status"], "formatted");
+        assert_eq!(v["output"], "lv_a = 1.\nlv_b = 2.\n");
+        let v = ffi_review(
+            b"@EndUserText.label: 'x'\ndefine view entity Z as select from t { key a }\n",
+            1,
+        );
+        assert_eq!(v["language"], "ddls");
+    }
+
+    #[test]
+    fn ffi_empty_and_invalid_input() {
+        // Zero bytes still get a real allocation; invalid UTF-8 is replaced.
+        assert_eq!(ffi_review(b"", 0)["status"], "unchanged");
+        let _ = ffi_review(b"lv_a = '\xff\xfe'.\n", 0);
+    }
+
+    #[test]
+    fn alloc_dealloc_match_for_many_sizes() {
+        for len in [0, 1, 2, 7, 8, 63, 64, 65, 1000, 4096, 100_000] {
+            let p = alloc(len);
+            // SAFETY: the buffer has at least `len` bytes; freed with the same `len`.
+            unsafe {
+                std::ptr::write_bytes(p, 0xAB, len);
+                dealloc(p, len);
+            }
+        }
     }
 }

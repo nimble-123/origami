@@ -161,26 +161,16 @@ const output = $("pg-output");
 const outputText = $("pg-output-text");
 const status = $("pg-status");
 
-let wasm = null;
+// origami runs in a Web Worker (worker.js). A run that takes longer than
+// RUN_TIMEOUT_MS terminates the worker and starts a new one.
+const RUN_TIMEOUT_MS = 5000;
+const LOAD_ERROR = "The playground could not load origami.wasm. Install origami to try it locally.";
 
-async function loadWasm() {
-  const res = await fetch("origami.wasm");
-  const { instance } = await WebAssembly.instantiateStreaming
-    ? await WebAssembly.instantiateStreaming(res, {})
-    : await WebAssembly.instantiate(await res.arrayBuffer(), {});
-  return instance.exports;
-}
-
-function review(source, opts) {
-  const bytes = new TextEncoder().encode(source);
-  const ptr = wasm.alloc(bytes.length);
-  new Uint8Array(wasm.memory.buffer, ptr, bytes.length).set(bytes);
-  const res = wasm.review(ptr, bytes.length, opts.cds ? 1 : 0, opts.width, 2, opts.lower ? 1 : 0);
-  const len = wasm.result_len();
-  const json = new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, res, len));
-  wasm.dealloc(res, len);
-  return JSON.parse(json);
-}
+let worker = null;
+let ready = false;
+let nextId = 0;
+let inflight = null; // { id, timer }
+let queued = null; // the newest request made while a run was in flight
 
 function ruleLink(text, rule) {
   const span = document.createElement("span");
@@ -267,21 +257,58 @@ function schedule() {
   timer = setTimeout(run, 120);
 }
 
-async function run() {
-  if (!wasm) return;
-  const t0 = performance.now();
-  let r;
-  try {
-    r = review(input.value, options());
-  } catch {
-    // A panic aborts the instance; start a fresh one.
-    wasm = await loadWasm();
-    status.classList.add("error");
-    status.textContent = "origami stopped on this input (internal error). Please report it with the code.";
-    return;
-  }
-  r.ms = Math.max(1, Math.round(performance.now() - t0));
-  render(r);
+function showError(message) {
+  status.classList.add("error");
+  status.textContent = message;
+}
+
+function startWorker() {
+  ready = false;
+  const mine = new Worker("worker.js");
+  worker = mine;
+  mine.onmessage = ({ data }) => {
+    if (mine !== worker) return;
+    if (data.type === "ready") {
+      ready = true;
+      if (queued) dispatch();
+      else run();
+    } else if (data.type === "load-error") {
+      showError(LOAD_ERROR);
+    } else if (inflight && data.id === inflight.id) {
+      clearTimeout(inflight.timer);
+      inflight = null;
+      if (data.type === "panic") {
+        showError("origami stopped on this input (internal error). Please report it with the code.");
+      } else {
+        render(data.result);
+      }
+      if (queued) dispatch();
+    }
+  };
+  mine.onerror = () => showError(LOAD_ERROR);
+}
+
+function dispatch() {
+  const job = queued;
+  queued = null;
+  const id = nextId++;
+  const timer = setTimeout(() => {
+    // The worker is stuck in a long run: stop it and start a new one.
+    worker.terminate();
+    inflight = null;
+    showError(
+      `origami took longer than ${RUN_TIMEOUT_MS / 1000} seconds on this input and was stopped. Try a smaller input.`,
+    );
+    startWorker();
+  }, RUN_TIMEOUT_MS);
+  inflight = { id, timer };
+  worker.postMessage({ id, ...job });
+}
+
+function run() {
+  if (!ready) return;
+  queued = { source: input.value, opts: options() };
+  if (!inflight) dispatch();
 }
 
 function loadExample(key) {
@@ -305,11 +332,9 @@ async function playground() {
     }
   });
   try {
-    wasm = await loadWasm();
-    run();
+    startWorker();
   } catch {
-    status.classList.add("error");
-    status.textContent = "The playground could not load origami.wasm. Install origami to try it locally.";
+    showError(LOAD_ERROR);
   }
 }
 

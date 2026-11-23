@@ -43,7 +43,7 @@ tempfile = "3.27"
 similar = { version = "3.2", features = ["inline"] }
 criterion = "0.8"
 assert_cmd = "2.2"
-jsonschema = "0.62"
+jsonschema = { version = "0.62", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

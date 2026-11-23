@@ -1,0 +1,42 @@
+name: Formatting disagreement
+description: origami formats a line in a way you would not. Nothing is broken, but you want to discuss the rule.
+labels: ["style"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every line break and every changed character comes from a rule in
+        [docs/STYLE.md](https://github.com/nimble-123/origami/blob/main/docs/STYLE.md).
+        Run `origami --review` on the file: it prints the rule ID below each
+        change. Strip anything confidential from the input.
+  - type: input
+    id: version
+    attributes:
+      label: origami version
+      description: Output of `origami --version`.
+      placeholder: "0.1.1"
+    validations:
+      required: true
+  - type: input
+    id: rule
+    attributes:
+      label: Rule ID
+      description: The ID that `origami --review` printed for the line.
+      placeholder: "ABAP-CALL-001"
+    validations:
+      required: true
+  - type: textarea
+    id: line
+    attributes:
+      label: The line, as written and as formatted
+      description: The input, and what origami made of it. Include the line width if it is not 120.
+      render: abap
+    validations:
+      required: true
+  - type: textarea
+    id: wanted
+    attributes:
+      label: What you would write instead
+      description: And why. A reference to the Clean ABAP guide or to what your team does is useful.
+    validations:
+      required: true

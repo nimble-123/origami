@@ -1,0 +1,55 @@
+name: Bug report
+description: origami crashed, hung, changed the meaning of code, or gave a different result on the second run.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If origami formats a line in a way you would not, but works as
+        designed, use "Formatting disagreement" instead.
+        Strip anything confidential from the input; a few lines that show
+        the problem are enough.
+  - type: input
+    id: version
+    attributes:
+      label: origami version
+      description: Output of `origami --version`, or the VS Code extension version.
+      placeholder: "0.1.1"
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command or editor action
+      description: The exact command line, or the editor action (format document, Preview Changes, ...).
+      placeholder: "origami --check --changed main"
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Input
+      description: The smallest piece of source that shows the problem, and the contents of `origami.toml` if you have one.
+      render: abap
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What you expected to happen or to be printed.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: What happened. Include the full output, the diagnostic code (for example E020 or X001) and the exit code.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: Operating system, and how you installed origami.
+      placeholder: "macOS 15, brew"

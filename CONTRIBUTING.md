@@ -34,7 +34,18 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-Before a pull request that touches formatting, also run the real-world checks:
+Before a pull request, run the whole chain with one command. It runs the steps
+below in order and stops at the first failure:
+
+```sh
+cargo xtask ci           # fmt, clippy, test, corpus, explain, oracle, stress
+cargo xtask ci --full    # the same, plus the idempotency sweep (minutes)
+```
+
+The corpus steps need `cargo xtask corpus fetch` once; the oracle step is
+skipped, with a note, until you run `npm ci` in `tools/abaplint-oracle`.
+
+The individual real-world checks, for a pull request that touches formatting:
 
 ```sh
 cargo xtask corpus fetch      # once: clones the public test repositories
@@ -44,6 +55,35 @@ cargo xtask oracle            # abaplint's lexer sees the same tokens
 cargo xtask stress 20000 1    # mutated inputs never crash or corrupt
 cargo xtask idempotency       # idempotent at every width, indent and case (minutes)
 ```
+
+### Idempotency sweep
+
+`cargo xtask idempotency` formats every corpus file at 80 settings (8 line
+widths, 5 indent widths, 2 keyword cases) and checks that formatting the
+output again changes nothing, that `explain` agrees with `format`, and that
+formatting a few lines of an already formatted file changes nothing. The
+corpus run checks the default setting only, and a second pass tends to differ
+at widths near the length of a construct. The nightly fuzz workflow runs the
+sweep too. A failure names the file and the setting; reproduce it with
+`--line-width` and `--indent-width` and fix the layout code, not the input.
+
+### Fuzzing
+
+The fuzz targets feed arbitrary bytes to the formatter and check that it never
+crashes, never reports X001 or X002, and that its output formats to itself. You
+need a nightly toolchain and `cargo install cargo-fuzz`:
+
+```sh
+cargo +nightly fuzz run format_abap     # or format_cds
+```
+
+A finding is saved under `fuzz/artifacts/`. Copy it to `fuzz/found/` with a
+name that says what it is (`abap-crlf.bin`) and open a pull request with the
+fix. `crates/origami_core/tests/fuzz_regressions.rs` runs every file in
+`fuzz/found/` as an ordinary test, so a fixed finding stays fixed. Prefix the
+name with `open-` for a finding that is known and not yet fixed; the test
+skips those. The nightly workflow runs both targets and opens an issue on a
+failure.
 
 The VS Code extension (`editors/vscode`): `npm ci`, `npm test`,
 `npm run lint`, `npm run test:e2e`. The website (`site/`):

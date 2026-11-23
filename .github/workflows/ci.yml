@@ -65,8 +65,45 @@ jobs:
       - run: cargo bench -p origami_core
       - run: scripts/bench-cli.sh
 
-  extension:
+  # The compiler channels a user might build with, next to the pinned
+  # toolchain of the `test` job. Beta is an early warning, not a gate.
+  toolchains:
+    name: toolchain (${{ matrix.toolchain }})
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: [stable, beta]
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.toolchain == 'beta' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal
+      - run: cargo +${{ matrix.toolchain }} test --workspace
+
+  # origami_wasm for the browser: the build site.yml deploys, and the C ABI
+  # (alloc, review, dealloc) called from Node like the playground worker does.
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: rustup target add wasm32-unknown-unknown
+      - run: sh site/build.sh
+      - run: node crates/origami_wasm/tests/smoke.mjs site/dist/origami.wasm
+
+  extension-os:
+    name: extension (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -74,19 +111,43 @@ jobs:
         with:
           node-version: 22
       - run: cargo build --release -p abap-origami
-      - name: Lint, typecheck, unit tests, bundle
+      - name: Install, unit tests, bundle
         working-directory: editors/vscode
         run: |
           npm ci
-          npm run lint
-          npx tsc --noEmit
           npm test
           npm run build
-      - name: End-to-end tests in VS Code
+      - name: Lint and typecheck
+        if: runner.os == 'Linux'
         working-directory: editors/vscode
         run: |
-          mkdir -p bin && cp ../../target/release/origami bin/origami
-          xvfb-run -a npm run test:e2e
+          npm run lint
+          npx tsc --noEmit
+      - name: Bundle the origami binary
+        shell: bash
+        working-directory: editors/vscode
+        run: |
+          mkdir -p bin
+          if [ "$RUNNER_OS" = Windows ]; then exe=origami.exe; else exe=origami; fi
+          cp "../../target/release/$exe" "bin/$exe"
+      - name: End-to-end tests in VS Code (Linux, needs a display)
+        if: runner.os == 'Linux'
+        working-directory: editors/vscode
+        run: xvfb-run -a npm run test:e2e
+      - name: End-to-end tests in VS Code
+        if: runner.os != 'Linux'
+        working-directory: editors/vscode
+        run: npm run test:e2e
       - name: Package VSIX (linux-x64)
+        if: runner.os == 'Linux'
         working-directory: editors/vscode
         run: npx vsce package --target linux-x64 --no-dependencies --allow-missing-repository
+
+  # The required check `extension`: passes when the extension passed on every
+  # operating system.
+  extension:
+    needs: extension-os
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.extension-os.result }}" = success

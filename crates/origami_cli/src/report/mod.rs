@@ -9,7 +9,7 @@ pub mod json;
 pub mod review;
 pub mod sarif;
 
-use origami_core::{Language, Reported, Status};
+use origami_core::{Language, Position, Reported, Status};
 
 /// The outcome for one file (or `<stdin>`, or a config file).
 #[derive(Debug, Clone)]
@@ -45,6 +45,24 @@ impl Run<'_> {
             })
             .collect();
         (out, truncated)
+    }
+}
+
+/// The position of byte `at` in `text` as reported to users: 1-based line,
+/// 1-based column in UTF-16 code units, and the byte offset after
+/// CRLF-to-LF conversion.
+pub fn position(text: &str, at: usize) -> Position {
+    let mut at = at.min(text.len());
+    while !text.is_char_boundary(at) {
+        at -= 1;
+    }
+    let before = &text[..at];
+    let line_start = before.rfind('\n').map_or(0, |i| i + 1);
+    let count = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
+    Position {
+        line: count(before.matches('\n').count() + 1),
+        column: count(before[line_start..].encode_utf16().count() + 1),
+        offset: count(at - before.matches("\r\n").count()),
     }
 }
 
@@ -101,4 +119,20 @@ pub(crate) fn escape_controls(s: &str) -> std::borrow::Cow<'_, str> {
         }
     }
     std::borrow::Cow::Owned(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::position;
+
+    #[test]
+    fn position_counts_lines_utf16_columns_and_lf_offsets() {
+        let p = position("ab\r\nä😀x", 10);
+        assert_eq!((p.line, p.column, p.offset), (2, 4, 9));
+        let p = position("abc", 99);
+        assert_eq!((p.line, p.column, p.offset), (1, 4, 3));
+        // Inside a character: its start.
+        let p = position("ä", 1);
+        assert_eq!((p.line, p.column, p.offset), (1, 1, 0));
+    }
 }
