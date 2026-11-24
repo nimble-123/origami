@@ -384,10 +384,20 @@ pub fn layout(
             }
             depth_limited += 1;
         }
+        // A unit glued to the one before starts no line. If its layout
+        // joined its lines, a block written over several lines could print
+        // on one, and the next run would keep it in the unit before
+        // (`units`, fuzz/found/cds-glued-block.bin). Such a unit inside a
+        // block keeps its line breaks.
+        let glued_inside = u.depth > 0
+            && matches!(u.kind, Kind::Element | Kind::Annotation)
+            && stream.tokens[u.first].glued;
         let body = if opaque.contains(&uid) || too_deep {
             b::opaque(first, last, blank)
         } else if quarantine.contains(&uid) {
             b::verbatim(first, last, blank)
+        } else if glued_inside {
+            b::unknown(first, last, blank)
         } else {
             let g = crate::grammar::G::new(text, stream, u.first, blank, explain);
             // The parsed layout and the rule for the whole unit (a case
