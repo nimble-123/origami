@@ -1,11 +1,11 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
-  <img src="docs/assets/logo.svg" alt="" width="96" height="96">
-</picture>
-
-# origami
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-lockup-dark.svg">
+    <img src="docs/assets/logo-lockup.svg" alt="origami" height="72">
+  </picture>
+</h1>
 
 **A long line of ABAP, folded into shape.**<br>
 A formatter for ABAP and CDS that changes layout and nothing else, checks its own output token by token, and tells you why it broke each line.

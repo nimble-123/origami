@@ -333,6 +333,24 @@ textarea.code:focus-visible { outline-offset: 0; }
 
 /* ---- figures, facts, install ------------------------------------------ */
 
+/* Photos: a paper crane folded in the theme's colors (docs/brand.md). The
+   left part of the photo is empty, so the caption sits there on wide screens. */
+.photo { margin: 0; position: relative; }
+.photo img { display: block; width: 100%; height: auto; border-radius: 4px; outline: 1px solid var(--outline); outline-offset: -1px; }
+.photo figcaption { margin-top: 1.25rem; }
+.photo h2 { font-size: clamp(var(--t-lg), 3.2vw, var(--t-2xl)); margin-bottom: 0.75rem; }
+.photo p { margin: 0; color: var(--ink-soft); max-width: 32ch; }
+@media (min-width: 48rem) {
+  .photo figcaption {
+    position: absolute; inset: 0 auto 0 0; width: 34%; margin: 0;
+    padding: clamp(1.5rem, 4vw, 3.5rem); display: flex; flex-direction: column; justify-content: center;
+  }
+}
+.split { display: grid; gap: 2rem; align-items: start; margin-bottom: 2rem; }
+.split .section-head { margin-bottom: 0; }
+.detail { display: block; width: 100%; max-width: 14rem; height: auto; border-radius: 4px; outline: 1px solid var(--outline); outline-offset: -1px; }
+@media (min-width: 48rem) { .split { grid-template-columns: minmax(0, 1fr) 14rem; } }
+
 .figure { margin: 0; }
 .figure img { display: block; width: 100%; height: auto; border-radius: 4px; outline: 1px solid var(--outline); outline-offset: -1px; }
 .figure.terminal img { outline: none; }

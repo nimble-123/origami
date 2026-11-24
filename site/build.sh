@@ -20,4 +20,6 @@ for f in logo logo-dark logo-small logo-small-dark favicon pipeline pipeline-dar
   cp "docs/assets/$f.svg" site/dist/assets/
 done
 cp docs/assets/social-preview.png docs/assets/apple-touch-icon.png site/dist/assets/
+mkdir -p site/dist/assets/photos
+cp docs/assets/photos/*.webp site/dist/assets/photos/
 echo "site/dist: $(du -sh site/dist | cut -f1)"
