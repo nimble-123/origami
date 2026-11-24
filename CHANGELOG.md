@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.1](https://github.com/nimble-123/origami/compare/v0.3.0...v0.3.1) (2026-11-24)
+
+
+### Fixes
+
+* **cds:** keep line breaks of glued units inside a block ([#55](https://github.com/nimble-123/origami/issues/55)) ([b66f86a](https://github.com/nimble-123/origami/commit/b66f86a9f2a4a30ebdae814c6f7c82cbc482d904))
+* **cds:** split a one-line block that holds a comment ([#57](https://github.com/nimble-123/origami/issues/57)) ([b2d09e6](https://github.com/nimble-123/origami/commit/b2d09e6665c8e6f12f1eed7f3b12ccd0fe029e05))
+* two nightly fuzz findings (glued period after a comment, where inside braces) ([#52](https://github.com/nimble-123/origami/issues/52)) ([2131d11](https://github.com/nimble-123/origami/commit/2131d11457904d80f5a610f840b98b53b616685f))
+
 ## [0.3.0](https://github.com/nimble-123/origami/compare/v0.2.3...v0.3.0) (2026-11-24)
 
 
