@@ -70,6 +70,19 @@
       </figure>
     </section>
 
+    <section class="band" aria-labelledby="fold-title">
+      <figure class="photo">
+        <picture>
+          <source srcset="assets/photos/crane-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="assets/photos/crane-light.webp" width="1920" height="1072" loading="lazy" alt="">
+        </picture>
+        <figcaption>
+          <h2 id="fold-title">Every line break is a fold</h2>
+          <p>origami takes a long line of ABAP and folds it into shape, and it can say why it folded where it did.</p>
+        </figcaption>
+      </figure>
+    </section>
+
     <section id="playground" class="band" aria-labelledby="pg-title">
       <div class="section-head">
         <h2 id="pg-title">Try it on your code</h2>
@@ -144,9 +157,12 @@
     </section>
 
     <section id="review" class="band" aria-labelledby="review-title">
-      <div class="section-head">
-        <h2 id="review-title">Every fold has a reason</h2>
-        <p><code>origami --review</code> shows what would change before anything is written, and below each construct it broke, the rule and the column the line would have ended at. In VS Code, <em>origami: Preview Changes</em> opens the same changes in the diff view.</p>
+      <div class="split">
+        <div class="section-head">
+          <h2 id="review-title">Every fold has a reason</h2>
+          <p><code>origami --review</code> shows what would change before anything is written, and below each construct it broke, the rule and the column the line would have ended at. In VS Code, <em>origami: Preview Changes</em> opens the same changes in the diff view.</p>
+        </div>
+        <img class="detail" src="assets/photos/crane-detail.webp" width="1024" height="1024" loading="lazy" alt="">
       </div>
       <figure class="figure terminal">
         <picture>

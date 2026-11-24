@@ -116,13 +116,13 @@ grounds.
 
 | File | Use |
 | --- | --- |
-| `logo.svg`, `logo-dark.svg` | the mark, 48px and up (README, docs) |
+| `logo.svg`, `logo-dark.svg` | the mark, 48px and up |
 | `logo-small.svg`, `logo-small-dark.svg` | 32px and below: no gaps, larger in the canvas (site header) |
-| `logo-lockup.svg`, `logo-lockup-dark.svg` | mark and wordmark side by side |
+| `logo-lockup.svg`, `logo-lockup-dark.svg` | mark and wordmark side by side (README header) |
 | `logo-lockup-stacked.svg`, `logo-lockup-stacked-dark.svg` | mark over the wordmark, for square spaces |
 | `logo-wordmark.svg`, `logo-wordmark-dark.svg` | the wordmark alone, where the mark is already on screen |
 | `logo-mono.svg`, `logo-white.svg` | one color: `--ink` (light) and white, e.g. on `--valley` |
-| `logo-tile.svg` | the dark mark on a `--sheet` (dark) tile: VS Code icon, app icon |
+| `logo-tile.svg` | the dark mark on a `--sheet` (dark) tile, filling 85% of its width: VS Code Marketplace icon, app icon |
 | `favicon.svg` | the small cut; switches to the dark tones with the browser |
 
 The PNG icons (`editors/vscode/icon.png` at 256px,
@@ -156,6 +156,28 @@ proof; a straight conversion of `#343B58` is C41 M33 Y0 K65.
 * **Don't:** recolor single facets, add outlines, shadows or gradients, rotate
   or mirror the crane, close the gaps in the large files, or put the dark
   files on a light ground (the `--crease` facets disappear).
+
+### In use
+
+![The logo on a GitHub README, as an app icon, in a website header, next to a terminal, as a sticker and as a social profile](assets/logo-in-use.webp)
+
+## Photography
+
+One subject: a real-looking paper crane, folded like the logo, in the three
+logo tones of the current theme, on a plain ground of the theme's paper.
+Soft light from the left, one shadow, the crane right of center so the left
+third stays empty for a headline. No text, props or hands in the picture.
+
+| File | Use |
+| --- | --- |
+| `photos/crane-light.webp`, `photos/crane-dark.webp` | the photo band on the website (light and dark), 1920px |
+| `photos/crane-detail.webp` | a square close-up, next to "Every fold has a reason" on the website |
+| `social-preview.png` | `crane-dark` with the headline, from `site/og/og.html` |
+
+The photos are generated with Nano Banana Pro (Gemini 3 Pro Image) from
+`logo.svg` as the reference and a prompt that names the hex values of the
+facets and the ground. Keep the source PNGs out of the repository; commit
+WebP at about 80 quality (under 50 KB each).
 
 ## Motion
 

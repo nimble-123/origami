@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="origami">
   <title>origami</title>
   <rect width="256" height="256" rx="48" fill="#1A1B26"/>
-  <polygon points="38.79,92.38 60.77,70.41 66.65,92.38" fill="#7AA2F7"/>
-  <polygon points="60.77,70.41 85.94,164.37 107.77,151.77" fill="#C0CAF5"/>
-  <polygon points="90.06,169.49 126.49,148.45 126.49,190.52" fill="#7AA2F7"/>
-  <polygon points="132.98,148.45 169.41,169.49 132.98,190.52" fill="#C0CAF5"/>
-  <polygon points="99.97,156.28 142.53,82.56 126.95,140.70" fill="#3B4261"/>
-  <polygon points="133.51,141.27 152.03,72.14 152.03,151.97" fill="#7AA2F7"/>
-  <polygon points="175.03,165.24 217.21,123.06 159.59,156.33" fill="#3B4261"/>
+  <polygon points="21.91,90.02 48.05,63.89 55.05,90.02" fill="#7AA2F7"/>
+  <polygon points="48.05,63.89 78.22,176.49 104.37,161.39" fill="#C0CAF5"/>
+  <polygon points="82.02,181.22 127.06,155.22 127.06,207.23" fill="#7AA2F7"/>
+  <polygon points="133.06,155.22 178.10,181.22 133.06,207.23" fill="#C0CAF5"/>
+  <polygon points="92.32,168.35 147.79,72.28 127.48,148.04" fill="#3B4261"/>
+  <polygon points="133.55,148.57 156.58,62.63 156.58,161.87" fill="#7AA2F7"/>
+  <polygon points="183.30,177.29 234.09,126.50 164.71,166.56" fill="#3B4261"/>
 </svg>
