@@ -16,8 +16,8 @@
 
 use crate::options::Options;
 use origami_syntax::{
-    Code, Diagnostic, LangResult, Language, LineIndex, SourceText, TokenIndex, TokenStream, UnitId,
-    equivalent,
+    Code, Diagnostic, LangResult, Language, LineIndex, MismatchKind, SourceText, TokenIndex,
+    TokenStream, UnitId, equivalent,
 };
 use std::collections::BTreeSet;
 
@@ -213,6 +213,15 @@ fn problems(
     if let Err(ms) = equivalent(&r.input_tokens, src.text(), &out_stream, output) {
         for m in ms {
             if let Some(u) = r.unit_of(m.input_index) {
+                bad.insert(u);
+            }
+            // Glue joins a token to the one before it, which can belong to
+            // the unit before (`METHODS h ⏎ * ⏎ ..`): that unit moved its
+            // last token, so it is left as written too.
+            if m.kind == MismatchKind::Glued
+                && m.input_index.0 > 0
+                && let Some(u) = r.unit_of(TokenIndex(m.input_index.0 - 1))
+            {
                 bad.insert(u);
             }
         }
