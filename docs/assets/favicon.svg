@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="origami">
+  <title>origami</title>
+  <style>.t0{fill:#343B58}.t1{fill:#34548A}.t2{fill:#A8AAB6}@media (prefers-color-scheme: dark){.t0{fill:#C0CAF5}.t1{fill:#7AA2F7}.t2{fill:#3B4261}}</style>
+  <polygon class="t1" points="9.85,81.48 38.96,52.37 46.76,81.48"/>
+  <polygon class="t0" points="38.96,52.37 73.45,181.11 103.35,163.85"/>
+  <polygon class="t1" points="73.45,181.11 130.29,148.30 130.29,213.93"/>
+  <polygon class="t0" points="130.29,148.30 187.13,181.11 130.29,213.93"/>
+  <polygon class="t2" points="79.14,177.83 159.83,38.07 130.29,148.30"/>
+  <polygon class="t1" points="130.29,148.30 159.83,38.07 159.83,165.35"/>
+  <polygon class="t2" points="187.13,181.11 246.15,122.10 165.54,168.64"/>
+</svg>

@@ -318,7 +318,8 @@ def page(examples, rows, cleaner, origami, profile_count):
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#d5d6db" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#16161e" media="(prefers-color-scheme: dark)">
-  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -331,8 +332,8 @@ def page(examples, rows, cleaner, origami, profile_count):
   <header class="top">
     <a class="brand" href="./" aria-label="origami home">
       <picture>
-        <source srcset="assets/logo-dark.svg" media="(prefers-color-scheme: dark)">
-        <img src="assets/logo.svg" alt="" width="32" height="32">
+        <source srcset="assets/logo-small-dark.svg" media="(prefers-color-scheme: dark)">
+        <img src="assets/logo-small.svg" alt="" width="32" height="32">
       </picture>
       <span>origami</span>
     </a>

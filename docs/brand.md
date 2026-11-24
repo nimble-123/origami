@@ -99,14 +99,63 @@ non-code content. Line length: at most 68 characters for prose.
 
 ## Logo
 
-A square sheet folded along its diagonal. The upper-left half carries three
-lines of code that get shorter towards the crease, in the keyword, cyan and
-string colors of the theme; the lower-right half is the folded flap, showing
-the back of the paper in `--crease`; between them runs the crease as a dashed
-`--valley` line. Outline in `--ink`. Wordmark: "origami" in Schibsted Grotesk
-800, lower case. Files: `docs/assets/logo.svg` (Tokyo Night Light),
-`docs/assets/logo-dark.svg` (Tokyo Night). The social preview
+A paper crane as a low-poly model: seven flat facets, each one a fold. Every
+edge runs at a multiple of 15°, so the crane looks constructed, not drawn. The
+facets take three roles: `--ink`, `--valley` and `--crease`, each in its
+theme's value. Between the facets runs a gap (the folds): 5 units on the
+256-unit canvas in the light files, 6 units in the dark and white files,
+because light shapes on a dark ground look larger and would close the gaps.
+The head joins the neck without a gap. The outline has no stroke. Wordmark:
+"origami" in Schibsted Grotesk 800, lower case, tracking −0.02em, set as paths
+(SIL Open Font License, which allows logo use).
+
+### Files
+
+All in `docs/assets/`. Light files go on light grounds, `-dark` files on dark
+grounds.
+
+| File | Use |
+| --- | --- |
+| `logo.svg`, `logo-dark.svg` | the mark, 48px and up (README, docs) |
+| `logo-small.svg`, `logo-small-dark.svg` | 32px and below: no gaps, larger in the canvas (site header) |
+| `logo-lockup.svg`, `logo-lockup-dark.svg` | mark and wordmark side by side |
+| `logo-lockup-stacked.svg`, `logo-lockup-stacked-dark.svg` | mark over the wordmark, for square spaces |
+| `logo-wordmark.svg`, `logo-wordmark-dark.svg` | the wordmark alone, where the mark is already on screen |
+| `logo-mono.svg`, `logo-white.svg` | one color: `--ink` (light) and white, e.g. on `--valley` |
+| `logo-tile.svg` | the dark mark on a `--sheet` (dark) tile: VS Code icon, app icon |
+| `favicon.svg` | the small cut; switches to the dark tones with the browser |
+
+The PNG icons (`editors/vscode/icon.png` at 256px,
+`docs/assets/apple-touch-icon.png` at 180px, without rounded corners because
+iOS rounds them) are rendered from the tile. The social preview
 (`docs/assets/social-preview.png`, from `site/og/og.html`) uses the dark theme.
+
+### Colors
+
+| Facet | Light (Tokyo Night Light) | Dark (Tokyo Night) |
+| --- | --- | --- |
+| neck, body right | `#343B58` · RGB 52 59 88 | `#C0CAF5` · RGB 192 202 245 |
+| head, body left, wing back | `#34548A` · RGB 52 84 138 | `#7AA2F7` · RGB 122 162 247 |
+| wing front, tail | `#A8AAB6` · RGB 168 170 182 | `#3B4261` · RGB 59 66 97 |
+| tile | – | `#1A1B26` |
+
+The logo is made for screens. For print, use `logo-mono.svg` and a CMYK
+proof; a straight conversion of `#343B58` is C41 M33 Y0 K65.
+
+### Rules
+
+* **Clear space:** keep a quarter of the mark's height free on every side
+  (for lockups: a quarter of the lockup's height).
+* **Minimum size:** `logo.svg` 48px wide; `logo-small.svg` 16px; horizontal
+  lockup 24px high.
+* **Lockup spacing:** the gap between mark and wordmark is a third of the
+  lockup's height; do not set the wordmark in live text next to the mark.
+* **Backgrounds:** light files on `--paper`, `--sheet` or white; dark files on
+  `--paper`/`--sheet` dark or GitHub's dark background; `logo-white.svg` on
+  `--valley` or photos. The light files on `--valley` lose their blue facets.
+* **Don't:** recolor single facets, add outlines, shadows or gradients, rotate
+  or mirror the crane, close the gaps in the large files, or put the dark
+  files on a light ground (the `--crease` facets disappear).
 
 ## Motion
 

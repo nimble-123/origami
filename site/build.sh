@@ -16,8 +16,8 @@ cp target/wasm32-unknown-unknown/release/origami_wasm.wasm site/dist/origami.was
 abap=$(grep -rohE '"[A-Z][A-Z-]*[A-Z]"' crates/origami_abap/src | tr -d '"' | sort -u | tr '\n' ' ')
 cds=$(grep -rohE '"[a-z][a-z_]*[a-z]"' crates/origami_cds/src | tr -d '"' | sort -u | tr '\n' ' ')
 printf 'self.KEYWORDS = { abap: "%s", cds: "%s" };\n' "$abap" "$cds" > site/dist/keywords.js
-for f in logo logo-dark pipeline pipeline-dark benchmark benchmark-dark latency latency-dark review-demo review-demo-dark; do
+for f in logo logo-dark logo-small logo-small-dark favicon pipeline pipeline-dark benchmark benchmark-dark latency latency-dark review-demo review-demo-dark; do
   cp "docs/assets/$f.svg" site/dist/assets/
 done
-cp docs/assets/social-preview.png site/dist/assets/
+cp docs/assets/social-preview.png docs/assets/apple-touch-icon.png site/dist/assets/
 echo "site/dist: $(du -sh site/dist | cut -f1)"
