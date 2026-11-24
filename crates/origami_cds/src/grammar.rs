@@ -432,9 +432,12 @@ impl G<'_> {
         let mut depth = 0i32;
         let mut in_where = false;
         for k in first + 1..=last {
+            // Braces count too: a block written on one line stays in this
+            // unit (`layout::units`), and a break inside it would make the
+            // next run split it off (fuzz/found/cds-grant-brace-where.bin).
             match self.kind(k) {
-                LPAREN | LBRACKET => depth += 1,
-                RPAREN | RBRACKET => depth -= 1,
+                LPAREN | LBRACKET | LBRACE => depth += 1,
+                RPAREN | RBRACKET | RBRACE => depth -= 1,
                 _ => {}
             }
             let w = self.word(k);
