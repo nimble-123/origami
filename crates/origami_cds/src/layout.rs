@@ -11,7 +11,8 @@
 use crate::kinds::*;
 use origami_layout::{Doc, builder as b};
 use origami_syntax::{
-    Code, Diagnostic, Language, LineIndex, MAX_NESTING, RuleSpan, TokenIndex, TokenStream, UnitId,
+    Code, Diagnostic, Language, LineIndex, MAX_NESTING, RuleSpan, TokenIndex, TokenStream,
+    TriviaPosition, UnitId,
 };
 use std::collections::BTreeSet;
 
@@ -164,6 +165,16 @@ pub fn units(text: &str, stream: &TokenStream, lang: Language) -> Vec<CdsUnit> {
     let lines = LineIndex::new(text);
     let line_of = |k: usize| lines.line_of(toks[k].start);
     let close_of = matching_braces(toks);
+    // Tokens followed by a comment on their line: the comment ends the line.
+    let mut eol_comment = vec![false; n];
+    for t in &stream.trivia {
+        if t.is_comment()
+            && t.position == TriviaPosition::Trailing
+            && let Some(c) = eol_comment.get_mut(t.anchor.0 as usize)
+        {
+            *c = true;
+        }
+    }
     let mut out = Vec::new();
     let mut depth = 0u32;
     let mut i = 0;
@@ -238,11 +249,14 @@ pub fn units(text: &str, stream: &TokenStream, lang: Language) -> Vec<CdsUnit> {
                             // A short block that the author wrote on one line,
                             // right after the previous token, stays part of
                             // this unit. (Both conditions survive formatting,
-                            // so a second run makes the same choice.)
+                            // so a second run makes the same choice.) A
+                            // comment in it ends the line, so such a block is
+                            // split (fuzz/found/cds-bdef-comment-block.bin).
                             match close_of[j] {
                                 Some(close)
                                     if line_of(j - 1) == line_of(j)
-                                        && line_of(j) == line_of(close) =>
+                                        && line_of(j) == line_of(close)
+                                        && !eol_comment[j - 1..close].contains(&true) =>
                                 {
                                     // The block ends the unit
                                     // (`use association _x { with draft; }`).
