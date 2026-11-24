@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/nimble-123/origami/compare/v0.2.3...v0.3.0) (2026-11-24)
+
+
+### Features
+
+* replace the logo with a polygon crane ([#47](https://github.com/nimble-123/origami/issues/47)) ([362a5d7](https://github.com/nimble-123/origami/commit/362a5d715adc5b8feb329c4fcd19030d4eab481c))
+* **site:** add the crane photos, a larger app icon and the README lockup ([#49](https://github.com/nimble-123/origami/issues/49)) ([fa6c0c8](https://github.com/nimble-123/origami/commit/fa6c0c843986df08692692890bb9265f3ccab4e0))
+
 ## [0.2.3](https://github.com/nimble-123/origami/compare/v0.2.2...v0.2.3) (2026-11-23)
 
 
