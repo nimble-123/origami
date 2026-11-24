@@ -99,14 +99,28 @@ non-code content. Line length: at most 68 characters for prose.
 
 ## Logo
 
-A square sheet folded along its diagonal. The upper-left half carries three
-lines of code that get shorter towards the crease, in the keyword, cyan and
-string colors of the theme; the lower-right half is the folded flap, showing
-the back of the paper in `--crease`; between them runs the crease as a dashed
-`--valley` line. Outline in `--ink`. Wordmark: "origami" in Schibsted Grotesk
-800, lower case. Files: `docs/assets/logo.svg` (Tokyo Night Light),
-`docs/assets/logo-dark.svg` (Tokyo Night). The social preview
-(`docs/assets/social-preview.png`, from `site/og/og.html`) uses the dark theme.
+A paper crane as a low-poly model: seven flat facets, each one a fold. Every
+edge runs at a multiple of 15°, so the crane looks constructed, not drawn. The
+facets take three roles: `--ink`, `--valley` and `--crease`, each in its
+theme's value. Between the facets runs a gap of 5 units on the 256-unit canvas
+(the folds); the outline has no stroke. Wordmark:
+"origami" in Schibsted Grotesk 800, lower case, tracking −0.02em, set as paths.
+
+| File | Use |
+| --- | --- |
+| `logo.svg`, `logo-dark.svg` | the mark, 48px and up (README, docs) |
+| `logo-small.svg`, `logo-small-dark.svg` | 32px and below: no gaps, larger in the canvas (site header) |
+| `logo-mono.svg` | one color (`--ink` light), for print and stamps |
+| `logo-lockup.svg`, `logo-lockup-dark.svg` | mark and wordmark side by side |
+| `logo-tile.svg` | the dark mark on a `--sheet` (dark) tile: VS Code icon, app icon |
+| `favicon.svg` | the small cut; switches to the dark tones with the browser |
+
+All files are in `docs/assets/`. The dark tones need a dark background
+(`--crease` dark is `#3B4261`); on light backgrounds use the light files.
+The PNG icons (`editors/vscode/icon.png` at 256px,
+`docs/assets/apple-touch-icon.png` at 180px) are rendered from
+`logo-tile.svg`. The social preview (`docs/assets/social-preview.png`, from
+`site/og/og.html`) uses the dark theme.
 
 ## Motion
 
