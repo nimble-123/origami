@@ -14,6 +14,7 @@
 use crate::kinds::*;
 use crate::stmt::{AlignKey, P, Row, Stmt};
 use origami_layout::{AlignItem, Doc, builder as b};
+use origami_syntax::Style;
 
 pub fn parse(p: &mut P) -> Option<Stmt> {
     let start = p.pos;
@@ -4387,7 +4388,12 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
             head.push(p.expr()?);
         }
     }
+    let aligned = p.c.style == Style::Aligned;
+    let first_group = p.pos;
     let mut groups = Vec::new();
+    // Aligned style: one table for all groups (keyword column, `=` aligned
+    // across the groups).
+    let mut table: Vec<AlignItem> = Vec::new();
     while !p.at_end() {
         let k = p.pos;
         if !is_group(p, k) {
@@ -4397,7 +4403,11 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
         p.pos += 1;
         let content = if p.is(k, "PARAMETER-TABLE") || p.is(k, "EXCEPTION-TABLE") {
             let sp = p.sp(p.pos);
-            b::concat(vec![sp, p.expr()?])
+            let e = p.expr()?;
+            if aligned {
+                table.push(b::row_cols(vec![vec![kw.clone()]], vec![e.clone()], vec![]));
+            }
+            b::concat(vec![sp, e])
         } else {
             let mut rows = Vec::new();
             while !p.at_end() && !is_group(p, p.pos) {
@@ -4443,9 +4453,35 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
             if rows.is_empty() {
                 return None;
             }
+            if aligned {
+                let mut first = true;
+                for it in &rows {
+                    table.push(match it {
+                        AlignItem::Row(r) => {
+                            let mut r = r.clone();
+                            r.lead = vec![if first {
+                                vec![kw.clone(), b::space()]
+                            } else {
+                                Vec::new()
+                            }];
+                            first = false;
+                            AlignItem::Row(r)
+                        }
+                        other => other.clone(),
+                    });
+                }
+            }
             b::concat(vec![p.sp(k + 1), b::hang(vec![b::align(rows)])])
         };
         groups.push(b::concat(vec![p.ln(k), kw, content]));
+    }
+    if aligned && !table.is_empty() {
+        // ABAP-CALL-003: each group on its own line, even when it would fit.
+        return Some(b::group(vec![
+            b::concat(head),
+            b::cont(vec![p.hl(first_group), b::align_broken(table)]),
+            p.period(),
+        ]));
     }
     Some(b::group(vec![b::concat(head), b::cont(groups), p.period()]))
 }
