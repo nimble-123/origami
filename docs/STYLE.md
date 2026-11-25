@@ -1279,7 +1279,7 @@ start after position 120 is not aligned. See the example in CDS-BLANK-002.
 **Compact:** not aligned (CDS-SPACE-001).
 
 ### CDS-ALIGN-002: Parameters of a data source
-Milestone: M5
+Milestone: M4
 Explanation: each parameter of the data source on its own line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-25. As ABAP Cleaner's
