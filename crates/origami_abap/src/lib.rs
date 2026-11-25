@@ -158,6 +158,8 @@ fn format_with(
             Style::Aligned => 1,
             Style::Compact => 2,
         },
+        comment_style: opts.style == Style::Aligned,
+        blank_after_comments: laid.blank_after_comments.clone(),
         comment_overrides,
     };
     let limit = max_output_len(src.text().len());

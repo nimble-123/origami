@@ -6,7 +6,7 @@
 //! `glued` flags, and the same comments: same text, same syntax, same
 //! placement, attached to the same token in the same position.
 //!
-//! Two exceptions, both as narrow as their rules:
+//! Three exceptions, each as narrow as its rule:
 //!
 //! * ABAP-SPACE-001: a token the input marks `may_glue` (a period or comma)
 //!   may become glued. When it does, the comments between it and the
@@ -16,6 +16,8 @@
 //! * ABAP-DOC-001: an ABAP Doc comment `"! @parameter name | …` (also
 //!   `@raising`, `@exception`) may change the blanks after the tag and
 //!   between the name and `|`; nothing else (see [`abap_doc_aligned`]).
+//! * ABAP-COMMENT-003: a `"` comment that continues with a letter or digit
+//!   may get one space after the `"` (see [`comment_spaced`]).
 
 use crate::token::{TokenIndex, TokenStream};
 use crate::trivia::{CommentSyntax, Trivia, TriviaKind, TriviaPosition};
@@ -93,7 +95,10 @@ pub fn equivalent(
     for (a, b) in comments_a.iter().zip(comments_b.iter()) {
         let at = clamp(a.anchor, input);
         let (ta, tb) = (a.text(input_src), b.text(output_src));
-        if ta != tb && !(a.kind == b.kind && is_abap_doc(a) && abap_doc_aligned(ta, tb)) {
+        if ta != tb
+            && !(a.kind == b.kind && is_abap_doc(a) && abap_doc_aligned(ta, tb))
+            && !(a.kind == b.kind && is_abap_quote(a) && spaced_comment(ta).as_deref() == Some(tb))
+        {
             mismatches.push(Mismatch {
                 input_index: at,
                 kind: MismatchKind::CommentText,
@@ -145,6 +150,26 @@ fn moved(input: &TokenStream, output: &TokenStream, a: &Trivia, b: &Trivia) -> b
         .is_some_and(|t| t.may_glue && !t.glued);
     let glued = output.tokens.get(glue).is_some_and(|t| t.glued);
     marked && glued && b.position == a.position && b.anchor.0 == a.anchor.0 + 1
+}
+
+fn is_abap_quote(t: &Trivia) -> bool {
+    matches!(
+        t.kind,
+        TriviaKind::Comment {
+            syntax: CommentSyntax::AbapQuote,
+            ..
+        }
+    )
+}
+
+/// ABAP-COMMENT-003: the text of a `"` comment with one space after the `"`,
+/// if the comment continues with a letter or digit directly after it.
+pub fn spaced_comment(text: &str) -> Option<String> {
+    let rest = text.strip_prefix('"')?;
+    rest.chars()
+        .next()
+        .filter(|c| c.is_alphanumeric())
+        .map(|_| format!("\" {rest}"))
 }
 
 fn is_abap_doc(t: &Trivia) -> bool {

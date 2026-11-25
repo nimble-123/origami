@@ -83,6 +83,8 @@ fn opts(width: u16) -> PrintOptions {
         keyword_case: Some(Case::Upper),
         identity: false,
         cont_levels: 2,
+        comment_style: false,
+        blank_after_comments: Default::default(),
         comment_overrides: Default::default(),
     }
 }

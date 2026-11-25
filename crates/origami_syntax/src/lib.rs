@@ -12,7 +12,7 @@ pub mod source;
 pub mod token;
 pub mod trivia;
 
-pub use compare::{Mismatch, MismatchKind, equivalent};
+pub use compare::{Mismatch, MismatchKind, equivalent, spaced_comment};
 pub use diagnostic::{Code, Diagnostic, Severity};
 pub use explain::{BreakCause, Note, RuleId, RuleSpan, Scope};
 pub use lang::{

@@ -968,7 +968,7 @@ after:  lv_a = 1.          " first
 (`lv_a = 1. " first`).
 
 ### ABAP-COMMENT-003: A space after the comment sign
-Milestone: M5
+Milestone: M4
 
 Approved by the maintainer, Nils Lutz, on 2026-11-25. A `"` comment whose
 text starts directly with a letter or a digit gets one space after the `"`,
