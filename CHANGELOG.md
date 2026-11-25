@@ -14,6 +14,7 @@
 ### Formatting output
 
 * **cds:** function parameters after =&gt; one per line (CDS-ALIGN-003) ([#83](https://github.com/nimble-123/origami/issues/83)) ([9302be8](https://github.com/nimble-123/origami/commit/9302be8bd129446ab77067d9607352733d3455f9))
+* **cds:** one field per line in group by and define view name lists (CDS-ALIGN-004) ([#80](https://github.com/nimble-123/origami/issues/80)) ([dfa256a](https://github.com/nimble-123/origami/commit/dfa256a8c1468cafb0e3d7d0c087d3121a1a4bf1))
 * **cds:** parameters of a data source one per line (CDS-ALIGN-002) ([#81](https://github.com/nimble-123/origami/issues/81)) ([ff4cc2d](https://github.com/nimble-123/origami/commit/ff4cc2d379b829149c32d6a70f044caf4bf92ab4))
 
 ## [0.4.0](https://github.com/nimble-123/origami/compare/v0.3.1...v0.4.0) (2026-11-25)
