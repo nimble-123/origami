@@ -1278,6 +1278,79 @@ start after position 120 is not aligned. See the example in CDS-BLANK-002.
 
 **Compact:** not aligned (CDS-SPACE-001).
 
+### CDS-ALIGN-002: Parameters of a data source
+Milestone: M5
+Explanation: each parameter of the data source on its own line
+
+Approved by the maintainer, Nils Lutz, on 2026-11-25. As ABAP Cleaner's
+"Align source parameters" does: in a DDLS view header, the parameters of a
+data source (`from ZI_Source( p_date : … )`, also after a join or
+`projection on`) always break after `(`, one parameter per line, one indent
+level right of the data source's name. The `:` and the values are aligned in
+columns. The closing `)` stays behind the last parameter, and `as <alias>`
+follows it. Spaces around the brackets are kept as written (CDS-SPACE-001).
+
+```cds
+define view entity ZI_Booking
+  as select from ZI_Source(
+                   p_date     : $parameters.p_date,
+                   p_currency : $parameters.p_currency ) as Source
+```
+
+**Compact:** the parameters stay as written (CDS-CONT-001).
+
+### CDS-ALIGN-003: Function parameters after `=>`
+Milestone: M5
+Explanation: each function parameter on its own line
+
+Approved by the maintainer, Nils Lutz, on 2026-11-25. As ABAP Cleaner's
+"Align function parameters after =>" does: in a select-list element, a
+function call with two or more parameters named with `=>`
+(`currency_conversion( amount => …, source_currency => … )`) puts each
+parameter on its own line, the first behind `(` and the others below it, with
+`=>` and the values aligned in columns. A call with one such parameter stays
+on one line. The element counts as spanning several lines (CDS-BLANK-002),
+and its alias is aligned by its last line (CDS-ALIGN-001).
+
+```cds
+      currency_conversion( amount             => Amount,
+                           source_currency    => Currency,
+                           target_currency    => $parameters.p_currency,
+                           exchange_rate_date => $parameters.p_date ) as Converted,
+```
+
+**Compact:** the element keeps its line breaks (CDS-CONT-001).
+
+### CDS-ALIGN-004: Name lists and `group by` lists
+Milestone: M5
+Explanation: each name of the list on its own line
+
+Approved by the maintainer, Nils Lutz, on 2026-11-25. As ABAP Cleaner's
+"Align name list and GROUP BY list" does: a `group by` list with two or more
+fields puts each field on its own line, aligned behind `group by`. The name
+list of a `define view` (`define view ZI_X ( Id, Name )`) starts with `(` on
+its own line at the level of `define`, has one name per line one indent level
+deeper, and ends with `)` on its own line; `as select from` follows on the
+next line (CDS-HEAD-001).
+
+```cds
+define view ZI_Names
+(
+  Id,
+  Name
+)
+  as select from t
+{
+  key id,
+      name
+}
+group by id,
+         name
+```
+
+**Compact:** `group by` lists break only where the author broke them, and name
+lists stay as written.
+
 ### CDS-ANNO-001: Annotation values
 Milestone: M2
 Explanation: annotation values on their own lines
