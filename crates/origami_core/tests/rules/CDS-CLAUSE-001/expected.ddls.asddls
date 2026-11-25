@@ -11,7 +11,9 @@ define view entity ZI_Flights
 }
 
 where carrid = 'LH'
-group by carrid, connid, cityfrom
+group by carrid,
+         connid,
+         cityfrom
 having count(*) > 1
 
 union all select from sflight { key carrid, key connid, cityfrom }

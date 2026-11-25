@@ -1322,7 +1322,7 @@ and its alias is aligned by its last line (CDS-ALIGN-001).
 **Compact:** the element keeps its line breaks (CDS-CONT-001).
 
 ### CDS-ALIGN-004: Name lists and `group by` lists
-Milestone: M5
+Milestone: M4
 Explanation: each name of the list on its own line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-25. As ABAP Cleaner's
@@ -1340,10 +1340,13 @@ define view ZI_Names
   Name
 )
   as select from t
+
 {
   key id,
+
       name
 }
+
 group by id,
          name
 ```
