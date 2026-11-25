@@ -1224,7 +1224,7 @@ after `{` and directly before `}` are removed. CDS-BLANK-002 adds blank lines
 in view definitions.
 
 ### CDS-BLANK-002: Blank lines between the sections of a view
-Milestone: M5
+Milestone: M4
 
 Approved by the maintainer, Nils Lutz, on 2026-11-25. In a DDLS view
 definition (`define view`, `define view entity`, `define root view entity`,
@@ -1265,7 +1265,7 @@ define view entity ZI_Travel
 **Compact:** no blank line is added.
 
 ### CDS-ALIGN-001: Aligned aliases and association targets
-Milestone: M5
+Milestone: M4
 
 Approved by the maintainer, Nils Lutz, on 2026-11-25. In a select list, the
 `as` aliases of one-line elements are aligned in one column, across blank

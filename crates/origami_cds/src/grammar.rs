@@ -8,6 +8,10 @@ use origami_layout::{Doc, builder as b};
 use origami_syntax::{Language, RuleId, RuleSpan, TokenIndex, TokenStream};
 use std::cell::RefCell;
 
+/// An alignable association: indices of `as` and `on`, widths up to `as`,
+/// from `as` to `on`, and from `on` to the end (CDS-ALIGN-001).
+type AssocRow = (usize, usize, usize, usize, usize);
+
 pub struct G<'a> {
     pub text: &'a str,
     pub stream: &'a TokenStream,
@@ -18,6 +22,11 @@ pub struct G<'a> {
     /// Spans of the unit being laid out. A helper collects its spans locally
     /// and appends them here only when it succeeds.
     pub spans: RefCell<Vec<RuleSpan>>,
+    /// Aligned style: associations align `as` and `on` (CDS-ALIGN-001).
+    pub aligned: bool,
+    /// Line width and indent width, for the associations' fit.
+    pub width: usize,
+    pub indent: usize,
 }
 
 impl G<'_> {
@@ -35,6 +44,9 @@ impl G<'_> {
             blank,
             explain,
             spans: RefCell::new(Vec::new()),
+            aligned: false,
+            width: 120,
+            indent: 2,
         }
     }
 
@@ -310,6 +322,11 @@ impl G<'_> {
                 params.push(k + 1);
             }
         }
+        let pads = if self.aligned && !bdef {
+            self.association_pads(&starts, last)
+        } else {
+            Default::default()
+        };
         let mut docs = vec![self.t(first)];
         let mut k = first + 1;
         let mut segment: Vec<Doc> = Vec::new();
@@ -345,10 +362,16 @@ impl G<'_> {
                 && matches!(self.word(k).as_str(), "and" | "or" | "on")
                 && !self.glued(k)
             {
+                if let Some(&p) = pads.get(&k) {
+                    segment.push(b::spaces(p));
+                }
                 // Long conditions break before on/and/or, two levels deeper.
                 segment.push(b::indent(vec![b::indent(vec![self.ln(k), self.t(k)])]));
             } else {
-                segment.push(self.sp(k));
+                match pads.get(&k) {
+                    Some(&p) => segment.push(b::spaces(p + 1)),
+                    None => segment.push(self.sp(k)),
+                }
                 segment.push(self.t(k));
             }
             k += 1;
@@ -356,6 +379,97 @@ impl G<'_> {
         flush(&mut segment, &mut segments, &mut docs);
         docs.extend(segments);
         Some(b::concat(docs))
+    }
+
+    /// CDS-ALIGN-001: padding in front of `as` and `on` of consecutive
+    /// one-line associations and compositions, so both line up.
+    fn association_pads(
+        &self,
+        starts: &[usize],
+        last: usize,
+    ) -> std::collections::HashMap<usize, usize> {
+        let mut pads = std::collections::HashMap::new();
+        // (index of `as`, index of `on`, width up to `as`, width from `as` up
+        // to `on`, width from `on`) of each alignable clause, in runs of
+        // consecutive clauses.
+        let mut runs: Vec<Vec<AssocRow>> = vec![Vec::new()];
+        for (n, &s) in starts.iter().enumerate() {
+            let end = starts.get(n + 1).map_or(last, |&e| e - 1);
+            let w = self.word(s);
+            let row = if matches!(w.as_str(), "association" | "composition") {
+                self.association_row(s, end)
+            } else {
+                None
+            };
+            match row {
+                Some(r) => runs.last_mut().unwrap().push(r),
+                None => runs.push(Vec::new()),
+            }
+        }
+        for run in runs.iter().filter(|r| r.len() > 1) {
+            let col_as = run.iter().map(|r| r.2).max().unwrap_or(0);
+            let col_on = run.iter().map(|r| r.3).max().unwrap_or(0);
+            // Every padded clause must stay on one line; otherwise its `on`
+            // would break and the next run would not count it.
+            if col_as + col_on > 120
+                || run
+                    .iter()
+                    .any(|r| self.indent + col_as + 1 + col_on + 1 + r.4 > self.width)
+            {
+                continue;
+            }
+            for &(a, o, wa, wo, _) in run {
+                pads.insert(a, col_as - wa);
+                pads.insert(o, col_on - wo);
+            }
+        }
+        pads
+    }
+
+    /// `association … to target as _alias on …` without comments that fits
+    /// on one line (the header prints it there, whatever the input's line
+    /// breaks): the positions of `as` and `on` and the widths around them.
+    fn association_row(&self, s: usize, end: usize) -> Option<(usize, usize, usize, usize, usize)> {
+        let toks = &self.stream.tokens;
+        if self
+            .stream
+            .trivia
+            .iter()
+            .any(|t| t.is_comment() && t.start >= toks[s].start && t.end <= toks[end].end)
+        {
+            return None;
+        }
+        let mut depth = 0i32;
+        let (mut a, mut o) = (None, None);
+        for k in s..=end {
+            match self.kind(k) {
+                LPAREN | LBRACKET => depth += 1,
+                RPAREN | RBRACKET => depth -= 1,
+                _ => {}
+            }
+            if depth == 0 && !self.glued(k) {
+                match self.word(k).as_str() {
+                    "as" if a.is_none() => a = Some(k),
+                    "on" if a.is_some() && o.is_none() => o = Some(k),
+                    _ => {}
+                }
+            }
+        }
+        let (a, o) = (a?, o?);
+        let width = |from: usize, to: usize| -> usize {
+            (from..to)
+                .map(|k| {
+                    let gap = usize::from(k > from && !self.glued(k));
+                    gap + toks[k].text(self.text).chars().count()
+                })
+                .sum()
+        };
+        let line = width(s, end + 1);
+        // A clause that does not fit breaks before `on` anyway.
+        if self.indent + line > self.width {
+            return None;
+        }
+        Some((a, o, width(s, a), width(a, o), width(o, end + 1)))
     }
 
     // ---- select-list elements ------------------------------------------

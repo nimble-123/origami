@@ -357,8 +357,12 @@ pub struct Laid {
     pub diagnostics: Vec<Diagnostic>,
     /// Units left as written because they nest too deep (W004).
     pub depth_limited: u32,
+    /// CDS-BLANK-002: blank lines added in front of these tokens.
+    pub forced_blanks: std::collections::BTreeMap<usize, u8>,
 }
 
+// `opts` is one more argument than the entry point had before the styles.
+#[allow(clippy::too_many_arguments)]
 pub fn layout(
     text: &str,
     stream: &TokenStream,
@@ -367,7 +371,15 @@ pub fn layout(
     quarantine: &BTreeSet<UnitId>,
     opaque: &BTreeSet<UnitId>,
     explain: bool,
+    opts: &origami_syntax::LangOptions,
 ) -> Laid {
+    let aligned = opts.style == origami_syntax::Style::Aligned;
+    let view = aligned && lang == Language::Ddls && is_view(text, stream, units);
+    let alias_pads = if view {
+        alias_pads(text, stream, units, opts.indent_width)
+    } else {
+        Default::default()
+    };
     let mut docs = Vec::with_capacity(units.len());
     let mut spans = Vec::new();
     let mut diagnostics = Vec::new();
@@ -413,7 +425,10 @@ pub fn layout(
         } else if glued_inside {
             b::unknown(first, last, blank)
         } else {
-            let g = crate::grammar::G::new(text, stream, u.first, blank, explain);
+            let mut g = crate::grammar::G::new(text, stream, u.first, blank, explain);
+            g.aligned = view;
+            g.width = opts.line_width as usize;
+            g.indent = opts.indent_width as usize;
             // The parsed layout and the rule for the whole unit (a case
             // expression records its own spans).
             let with = |d: Option<Doc>, rule| d.map(|d| (d, rule));
@@ -445,7 +460,10 @@ pub fn layout(
                     }
                     clause_doc(text, stream, u, blank)
                 }
-                None => b::unknown(first, last, blank),
+                None => match alias_pads.get(&id) {
+                    Some(&(at, pad)) => padded_element(stream, u, at, pad, blank),
+                    None => b::unknown(first, last, blank),
+                },
             }
         };
         let glued = stream.tokens[u.first].glued;
@@ -461,10 +479,318 @@ pub fn layout(
         };
         docs.push((0..level).fold(b::concat(vec![start, body]), |d, _| b::indent(vec![d])));
     }
+    let forced_blanks = if view {
+        view_blanks(text, stream, units)
+    } else {
+        Default::default()
+    };
     Laid {
         doc: b::concat(docs),
         rule_spans: spans,
         diagnostics,
         depth_limited,
+        forced_blanks,
     }
+}
+
+fn word(text: &str, stream: &TokenStream, k: usize) -> String {
+    match stream.tokens.get(k) {
+        Some(t) if t.kind == IDENT => t.text(text).to_ascii_lowercase(),
+        _ => String::new(),
+    }
+}
+
+/// A DDLS view definition (`define [root] view [entity] …`): the unit at
+/// depth 0 after the annotations starts with `define` and has `view` among
+/// its next words.
+fn is_view(text: &str, stream: &TokenStream, units: &[CdsUnit]) -> bool {
+    units
+        .iter()
+        .find(|u| u.kind == Kind::Element && u.depth == 0)
+        .is_some_and(|u| {
+            word(text, stream, u.first) == "define"
+                && (u.first + 1..=(u.first + 3).min(u.last))
+                    .any(|k| word(text, stream, k) == "view")
+        })
+}
+
+/// A `case` in the unit has two or more `when` (CDS-ELEM-001 breaks it).
+fn case_breaks(text: &str, stream: &TokenStream, u: &CdsUnit) -> bool {
+    let mut whens: Vec<u32> = Vec::new();
+    for k in u.first..=u.last {
+        match word(text, stream, k).as_str() {
+            "case" => whens.push(0),
+            "when" => {
+                if let Some(n) = whens.last_mut() {
+                    *n += 1;
+                    if *n >= 2 {
+                        return true;
+                    }
+                }
+            }
+            "end" => {
+                whens.pop();
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+/// The unit's tokens are on one line and have no comment between them.
+fn one_line(text: &str, stream: &TokenStream, u: &CdsUnit) -> bool {
+    let toks = &stream.tokens;
+    let (a, b) = (toks[u.first].start, toks[u.last].end);
+    !text[a as usize..b as usize].contains('\n')
+        && !stream
+            .trivia
+            .iter()
+            .any(|t| t.is_comment() && t.start > a && t.end <= b)
+}
+
+/// Width of tokens `from..to` printed with single spaces.
+fn width(text: &str, stream: &TokenStream, from: usize, to: usize) -> usize {
+    (from..to)
+        .map(|k| {
+            let gap = usize::from(k > from && !stream.tokens[k].glued);
+            gap + stream.tokens[k].text(text).chars().count()
+        })
+        .sum()
+}
+
+/// CDS-ALIGN-001: for each one-line select-list element with an alias, the
+/// index of its `as` and the padding in front of it. Elements without an
+/// alias that are a name or a path count for the column.
+fn alias_pads(
+    text: &str,
+    stream: &TokenStream,
+    units: &[CdsUnit],
+    indent_width: u8,
+) -> std::collections::HashMap<usize, (usize, usize)> {
+    let mut out = std::collections::HashMap::new();
+    let Some(open) = units
+        .iter()
+        .position(|u| u.kind == Kind::Open && u.depth == 0)
+    else {
+        return out;
+    };
+    // (unit id, offset + width up to `as`, `as` index) and widths of plain
+    // paths.
+    let mut rows: Vec<(usize, usize, usize)> = Vec::new();
+    let mut col = 0usize;
+    for (id, u) in units.iter().enumerate().skip(open + 1) {
+        if u.kind == Kind::Close && u.depth == 0 {
+            break;
+        }
+        // A `case` element has its own layout (CDS-ELEM-001) and is not
+        // padded, so it does not count either.
+        if u.kind != Kind::Element
+            || u.depth != 1
+            || !one_line(text, stream, u)
+            || (u.first..=u.last).any(|k| word(text, stream, k) == "case")
+        {
+            continue;
+        }
+        let offset = u.extra as usize * indent_width as usize;
+        let mut last = u.last;
+        if stream.tokens[last].kind == COMMA {
+            last -= 1;
+        }
+        // `… as Alias`: `as` at bracket depth 0, followed by the alias only.
+        let mut depth = 0i32;
+        let mut as_at = None;
+        for k in u.first..=last {
+            match stream.tokens[k].kind {
+                LPAREN | LBRACKET => depth += 1,
+                RPAREN | RBRACKET => depth -= 1,
+                _ => {}
+            }
+            if depth == 0 && k > u.first && word(text, stream, k) == "as" && !stream.tokens[k].glued
+            {
+                as_at = Some(k);
+            }
+        }
+        match as_at {
+            Some(a) if a + 1 == last => {
+                let w = offset + width(text, stream, u.first, a);
+                col = col.max(w);
+                rows.push((id, w, a));
+            }
+            Some(_) => {}
+            None => {
+                // A name or a path (`t.customer_id`, `key travel_id`).
+                let plain = (u.first..=last).all(|k| {
+                    let t = &stream.tokens[k];
+                    t.kind == IDENT || (t.kind == DOT && t.glued)
+                });
+                if plain {
+                    col = col.max(offset + width(text, stream, u.first, last + 1));
+                }
+            }
+        }
+    }
+    if rows.len() < 2 || col > 120 {
+        return out;
+    }
+    for (id, w, a) in rows {
+        out.insert(id, (a, col - w));
+    }
+    out
+}
+
+/// An element printed with `pad` extra spaces in front of its `as` (token
+/// `at`); otherwise as `b::unknown` prints a one-line unit.
+fn padded_element(stream: &TokenStream, u: &CdsUnit, at: usize, pad: usize, blank: bool) -> Doc {
+    let mut docs = Vec::new();
+    for k in u.first..=u.last {
+        let i = TokenIndex(k as u32);
+        if k > u.first {
+            if k == at {
+                docs.push(b::spaces(pad + 1));
+            } else if !stream.tokens[k].glued {
+                docs.push(b::sep(stream, i));
+            }
+        }
+        docs.push(if k == u.first && blank {
+            b::token_keep_blank(i)
+        } else {
+            b::token(i)
+        });
+    }
+    b::concat(docs)
+}
+
+/// CDS-BLANK-002: blank lines between the sections of a view and in its
+/// select list.
+fn view_blanks(
+    text: &str,
+    stream: &TokenStream,
+    units: &[CdsUnit],
+) -> std::collections::BTreeMap<usize, u8> {
+    let mut out = std::collections::BTreeMap::new();
+    let Some(h) = units
+        .iter()
+        .position(|u| u.kind == Kind::Element && u.depth == 0)
+    else {
+        return out;
+    };
+    let head = &units[h];
+    if h > 0 {
+        out.insert(head.first, 1);
+    }
+    // Header clauses (as `G::header` finds them, at bracket depth 0).
+    let mut depth = 0i32;
+    let (mut params, mut select, mut join, mut assoc) = (false, None, None, None);
+    for k in head.first + 1..=head.last {
+        match stream.tokens[k].kind {
+            LPAREN | LBRACKET | LBRACE => depth += 1,
+            RPAREN | RBRACKET | RBRACE => depth -= 1,
+            _ => {}
+        }
+        if depth != 0 || stream.tokens[k].glued {
+            continue;
+        }
+        let w = word(text, stream, k);
+        let next = word(text, stream, k + 1);
+        let prev = word(text, stream, k - 1);
+        let joined = matches!(
+            prev.as_str(),
+            "inner" | "left" | "right" | "cross" | "outer"
+        );
+        if w == "with" && next == "parameters" {
+            params = true;
+        } else if w == "as" && matches!(next.as_str(), "select" | "projection") {
+            select.get_or_insert(k);
+        } else if (matches!(w.as_str(), "inner" | "left" | "right" | "cross") || w == "join")
+            && !joined
+            && select.is_some()
+        {
+            join.get_or_insert(k);
+        } else if matches!(w.as_str(), "association" | "composition") && select.is_some() {
+            assoc.get_or_insert(k);
+        }
+    }
+    if params && let Some(s) = select {
+        out.insert(s, 1);
+    }
+    for k in [join, assoc].into_iter().flatten() {
+        out.insert(k, 1);
+    }
+    // The select list: `{` and the unit after `}`.
+    let Some(open) = units
+        .iter()
+        .position(|u| u.kind == Kind::Open && u.depth == 0)
+    else {
+        return out;
+    };
+    out.insert(units[open].first, 1);
+    let close = units
+        .iter()
+        .enumerate()
+        .skip(open + 1)
+        .find(|(_, u)| u.kind == Kind::Close && u.depth == 0)
+        .map(|(i, _)| i);
+    if let Some(c) = close
+        && let Some(after) = units.get(c + 1)
+    {
+        out.insert(after.first, 1);
+    }
+    // Elements with their annotations: (first token, key, association,
+    // spans several lines).
+    let aliases: Vec<String> = {
+        let mut v = Vec::new();
+        for k in head.first..head.last {
+            if word(text, stream, k) == "as" && !word(text, stream, k.saturating_sub(1)).is_empty()
+            {
+                v.push(word(text, stream, k + 1));
+            }
+        }
+        v
+    };
+    let end = close.unwrap_or(units.len());
+    let mut groups: Vec<(usize, bool, bool, bool)> = Vec::new();
+    let mut annotated: Option<usize> = None;
+    for u in &units[open + 1..end] {
+        if u.depth != 1 {
+            continue;
+        }
+        match u.kind {
+            Kind::Annotation => {
+                annotated.get_or_insert(u.first);
+            }
+            Kind::Element => {
+                let w0 = word(text, stream, u.first);
+                let key = w0 == "key";
+                let name = if key {
+                    word(text, stream, u.first + 1)
+                } else {
+                    w0
+                };
+                let assoc = name.starts_with('_')
+                    && aliases.contains(&name)
+                    && stream
+                        .tokens
+                        .get(u.first + 1 + usize::from(key))
+                        .is_none_or(|t| t.kind != DOT);
+                // A `case` element is printed by its rule (CDS-ELEM-001: two
+                // or more `when` always break); others keep their lines.
+                let has_case = (u.first..=u.last).any(|k| word(text, stream, k) == "case");
+                let multi = annotated.is_some()
+                    || if has_case {
+                        case_breaks(text, stream, u)
+                    } else {
+                        !one_line(text, stream, u)
+                    };
+                groups.push((annotated.take().unwrap_or(u.first), key, assoc, multi));
+            }
+            _ => {}
+        }
+    }
+    for pair in groups.windows(2) {
+        let (p, c) = (pair[0], pair[1]);
+        if (p.1 && !c.1) || (c.2 && !p.2) || p.3 || c.3 {
+            out.insert(c.0, 1);
+        }
+    }
+    out
 }

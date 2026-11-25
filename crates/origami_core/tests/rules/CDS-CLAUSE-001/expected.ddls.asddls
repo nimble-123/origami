@@ -1,11 +1,15 @@
 @AbapCatalog.viewEnhancementCategory: [#NONE]
+
 define view entity ZI_Flights
   as select from spfli
+
 {
   key carrid,
   key connid,
+
       cityfrom
 }
+
 where carrid = 'LH'
 group by carrid, connid, cityfrom
 having count(*) > 1
