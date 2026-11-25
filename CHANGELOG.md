@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.1](https://github.com/nimble-123/origami/compare/v0.4.0...v0.4.1) (2026-11-25)
+
+
+### Fixes
+
+* **cds:** leave lists with braces as written ([#85](https://github.com/nimble-123/origami/issues/85)) ([136855f](https://github.com/nimble-123/origami/commit/136855f8678a62e1cbdd50962c0f6e9604c7af8e))
+* **cds:** no blank lines around an element laid out as a header ([#74](https://github.com/nimble-123/origami/issues/74)) ([681460a](https://github.com/nimble-123/origami/commit/681460a3fbc3b52f668bdabe6b98cba459f742d4))
+* **cds:** split a one-line block after a case in its unit ([#82](https://github.com/nimble-123/origami/issues/82)) ([2c3705a](https://github.com/nimble-123/origami/commit/2c3705a82d534de88adf1d88661eda0b8f900aa7))
+* **cds:** split a one-line block after an end-of-line comment in its unit ([#77](https://github.com/nimble-123/origami/issues/77)) ([9ef845c](https://github.com/nimble-123/origami/commit/9ef845ca7a1eeca870c1150be115cbffa17721b1))
+
+
+### Formatting output
+
+* **cds:** function parameters after =&gt; one per line (CDS-ALIGN-003) ([#83](https://github.com/nimble-123/origami/issues/83)) ([9302be8](https://github.com/nimble-123/origami/commit/9302be8bd129446ab77067d9607352733d3455f9))
+* **cds:** parameters of a data source one per line (CDS-ALIGN-002) ([#81](https://github.com/nimble-123/origami/issues/81)) ([ff4cc2d](https://github.com/nimble-123/origami/commit/ff4cc2d379b829149c32d6a70f044caf4bf92ab4))
+
 ## [0.4.0](https://github.com/nimble-123/origami/compare/v0.3.1...v0.4.0) (2026-11-25)
 
 
