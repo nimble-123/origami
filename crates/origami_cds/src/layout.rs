@@ -582,12 +582,14 @@ fn alias_pads(
         if u.kind == Kind::Close && u.depth == 0 {
             break;
         }
-        // A `case` element has its own layout (CDS-ELEM-001) and is not
-        // padded, so it does not count either.
+        // A `case` element has its own layout (CDS-ELEM-001), and an element
+        // that starts with `define` or `extend` is laid out as a header,
+        // which joins its lines; neither is padded, so neither counts.
         if u.kind != Kind::Element
             || u.depth != 1
             || !one_line(text, stream, u)
             || (u.first..=u.last).any(|k| word(text, stream, k) == "case")
+            || matches!(word(text, stream, u.first).as_str(), "define" | "extend")
         {
             continue;
         }
