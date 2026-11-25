@@ -1,6 +1,6 @@
 2: CDS-UNIT-001: each annotation and element on its own line
-3: CDS-HEAD-001: each clause of the header on its own line
-6: CDS-UNIT-001: each annotation and element on its own line
-8: CDS-UNIT-001: each annotation and element on its own line
+4: CDS-HEAD-001: each clause of the header on its own line
 9: CDS-UNIT-001: each annotation and element on its own line
-10: CDS-ELEM-001: each WHEN on its own line
+11: CDS-UNIT-001: each annotation and element on its own line
+13: CDS-UNIT-001: each annotation and element on its own line
+15: CDS-ELEM-001: each WHEN on its own line

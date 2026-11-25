@@ -73,6 +73,11 @@ pub fn space() -> Doc {
     Doc(Inner::Space)
 }
 
+/// `n` spaces (padding for an aligned column).
+pub fn spaces(n: usize) -> Doc {
+    concat((0..n).map(|_| space()).collect())
+}
+
 pub fn empty() -> Doc {
     Doc(Inner::Concat(Vec::new()))
 }

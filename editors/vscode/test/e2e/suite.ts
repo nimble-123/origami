@@ -92,7 +92,7 @@ const tests: Test[] = [
       );
       assert.equal(
         doc.getText(),
-        "define view entity ZI_E2E\n  as select from t\n{\n  key id,\n      name\n}\n",
+        "define view entity ZI_E2E\n  as select from t\n\n{\n  key id,\n\n      name\n}\n",
       );
     },
   ],

@@ -1,2 +1,2 @@
 1: CDS-HEAD-001: each clause of the header on its own line
-5: CDS-ELEM-001: each WHEN on its own line
+7: CDS-ELEM-001: each WHEN on its own line
