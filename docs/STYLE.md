@@ -26,9 +26,29 @@ written and approved before its layout code is merged.
   "Formatting output" with its rule ID, and the style edition (`2026`) stays
   the same. `--preview` is accepted but no rule reads it yet. To keep the
   output of one release, pin it with `required_version` in `origami.toml`
-  (see [adoption.md](adoption.md)). From 1.0, a new or changed rule first
+  (see [adoption.md](adoption.md)). 0.4 changes the default style from
+  `compact` to `aligned` (see "Styles"); `style = "compact"` keeps the 0.3
+  layout. From 1.0, a new or changed rule first
   appears behind `--preview` and becomes the default only with a new style
   edition; within an edition, output changes only to fix bugs.
+
+## Styles
+
+Approved by the maintainer, Nils Lutz, on 2026-11-25. origami has two styles,
+chosen with `style` in `origami.toml` (or `--style`):
+
+* **`aligned`** (default from 0.4): follows ABAP Cleaner's layout where the
+  two differed. Continuation lines are indented one level, parameter
+  keywords and declaration types are aligned in columns, method signatures
+  are tables behind the method name, and blank lines are added between
+  sections and groups.
+* **`compact`**: the output of origami 0.3.
+
+Each rule describes the `aligned` style. Where `compact` differs, a paragraph
+starting with **Compact:** gives its form. `style` is the only option that
+changes the style; see "No new knobs" in CONTRIBUTING.md. Until all of it is
+implemented, `aligned` prints parts of the `compact` layout; new rules wait
+at `Milestone: M5`.
 
 ## Line-break notes
 
@@ -259,10 +279,16 @@ ENDCLASS.
 ### ABAP-BLANK-001: Blank lines
 Milestone: M1
 
-Blank lines between statements are kept as written, at most one in a row.
-Blank lines directly after a block opener (`METHOD`, `IF`, `LOOP`, …) and
+Blank lines between statements are kept as written, at most one in a row
+(two between classes and interfaces, ABAP-BLANK-002). Blank lines directly
+after a block opener (`METHOD`, `IF`, `LOOP`, …) and
 directly before its closer are removed. Blank lines inside a statement are
-removed.
+removed. A blank line between comment lines and the statement they lead is
+kept, also directly after a block opener; only blank lines in front of the
+comment lines are removed there. ABAP-BLANK-002 adds blank lines.
+
+**Compact:** directly after a block opener, the blank line between comment
+lines and their statement is removed too.
 
 ```abap
 before: METHOD run.
@@ -280,6 +306,62 @@ after:  METHOD run.
         ENDMETHOD.
 ```
 
+### ABAP-BLANK-002: Blank lines that are added
+Milestone: M5
+
+Approved by the maintainer, Nils Lutz, on 2026-11-25. As ABAP Cleaner does,
+one blank line is added where none was written:
+
+* in a class definition, before `PROTECTED SECTION` and `PRIVATE SECTION`;
+* in a class definition section or an interface, between two declarations
+  with different keywords (`INTERFACES`, `ALIASES`, `TYPES`, `CONSTANTS`,
+  `DATA`, `CLASS-DATA`, `METHODS`, `CLASS-METHODS`, `EVENTS`,
+  `CLASS-EVENTS`); a `TYPES BEGIN OF … END OF` structure counts as one
+  `TYPES` declaration;
+* in the same places, before and after a declaration that spans two or more
+  lines (for example a method signature table);
+* in a `METHOD`, `FORM` or `FUNCTION`, between the declarations at its start
+  (`DATA`, `TYPES`, `CONSTANTS`, `STATICS`, `FIELD-SYMBOLS`) and the first
+  other statement;
+* in a class implementation, between `ENDMETHOD` and the next `METHOD`.
+
+Between two classes or interfaces (`ENDCLASS` or `ENDINTERFACE` and the next
+`CLASS` or `INTERFACE`, with any comment lines in front of it), there are
+exactly two blank lines.
+
+Apart from that, a blank line is never added directly after a block opener or
+before a closer, and never more than one in a row.
+
+```abap
+CLASS zcl_rates DEFINITION PUBLIC.
+  PUBLIC SECTION.
+    INTERFACES zif_rates.
+
+    METHODS reset.
+    METHODS calculate_all.
+
+    METHODS calculate IMPORTING iv_amount   TYPE p
+                                iv_currency TYPE waers.
+
+  PRIVATE SECTION.
+    DATA mv_rate TYPE p.
+ENDCLASS.
+
+
+CLASS zcl_rates IMPLEMENTATION.
+  METHOD reset.
+    DATA lv_count TYPE i.
+
+    CLEAR mv_rate.
+  ENDMETHOD.
+
+  METHOD calculate_all.
+  ENDMETHOD.
+ENDCLASS.
+```
+
+**Compact:** no blank line is added.
+
 ### ABAP-WIDTH-001: Line breaking
 Milestone: M1
 
@@ -292,10 +374,20 @@ exceed the width when one of them alone does not fit.
 ### ABAP-INDENT-001: Continuation indent
 Milestone: M1
 
-Continuation lines of a statement are indented two levels (default 4 spaces)
+Continuation lines of a statement are indented one level (default 2 spaces)
 relative to the start of the statement, unless a rule aligns them to a column
-(ABAP-CALL-001, ABAP-VALUE-001, ABAP-DECL-001). This keeps a wrapped condition
-visually apart from the block body, which is indented one level.
+(ABAP-CALL-001, ABAP-VALUE-001, ABAP-DECL-001), as ABAP Cleaner indents SQL
+clauses and `CALL FUNCTION` groups.
+
+```abap
+SELECT carrid, connid
+  FROM spfli
+  INTO TABLE @DATA(lt_routes)
+  WHERE carrid = @lv_carrier.
+```
+
+**Compact:** two levels (default 4 spaces), which keeps a wrapped condition
+visually apart from the block body:
 
 ```abap
 IF lv_amount > 0
@@ -328,9 +420,10 @@ Explanation: each parameter group on its own line
 
 When a broken call uses `EXPORTING`, `IMPORTING`, `CHANGING`, `RECEIVING` or
 `EXCEPTIONS`, the first keyword stays behind `(`, further keywords are aligned
-under it, and each keyword's parameters hang behind the keyword, aligned under
-its first parameter. Keywords are never added or removed. The fallback of
-ABAP-CALL-001 applies.
+under it, and each keyword's parameters hang behind the keyword. Keywords are
+padded to the longest one in the call, so all parameter names start in one
+column, and the `=` signs of all groups are aligned together (ABAP-ALIGN-001).
+Keywords are never added or removed. The fallback of ABAP-CALL-001 applies.
 
 Approved by the maintainer, Nils Lutz, on 2026-11-23: a call with two or more
 parameter keywords is always broken this way, even when it would fit on one
@@ -341,9 +434,17 @@ fits.
 lo_service->read( EXPORTING iv_id   = lv_id
                             iv_lang = sy-langu
                   IMPORTING es_data = ls_data ).
-lo_service->read( EXPORTING iv_id = lv_id
-                  IMPORTING es_data = ls_data ).
+lo_service->read( EXPORTING iv_identifier = lv_id
+                  CHANGING  ct_log        = lt_log ).
 lo_service->check( EXPORTING iv_id = lv_id ).
+```
+
+**Compact:** keywords are not padded, and the `=` signs are aligned per
+keyword:
+
+```abap
+lo_service->read( EXPORTING iv_identifier = lv_id
+                  CHANGING ct_log = lt_log ).
 ```
 
 ### ABAP-ALIGN-001: Align `=` in broken parameter lists (A1)
@@ -386,9 +487,13 @@ Milestone: M1
 Explanation: one declaration per line
 
 A declaration (`DATA`, `TYPES`, `CONSTANTS`, `CLASS-DATA`, `STATICS`,
-`FIELD-SYMBOLS`) that fits is printed on one line. In a chain that does not
-fit, each item goes on its own line, aligned after the colon. Components
-between `BEGIN OF` and `END OF` are indented one level more.
+`FIELD-SYMBOLS`) that fits is printed on one line. In a chain with two or more
+items, each item goes on its own line, aligned after the colon, even when the
+chain would fit on one line. Components between `BEGIN OF` and `END OF` are
+indented one level more.
+
+**Compact:** a chain that fits stays on one line; only a chain that does not
+fit puts each item on its own line.
 
 ```abap
 DATA: lv_count TYPE i,
@@ -419,8 +524,40 @@ Milestone: M1
 
 In a broken `DATA:`, `TYPES:`, `CONSTANTS:` or `CLASS-DATA:` chain, the
 `TYPE`/`LIKE` keyword of consecutive items is aligned (see the example in
-ABAP-DECL-001). A blank line or comment line ends the group; nested
-`BEGIN OF` levels align separately.
+ABAP-DECL-001), and so are `VALUE` and `READ-ONLY` as ABAP-ALIGN-008
+describes. A blank line or comment line ends the group; nested `BEGIN OF`
+levels align separately.
+
+**Compact:** only `TYPE`/`LIKE` is aligned.
+
+### ABAP-ALIGN-008: Align `TYPE` across declaration statements
+Milestone: M5
+
+Approved by the maintainer, Nils Lutz, on 2026-11-25. Consecutive one-line
+declarations with the same keyword (`DATA`, `CLASS-DATA`, `CONSTANTS`,
+`TYPES`, `STATICS`, `FIELD-SYMBOLS`) at the same block level are aligned in
+columns, as ABAP Cleaner does: the `TYPE`/`LIKE` keyword, then `VALUE` and
+then `READ-ONLY`. The type part (`TYPE c LENGTH 10`, `TYPE STANDARD TABLE OF
+…`) is one column. A `VALUE` or `READ-ONLY` column is made only if at least a
+fifth of the declarations in the group have one; its position is set by the
+declarations that have it, so a long type without a value does not push it.
+Blank lines and comment lines between the declarations do not end the
+group; another statement, a chain or a `BEGIN OF` structure does. If
+aligning would push a line past the width, the group uses single spaces.
+
+```abap
+DATA lv_count   TYPE i                VALUE 1.
+DATA lt_flights TYPE STANDARD TABLE OF sflight WITH EMPTY KEY.
+" logging
+DATA lv_text    TYPE c LENGTH 10      VALUE 'abc'.
+DATA lv_rate    TYPE p DECIMALS 2.
+CONSTANTS lc_max  TYPE i      VALUE 10.
+CONSTANTS lc_name TYPE string VALUE `origami`.
+DATA mv_id    TYPE i         READ-ONLY.
+DATA mv_count TYPE i VALUE 3 READ-ONLY.
+```
+
+**Compact:** not aligned.
 
 ### ABAP-ALIGN-004: Align assignments to the same object
 Milestone: M1
@@ -587,10 +724,11 @@ DATA: END OF status_view.
 Milestone: M4
 Explanation: each section and parameter on its own line
 
-Approved by the maintainer, Nils Lutz, on 2026-11-21. A `FORM` signature follows
-ABAP-METHODS-001 with the sections `TABLES`, `USING`, `CHANGING` and
-`RAISING`: on one line if it fits, otherwise each section on its own line at
-the continuation indent and each parameter one level deeper.
+Approved by the maintainer, Nils Lutz, on 2026-11-21. A `FORM` signature has
+the sections `TABLES`, `USING`, `CHANGING` and `RAISING`: on one line if it
+fits, otherwise each section on its own line at the continuation indent and
+each parameter one level deeper. This is the compact form of
+ABAP-METHODS-001, in both styles (the indent follows ABAP-INDENT-001).
 
 ```abap
 FORM read_flights
@@ -614,10 +752,31 @@ is a call.
 Milestone: M1
 Explanation: each section and parameter on its own line
 
-A `METHODS` or `CLASS-METHODS` declaration that fits is printed on one line.
-Otherwise each section keyword (`IMPORTING`, `EXPORTING`, `CHANGING`,
-`RETURNING`, `RAISING`, `EXCEPTIONS`) goes on its own line at the continuation
-indent, and each parameter one level deeper. Parameter types are not aligned.
+Approved by the maintainer, Nils Lutz, on 2026-11-25. A `METHODS` or
+`CLASS-METHODS` declaration with at most one parameter in one section
+(`IMPORTING`, `EXPORTING`, `CHANGING`, `RETURNING`, `RAISING`, `EXCEPTIONS`)
+is printed on one line if it fits. Any other signature is a table, as in
+ABAP Cleaner: the first section keyword stays behind the method name, the
+further keywords are aligned under it, and each parameter goes on its own
+line. Keywords are padded to the longest one, so all parameter names start in
+one column; the `TYPE`/`LIKE` of all parameters is aligned, and so are
+`OPTIONAL` and `DEFAULT`. The exceptions after `RAISING` or `EXCEPTIONS` stay
+on one line.
+
+If the table does not fit behind the method name, the line breaks after the
+name and the keyword column starts at the continuation indent.
+
+```abap
+METHODS calculate IMPORTING iv_amount        TYPE p
+                            iv_currency      TYPE waers OPTIONAL
+                  RETURNING VALUE(rv_result) TYPE p
+                  RAISING   zcx_calc_error zcx_rate_error.
+METHODS reset IMPORTING iv_hard TYPE abap_bool.
+```
+
+**Compact:** a declaration that fits is printed on one line. Otherwise each
+section keyword goes on its own line at the continuation indent, and each
+parameter one level deeper. Parameter types are not aligned.
 
 ```abap
 METHODS calculate
@@ -793,32 +952,74 @@ ABAP Cleaner removes it).
 ### ABAP-COMMENT-002: End-of-line comments
 Milestone: M1
 
-An end-of-line `"` comment is separated from the code before it by exactly one
-space. Hand-aligned comment columns are not kept.
+An end-of-line `"` comment keeps the spaces in front of it as written, at
+least one, as ABAP Cleaner does; a comment glued to the code gets one space.
+Comment columns that the author aligned stay aligned as long as the code in
+front of them keeps its width.
 
 ```abap
 before: lv_a = 1.          " first
-after:  lv_a = 1. " first
+        lv_b = 2." second
+after:  lv_a = 1.          " first
+        lv_b = 2. " second
 ```
+
+**Compact:** exactly one space; hand-aligned comment columns are not kept
+(`lv_a = 1. " first`).
+
+### ABAP-COMMENT-003: A space after the comment sign
+Milestone: M5
+
+Approved by the maintainer, Nils Lutz, on 2026-11-25. A `"` comment whose
+text starts directly with a letter or a digit gets one space after the `"`,
+as ABAP Cleaner's rule 'Start " comment with space' does. Nothing else in the
+comment changes. ABAP Doc (`"!`), pseudo-comments (`"#EC`), `""` and comments
+starting with any other character (`"---`, `"*`, `"<`) are left alone. This is
+the one rule that changes the text of a comment (INVARIANTS.md, section 3).
+
+```abap
+before: "tax is added later
+        lv_tax = lv_total * lv_rate. "rounded
+after:  " tax is added later
+        lv_tax = lv_total * lv_rate. " rounded
+```
+
+**Compact:** comments are not changed.
 
 ### ABAP-CALL-003: CALL FUNCTION and CALL METHOD
 Milestone: M1
 Explanation: each parameter group on its own line
 
-Approved by the maintainer, Nils Lutz, on 2026-11-21. A `CALL FUNCTION` or
-`CALL METHOD` statement is printed on one line when it fits. Otherwise each
-parameter group (`EXPORTING`, `IMPORTING`, `CHANGING`, `TABLES`, `EXCEPTIONS`,
-`RECEIVING`, `PARAMETER-TABLE`, `EXCEPTION-TABLE`) starts a line at the
-continuation indent, and its parameters hang behind the keyword with aligned
-`=` (as ABAP-ALIGN-001). Header additions (`DESTINATION`, `STARTING NEW TASK`,
+Approved by the maintainer, Nils Lutz, on 2026-11-25. In a `CALL FUNCTION`
+or `CALL METHOD` statement with parameters, each parameter group
+(`EXPORTING`, `IMPORTING`, `CHANGING`, `TABLES`, `EXCEPTIONS`, `RECEIVING`,
+`PARAMETER-TABLE`, `EXCEPTION-TABLE`) starts a line at the continuation
+indent, even when the statement would fit on one line, as ABAP Cleaner does.
+The keywords are padded to the longest one, so all parameter names start in
+one column, and the `=` signs of all groups are aligned together
+(ABAP-ALIGN-001). Header additions (`DESTINATION`, `STARTING NEW TASK`,
 `IN UPDATE TASK`, …) stay on the first line.
+
+```abap
+CALL FUNCTION 'Z_FLIGHT_TRAVEL_CREATE'
+  EXPORTING  is_travel   = ls_travel
+             it_booking  = lt_booking
+  IMPORTING  es_travel   = ls_result
+             et_messages = lt_messages
+  EXCEPTIONS not_found   = 1
+             OTHERS      = 2.
+CALL FUNCTION 'Z_SHORT'
+  EXPORTING iv_a = 1.
+```
+
+**Compact:** a statement that fits stays on one line; otherwise the groups
+break at the continuation indent, keywords are not padded, and the `=` signs
+are aligned per group:
 
 ```abap
 CALL FUNCTION 'Z_FLIGHT_TRAVEL_CREATE'
     EXPORTING is_travel  = ls_travel
               it_booking = lt_booking
-    IMPORTING es_travel   = ls_result
-              et_messages = lt_messages
     EXCEPTIONS not_found = 1
                OTHERS    = 2.
 ```
@@ -1002,7 +1203,8 @@ start left of one indent level.
 Milestone: M2
 
 Runs of spaces between tokens on one line shrink to one space. Hand-aligned
-columns, for example annotation values or `as` aliases, are not kept.
+columns, for example annotation values, are not kept; CDS-ALIGN-001 aligns
+`as` aliases and association targets.
 
 ```cds
 before: id:              'Connection',
@@ -1018,7 +1220,62 @@ CDS-family keywords and names keep their case as written.
 Milestone: M2
 
 Blank lines between units are kept, at most one in a row. Blank lines directly
-after `{` and directly before `}` are removed.
+after `{` and directly before `}` are removed. CDS-BLANK-002 adds blank lines
+in view definitions.
+
+### CDS-BLANK-002: Blank lines between the sections of a view
+Milestone: M5
+
+Approved by the maintainer, Nils Lutz, on 2026-11-25. In a DDLS view
+definition (`define view`, `define view entity`, `define root view entity`,
+projections), one blank line is added where none was written, as ABAP
+Cleaner does:
+
+* between the annotations at the top and `define`;
+* between the view parameters and `as select from` (or `as projection on`);
+* between `as select from` and the first join;
+* between the data sources (joins) and the first association or composition;
+* before the select list's `{` and after its `}`;
+* in the select list: after the last `key` element, before the first element
+  that exposes an association of the header (`_Agency`), and before and after
+  an element that spans two or more lines, counting its annotations.
+
+```cds
+@EndUserText.label: 'Travel'
+
+define view entity ZI_Travel
+  as select from /dmo/travel
+
+  association [0..1] to /DMO/I_Agency   as _Agency   on $projection.AgencyID = _Agency.AgencyID
+  association [0..*] to /DMO/I_Customer as _Customer on $projection.CustomerID = _Customer.CustomerID
+
+{
+  key travel_id   as TravelID,
+
+      @Semantics.amount.currencyCode: 'CurrencyCode'
+      total_price as TotalPrice,
+
+      agency_id   as AgencyID,
+
+      _Agency,
+      _Customer
+}
+```
+
+**Compact:** no blank line is added.
+
+### CDS-ALIGN-001: Aligned aliases and association targets
+Milestone: M5
+
+Approved by the maintainer, Nils Lutz, on 2026-11-25. In a select list, the
+`as` aliases of one-line elements are aligned in one column, across blank
+lines and annotations. Elements without an alias that are a name or a path
+(`t.customer_id`) count for the column; elements that span several lines are
+not aligned and do not count. In the header, consecutive one-line
+associations and compositions align their `as` and `on`. A column that would
+start after position 120 is not aligned. See the example in CDS-BLANK-002.
+
+**Compact:** not aligned (CDS-SPACE-001).
 
 ### CDS-ANNO-001: Annotation values
 Milestone: M2

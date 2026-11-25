@@ -18,7 +18,7 @@ equal when all of these hold:
 |---|---|---|
 | 1.1 | Same number of tokens, same kinds, same texts. Only tokens a parser marked as keywords or (ABAP) identifiers may differ in letter case. | `crates/origami_syntax/tests/compare.rs` |
 | 1.2 | Same `glued` flag on every token: two tokens that touch in the input touch in the output, and two tokens separated by whitespace stay separated. One exception (ABAP-SPACE-001): an ABAP statement's closing period and a comma outside brackets, which the ABAP crate marks `may_glue`, may become glued to the token before them. | `compare.rs`, `crates/origami_abap/tests/lexer.rs::glued_flags` |
-| 1.3 | Same comments: same text, same syntax (`*`, `"`, `"!`, `"#EC`, `//`/`--`, `/* */`), same placement (own line / end of line), attached to the same token in the same position. Two exceptions (section 3): comments in front of a period or comma that 1.2 glues move behind it (ABAP-SPACE-001), and ABAP Doc tag lines may change two runs of blanks (ABAP-DOC-001). | `compare.rs`, `crates/origami_syntax/tests/trivia.rs` |
+| 1.3 | Same comments: same text, same syntax (`*`, `"`, `"!`, `"#EC`, `//`/`--`, `/* */`), same placement (own line / end of line), attached to the same token in the same position. Three exceptions (section 3): comments in front of a period or comma that 1.2 glues move behind it (ABAP-SPACE-001), ABAP Doc tag lines may change two runs of blanks (ABAP-DOC-001), and a `"` comment may get one space after the `"` (ABAP-COMMENT-003). | `compare.rs`, `crates/origami_syntax/tests/trivia.rs` |
 | 1.4 | Verbatim regions (AMDP, `EXEC SQL`, macro bodies) are single opaque tokens, so rule 1.1 compares them byte for byte. | `lexer.rs::verbatim_regions` |
 | 1.5 | No ABAP output line exceeds 255 characters unless the same input line already did. | `crates/origami_core/src/check.rs` |
 
@@ -68,8 +68,12 @@ The only exceptions to rule 1.3, each checked by `equivalent` and tested in
   `"! @parameter name | text` (also `@raising` and `@exception`, in any letter
   case), only the blanks after the tag (at least one) and between the name
   and `|` (possibly none) may change. The text up to the end of the tag, the
-  name, and everything from `|` on are compared byte for byte; every other
-  comment change is a mismatch.
+  name, and everything from `|` on are compared byte for byte.
+* **ABAP-COMMENT-003.** A `"` comment whose input text continues with a letter
+  or digit directly after the `"` may have exactly one space inserted there;
+  the rest is compared byte for byte.
+
+Every other comment change is a mismatch.
 
 ## 4. Re-indentation of unknown and quarantined statements (from M1)
 
