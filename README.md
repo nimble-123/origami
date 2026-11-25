@@ -85,6 +85,7 @@ Configuration, found by walking up to the repository root:
 required_version = ">=0.1, <0.2"
 line_width = 120
 indent_width = 2
+style = "aligned"   # or "compact": the layout of origami 0.3
 
 [abap]
 keyword_case = "upper"

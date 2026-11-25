@@ -18,6 +18,12 @@ pub enum CaseArg {
     Lower,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum StyleArg {
+    Aligned,
+    Compact,
+}
+
 /// `Default` is a command line without flags (as the MCP server uses it).
 #[derive(Debug, Default, Parser)]
 #[command(
@@ -107,6 +113,11 @@ pub struct Args {
     /// Case of ABAP keywords (default upper)
     #[arg(long, value_enum, value_name = "CASE")]
     pub keyword_case: Option<CaseArg>,
+
+    /// Layout style: aligned (ABAP Cleaner layout, default) or compact
+    /// (the layout of origami 0.3)
+    #[arg(long, value_enum, value_name = "STYLE")]
+    pub style: Option<StyleArg>,
 
     /// Worker threads for directory mode (default: CPU count).
     #[arg(short = 'j', long = "jobs", value_name = "N")]

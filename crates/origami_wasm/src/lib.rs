@@ -2,7 +2,7 @@
 //! by the website playground (`site/`). No wasm-bindgen; JavaScript calls:
 //!
 //! 1. `alloc(len)` and writes the UTF-8 source into that buffer;
-//! 2. `review(ptr, len, cds, width, indent, lower)`; the source buffer is
+//! 2. `review(ptr, len, cds, width, indent, lower, compact)`; the source buffer is
 //!    freed by this call;
 //! 3. reads `result_len()` bytes at the returned pointer: a JSON document
 //!    (see [`review_json`]); then `dealloc(result, result_len())`.
@@ -10,7 +10,7 @@
 //! The core does no I/O, so nothing else is needed. A panic aborts the
 //! instance (wasm32 has no unwinding); the page then starts a new one.
 
-use origami_core::{Case, LanguageHint, Options, Status, explain};
+use origami_core::{Case, LanguageHint, Options, Status, Style, explain};
 use serde_json::json;
 use std::cell::Cell;
 
@@ -21,7 +21,14 @@ thread_local! {
 /// Formats `source` and returns the result with its line-break notes as JSON:
 /// `{status, changed, output, language, diagnostics: [{code, severity,
 /// message, line, column}], notes: [{first, last, rule, text}]}`.
-pub fn review_json(source: &str, cds: bool, width: u16, indent: u8, lower: bool) -> String {
+pub fn review_json(
+    source: &str,
+    cds: bool,
+    width: u16,
+    indent: u8,
+    lower: bool,
+    compact: bool,
+) -> String {
     let hint = if cds {
         LanguageHint::CdsFamily
     } else {
@@ -31,6 +38,11 @@ pub fn review_json(source: &str, cds: bool, width: u16, indent: u8, lower: bool)
     opts.lang.line_width = width;
     opts.lang.indent_width = indent;
     opts.lang.abap_keyword_case = if lower { Case::Lower } else { Case::Upper };
+    opts.lang.style = if compact {
+        Style::Compact
+    } else {
+        Style::Aligned
+    };
     let e = explain(source.as_bytes(), &hint, &opts, &[]);
     let status = match e.result.status {
         Status::Formatted => "formatted",
@@ -130,13 +142,15 @@ pub unsafe extern "C" fn review(
     width: u32,
     indent: u32,
     lower: u32,
+    compact: u32,
 ) -> *mut u8 {
     // SAFETY: `ptr` comes from `alloc(len)` and JavaScript wrote `len` bytes.
     let input = unsafe { take_buffer(ptr, len) };
     let source = String::from_utf8_lossy(&input[..len]);
     let width = u16::try_from(width).unwrap_or(120);
     let indent = u8::try_from(indent).unwrap_or(2);
-    let mut out = review_json(&source, cds != 0, width, indent, lower != 0).into_bytes();
+    let mut out =
+        review_json(&source, cds != 0, width, indent, lower != 0, compact != 0).into_bytes();
     if out.is_empty() {
         // Not reachable (the JSON is never empty); keeps `alloc_len` honest.
         out.push(b' ');
@@ -154,9 +168,15 @@ mod tests {
 
     #[test]
     fn formats_and_explains() {
-        let v: serde_json::Value =
-            serde_json::from_str(&review_json("lv_a = 1. lv_b = 2.\n", false, 120, 2, false))
-                .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&review_json(
+            "lv_a = 1. lv_b = 2.\n",
+            false,
+            120,
+            2,
+            false,
+            false,
+        ))
+        .unwrap();
         assert_eq!(v["status"], "formatted");
         assert_eq!(v["output"], "lv_a = 1.\nlv_b = 2.\n");
         assert_eq!(v["notes"][0]["rule"], "ABAP-STMT-001");
@@ -165,7 +185,7 @@ mod tests {
     #[test]
     fn reports_errors() {
         let v: serde_json::Value =
-            serde_json::from_str(&review_json("lv_a = 1\n", false, 120, 2, false)).unwrap();
+            serde_json::from_str(&review_json("lv_a = 1\n", false, 120, 2, false, false)).unwrap();
         assert_eq!(v["status"], "error");
         assert_eq!(v["diagnostics"][0]["code"], "E003");
         assert!(v["output"].is_null());
@@ -177,7 +197,7 @@ mod tests {
         // SAFETY: `alloc(len)` returns at least `len` writable bytes.
         unsafe { std::ptr::copy_nonoverlapping(source.as_ptr(), ptr, source.len()) };
         // SAFETY: `ptr` comes from `alloc(source.len())` and holds those bytes.
-        let res = unsafe { review(ptr, source.len(), cds, 120, 2, 0) };
+        let res = unsafe { review(ptr, source.len(), cds, 120, 2, 0, 0) };
         let len = result_len();
         // SAFETY: `review` returns `result_len()` initialized bytes at `res`.
         let json = unsafe { std::slice::from_raw_parts(res, len) }.to_vec();

@@ -1,5 +1,5 @@
 //! `idempotency`: formats every corpus file at every combination of line
-//! width, indent width and keyword case, and checks:
+//! width, indent width, keyword case and style, and checks:
 //! * formatting the output again gives the same output;
 //! * `explain` gives the same result as `format`;
 //! * an already formatted file stays unchanged when only some of its lines
@@ -10,23 +10,27 @@
 //! unusual indents are where a second pass can choose a different layout.
 
 use crate::corpus::{files, manifest};
-use origami_core::{Case, LanguageHint, Options, explain, format, format_lines};
+use origami_core::{Case, LanguageHint, Options, Style, explain, format, format_lines};
 use std::path::PathBuf;
 
 const WIDTHS: [u16; 8] = [40, 55, 72, 80, 100, 120, 160, 255];
 const INDENTS: [u8; 5] = [1, 2, 3, 4, 8];
 const CASES: [Case; 2] = [Case::Upper, Case::Lower];
+const STYLES: [Style; 2] = [Style::Aligned, Style::Compact];
 
 pub fn options() -> Vec<Options> {
     let mut all = Vec::new();
     for &w in &WIDTHS {
         for &i in &INDENTS {
             for &c in &CASES {
-                let mut o = Options::default();
-                o.lang.line_width = w;
-                o.lang.indent_width = i;
-                o.lang.abap_keyword_case = c;
-                all.push(o);
+                for &s in &STYLES {
+                    let mut o = Options::default();
+                    o.lang.line_width = w;
+                    o.lang.indent_width = i;
+                    o.lang.abap_keyword_case = c;
+                    o.lang.style = s;
+                    all.push(o);
+                }
             }
         }
     }
@@ -35,8 +39,11 @@ pub fn options() -> Vec<Options> {
 
 pub fn label(o: &Options) -> String {
     format!(
-        "w{} i{} {:?}",
-        o.lang.line_width, o.lang.indent_width, o.lang.abap_keyword_case
+        "w{} i{} {:?} {}",
+        o.lang.line_width,
+        o.lang.indent_width,
+        o.lang.abap_keyword_case,
+        o.lang.style.as_str()
     )
 }
 

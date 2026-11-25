@@ -314,6 +314,30 @@ fn unknown_key_is_w101_and_strict_exits_5() {
 }
 
 #[test]
+fn style_is_read_from_config_and_flag() {
+    let d = dir();
+    write(d.path(), "origami.toml", "style = \"compact\"\n");
+    write(d.path(), "a.clas.abap", CLASS);
+    origami().current_dir(d.path()).assert().code(0);
+    origami()
+        .current_dir(d.path())
+        .args(["--style", "aligned"])
+        .assert()
+        .code(0);
+    write(d.path(), "origami.toml", "style = \"wide\"\n");
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--diagnostics", "json"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    assert_eq!(
+        json_of(&out.stderr)["files"][0]["diagnostics"][0]["code"],
+        "E020"
+    );
+}
+
+#[test]
 fn origamiignore_is_honored() {
     let d = dir();
     write(d.path(), ".origamiignore", "generated/\n");

@@ -13,11 +13,11 @@ for (const name of ["memory", "alloc", "dealloc", "review", "result_len"]) {
   assert.ok(name in wasm, `missing export: ${name}`);
 }
 
-function review(source, { cds = false, width = 120, indent = 2, lower = false } = {}) {
+function review(source, { cds = false, width = 120, indent = 2, lower = false, compact = false } = {}) {
   const bytes = new TextEncoder().encode(source);
   const ptr = wasm.alloc(bytes.length);
   new Uint8Array(wasm.memory.buffer, ptr, bytes.length).set(bytes);
-  const res = wasm.review(ptr, bytes.length, cds ? 1 : 0, width, indent, lower ? 1 : 0);
+  const res = wasm.review(ptr, bytes.length, cds ? 1 : 0, width, indent, lower ? 1 : 0, compact ? 1 : 0);
   const len = wasm.result_len();
   const json = new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, res, len));
   wasm.dealloc(res, len);

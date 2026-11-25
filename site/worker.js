@@ -2,7 +2,7 @@
 // crates/origami_wasm) off the main thread, so a slow input cannot freeze the
 // page. app.js terminates and restarts this worker when a run takes too long.
 //
-// Messages in:  { id, source, opts: { cds, width, lower } }
+// Messages in:  { id, source, opts: { cds, width, lower, compact } }
 // Messages out: { type: "ready" } | { type: "load-error" }
 //               { type: "result", id, result } | { type: "panic", id }
 
@@ -19,7 +19,7 @@ function review(source, opts) {
   const bytes = new TextEncoder().encode(source);
   const ptr = wasm.alloc(bytes.length);
   new Uint8Array(wasm.memory.buffer, ptr, bytes.length).set(bytes);
-  const res = wasm.review(ptr, bytes.length, opts.cds ? 1 : 0, opts.width, 2, opts.lower ? 1 : 0);
+  const res = wasm.review(ptr, bytes.length, opts.cds ? 1 : 0, opts.width, 2, opts.lower ? 1 : 0, opts.compact ? 1 : 0);
   const len = wasm.result_len();
   const json = new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, res, len));
   wasm.dealloc(res, len);

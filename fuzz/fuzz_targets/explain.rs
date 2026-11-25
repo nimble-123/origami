@@ -5,7 +5,7 @@
 //! selects the whole file or a line range.
 
 use libfuzzer_sys::fuzz_target;
-use origami_core::{Case, Code, Language, LanguageHint, Options, explain, format_lines};
+use origami_core::{Case, Code, Language, LanguageHint, Options, Style, explain, format_lines};
 
 const LANGS: [Language; 6] = [
     Language::Abap,
@@ -24,6 +24,11 @@ fn variant(n: usize) -> Options {
     o.lang.line_width = 40 + (n * 7 % 216) as u16;
     o.lang.indent_width = 1 + (n % 8) as u8;
     o.lang.abap_keyword_case = if n % 2 == 1 { Case::Lower } else { Case::Upper };
+    o.lang.style = if n / 2 % 2 == 1 {
+        Style::Compact
+    } else {
+        Style::Aligned
+    };
     o
 }
 

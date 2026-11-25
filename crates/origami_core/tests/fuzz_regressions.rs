@@ -6,7 +6,7 @@
 //! are checked with their invariants.
 
 use origami_core::{
-    Case, Code, Language, LanguageHint, Options, Status, explain, format, format_lines,
+    Case, Code, Language, LanguageHint, Options, Status, Style, explain, format, format_lines,
 };
 use std::path::Path;
 
@@ -34,6 +34,11 @@ fn variant(n: usize) -> Options {
     o.lang.line_width = 40 + (n * 7 % 216) as u16;
     o.lang.indent_width = 1 + (n % 8) as u8;
     o.lang.abap_keyword_case = if n % 2 == 1 { Case::Lower } else { Case::Upper };
+    o.lang.style = if n / 2 % 2 == 1 {
+        Style::Compact
+    } else {
+        Style::Aligned
+    };
     o
 }
 

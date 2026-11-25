@@ -38,6 +38,7 @@ origami [OPTIONS] [PATHS...]
   --line-width N        40..=255
   --indent-width N      1..=8
   --keyword-case C      upper | lower (ABAP keywords only)
+  --style S             aligned (default) | compact (STYLE.md, "Styles")
   -j, --jobs N          worker threads for directory mode (default: CPU count)
   --mcp                 run as an MCP server on stdin/stdout
   --version [--json] [--config FILE]
@@ -250,6 +251,7 @@ style_edition    = "2026"       # which version of the style rules to apply
 required_version = ">=1.0, <2"  # semver range (Rust syntax); mismatch is E020
 line_width       = 120          # 40..=255
 indent_width     = 2            # 1..=8
+style            = "aligned"    # "aligned" (ABAP Cleaner layout) | "compact" (0.3 layout)
 preview          = false
 
 [abap]
