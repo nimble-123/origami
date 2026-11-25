@@ -1,11 +1,11 @@
 READ ENTITIES OF /DMO/I_Travel_M IN LOCAL MODE
-    ENTITY travel
-      FIELDS ( customer_id ) WITH CORRESPONDING #( keys )
-      RESULT DATA(travels)
-    FAILED DATA(failed).
+  ENTITY travel
+    FIELDS ( customer_id ) WITH CORRESPONDING #( keys )
+    RESULT DATA(travels)
+  FAILED DATA(failed).
 MODIFY ENTITIES OF /dmo/i_travel_m
-    ENTITY travel
-      CREATE FROM create_travel
-    REPORTED reported
-    FAILED failed
-    MAPPED mapped.
+  ENTITY travel
+    CREATE FROM create_travel
+  REPORTED reported
+  FAILED failed
+  MAPPED mapped.

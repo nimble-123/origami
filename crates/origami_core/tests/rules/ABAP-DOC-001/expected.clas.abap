@@ -8,13 +8,13 @@ CLASS zcl_doc DEFINITION PUBLIC FINAL CREATE PUBLIC.
     "! @parameter rs_flight        | Flight
     "! @raising   zcx_not_found    | Flight not found
     METHODS read
-        IMPORTING
-          iv_carrier TYPE s_carr_id
-          iv_connection_id TYPE s_conn_id
-        RETURNING
-          VALUE(rs_flight) TYPE sflight
-        RAISING
-          zcx_not_found.
+      IMPORTING
+        iv_carrier TYPE s_carr_id
+        iv_connection_id TYPE s_conn_id
+      RETURNING
+        VALUE(rs_flight) TYPE sflight
+      RAISING
+        zcx_not_found.
 
     "! @parameter iv_id |
     "! @parameter iv_name_of_the_thing Name

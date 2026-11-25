@@ -84,6 +84,7 @@ fn format_with(
         indent: opts.indent_width,
         keyword_case: None,
         identity,
+        cont_levels: 2,
         comment_overrides: Default::default(),
     };
     let limit = max_output_len(src.text().len());

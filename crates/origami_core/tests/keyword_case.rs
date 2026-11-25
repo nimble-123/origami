@@ -2,15 +2,18 @@
 //! upper-cased, wherever it stands. Each case is written in lower case and
 //! must format to the expected text without W003 (statement recognized).
 //! The list grew from comparing origami with ABAP Cleaner on the test corpus
-//! (scripts/abap-cleaner-compare/keywords.py).
+//! (scripts/abap-cleaner-compare/keywords.py). The cases are written in the
+//! compact style, so their line breaks do not depend on the style rules.
 
-use origami_core::{Code, LanguageHint, Options, format};
+use origami_core::{Code, LanguageHint, Options, Style, format};
 
 fn check(cases: &[(&str, &str)]) {
     let hint = LanguageHint::Path("t.prog.abap".into());
+    let mut opts = Options::default();
+    opts.lang.style = Style::Compact;
     for (input, expected) in cases {
         for src in [input, expected] {
-            let r = format(src.as_bytes(), &hint, &Options::default());
+            let r = format(src.as_bytes(), &hint, &opts);
             assert!(!r.has(Code::W003), "not recognized: {src}");
             let out = String::from_utf8(r.output.expect("output")).unwrap();
             assert_eq!(&out, expected, "input: {src}");
