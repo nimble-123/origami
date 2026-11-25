@@ -15,6 +15,7 @@ pub use options::Fault;
 pub use options::Options;
 pub use origami_syntax::{
     BreakCause, Case, Code, Edition, Language, Note, Position, RuleId, Scope, Severity, Stats,
+    Style,
 };
 pub use result::{FormatResult, Reported, ReportedRange, Status};
 

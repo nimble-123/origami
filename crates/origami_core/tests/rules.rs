@@ -8,8 +8,12 @@
 //! note: `<first line>: <text>`); `ORIGAMI_BLESS=1` writes it for every rule
 //! in the sentence table. It
 //! also checks that every rule has a directory and every directory a rule.
+//!
+//! `expected.*` is the output of the default style (`aligned`). The same
+//! checks run with `style = compact` against `expected.compact.*` if the
+//! directory has one, else against `expected.*`.
 
-use origami_core::{Code, LanguageHint, Options, RULE_PHRASES, explain, format};
+use origami_core::{Code, LanguageHint, Options, RULE_PHRASES, Style, explain, format};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -58,13 +62,20 @@ fn rules() -> BTreeMap<String, u8> {
     out
 }
 
-fn find(dir: &Path, prefix: &str) -> PathBuf {
+fn try_find(dir: &Path, prefix: &str) -> Option<PathBuf> {
     std::fs::read_dir(dir)
         .unwrap()
         .flatten()
         .map(|e| e.path())
-        .find(|p| p.file_name().unwrap().to_string_lossy().starts_with(prefix))
-        .unwrap_or_else(|| panic!("{} has no {prefix}* file", dir.display()))
+        .find(|p| {
+            let name = p.file_name().unwrap().to_string_lossy();
+            name.starts_with(prefix)
+                && (prefix != "expected." || !name.starts_with("expected.compact."))
+        })
+}
+
+fn find(dir: &Path, prefix: &str) -> PathBuf {
+    try_find(dir, prefix).unwrap_or_else(|| panic!("{} has no {prefix}* file", dir.display()))
 }
 
 #[test]
@@ -85,6 +96,8 @@ fn style_rules() {
         );
     }
     let opts = Options::default();
+    let mut compact = Options::default();
+    compact.lang.style = Style::Compact;
     let mut ran = 0;
     for (id, milestone) in &rules {
         if *milestone > CURRENT_MILESTONE {
@@ -96,26 +109,36 @@ fn style_rules() {
         let expected = find(&dir, "expected.");
         let in_bytes = std::fs::read(&input).unwrap();
         let exp_bytes = std::fs::read(&expected).unwrap();
-        for (label, bytes) in [("input", &in_bytes), ("expected", &exp_bytes)] {
-            let hint = LanguageHint::Path(input.to_string_lossy().into_owned());
-            let r = format(bytes, &hint, &opts);
-            assert_eq!(
-                explain(bytes, &hint, &opts, &[]).result,
-                r,
-                "{id}: explain differs from format on {label}"
-            );
-            assert!(
-                !r.has(Code::W001) && !r.has(Code::X001),
-                "{id}: self-check problem on {label}"
-            );
-            let out = r
-                .output
-                .unwrap_or_else(|| panic!("{id}: no output for {label}: {:?}", r.diagnostics));
-            assert_eq!(
-                String::from_utf8_lossy(&out),
-                String::from_utf8_lossy(&exp_bytes),
-                "{id}: {label} does not format to expected"
-            );
+        let compact_bytes = match try_find(&dir, "expected.compact.") {
+            Some(p) => std::fs::read(p).unwrap(),
+            None => exp_bytes.clone(),
+        };
+        for (style, opts, exp_bytes) in [
+            ("aligned", &opts, &exp_bytes),
+            ("compact", &compact, &compact_bytes),
+        ] {
+            for (label, bytes) in [("input", &in_bytes), ("expected", exp_bytes)] {
+                let label = format!("{label} ({style})");
+                let hint = LanguageHint::Path(input.to_string_lossy().into_owned());
+                let r = format(bytes, &hint, opts);
+                assert_eq!(
+                    explain(bytes, &hint, opts, &[]).result,
+                    r,
+                    "{id}: explain differs from format on {label}"
+                );
+                assert!(
+                    !r.has(Code::W001) && !r.has(Code::X001),
+                    "{id}: self-check problem on {label}"
+                );
+                let out = r
+                    .output
+                    .unwrap_or_else(|| panic!("{id}: no output for {label}: {:?}", r.diagnostics));
+                assert_eq!(
+                    String::from_utf8_lossy(&out),
+                    String::from_utf8_lossy(exp_bytes),
+                    "{id}: {label} does not format to expected"
+                );
+            }
         }
         let notes_file = dir.join("notes.txt");
         let ex = explain(

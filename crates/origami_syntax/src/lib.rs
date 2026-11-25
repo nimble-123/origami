@@ -16,7 +16,7 @@ pub use compare::{Mismatch, MismatchKind, equivalent};
 pub use diagnostic::{Code, Diagnostic, Severity};
 pub use explain::{BreakCause, Note, RuleId, RuleSpan, Scope};
 pub use lang::{
-    Case, Edition, LangOptions, LangResult, Language, MAX_NESTING, Stats, Unit, UnitId,
+    Case, Edition, LangOptions, LangResult, Language, MAX_NESTING, Stats, Style, Unit, UnitId,
     max_output_len, output_limit_diagnostic,
 };
 pub use source::{LineEnding, LineIndex, Position, SourceText};

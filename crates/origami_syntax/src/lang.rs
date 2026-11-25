@@ -54,6 +54,33 @@ pub enum Case {
     Lower,
 }
 
+/// The style (STYLE.md, "Styles"): `Aligned` follows ABAP Cleaner's layout,
+/// `Compact` is the layout of origami 0.3.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Style {
+    #[default]
+    Aligned,
+    Compact,
+}
+
+impl Style {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Style::Aligned => "aligned",
+            Style::Compact => "compact",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Style> {
+        match s {
+            "aligned" => Some(Style::Aligned),
+            "compact" => Some(Style::Compact),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Edition {
     E2026,
@@ -79,6 +106,7 @@ pub struct LangOptions {
     pub line_width: u16,
     pub indent_width: u8,
     pub abap_keyword_case: Case,
+    pub style: Style,
     pub preview: bool,
 }
 
@@ -88,6 +116,7 @@ impl Default for LangOptions {
             line_width: 120,
             indent_width: 2,
             abap_keyword_case: Case::Upper,
+            style: Style::Aligned,
             preview: false,
         }
     }

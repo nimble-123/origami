@@ -1,7 +1,7 @@
 //! Config discovery and merging: defaults, then `origami.toml`, then flags.
 
-use crate::args::{Args, CaseArg};
-use origami_core::{Case, Code, Edition, Options, Position};
+use crate::args::{Args, CaseArg, StyleArg};
+use origami_core::{Case, Code, Edition, Options, Position, Style};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
@@ -15,6 +15,7 @@ pub struct FileConfig {
     pub line_width: Option<u16>,
     pub indent_width: Option<u8>,
     pub preview: Option<bool>,
+    pub style: Option<String>,
     pub keyword_case: Option<String>,
     pub unknown_keys: Vec<String>,
 }
@@ -63,6 +64,7 @@ pub fn parse(text: &str, path: &Path) -> Result<FileConfig, ConfigIssue> {
                 c.indent_width = Some(u8::try_from(n).map_err(|_| wrong("1..=8"))?);
             }
             "preview" => c.preview = Some(v.as_bool().ok_or_else(|| wrong("a boolean"))?),
+            "style" => c.style = Some(v.as_str().ok_or_else(|| wrong("a string"))?.into()),
             "abap" => {
                 let t = v.as_table().ok_or_else(|| wrong("a table"))?;
                 for (ak, av) in t {
@@ -122,6 +124,13 @@ pub fn options(file: &FileConfig, args: &Args, path: &Path) -> Result<Options, C
     if let Some(p) = file.preview {
         o.lang.preview = p;
     }
+    if let Some(s) = &file.style {
+        o.lang.style = Style::parse(s).ok_or_else(|| {
+            issue(format!(
+                "`style` must be \"aligned\" or \"compact\", got `{s}`"
+            ))
+        })?;
+    }
     if let Some(k) = &file.keyword_case {
         o.lang.abap_keyword_case = match k.as_str() {
             "upper" => Case::Upper,
@@ -166,6 +175,12 @@ pub fn apply_flags(o: &mut Options, args: &Args) {
     }
     if args.preview {
         o.lang.preview = true;
+    }
+    if let Some(s) = args.style {
+        o.lang.style = match s {
+            StyleArg::Aligned => Style::Aligned,
+            StyleArg::Compact => Style::Compact,
+        };
     }
     if let Some(k) = args.keyword_case {
         o.lang.abap_keyword_case = match k {

@@ -299,6 +299,7 @@ function options() {
     cds: $("pg-lang").value === "cds",
     width: Number($("pg-width").value),
     lower: $("pg-case").value === "lower",
+    compact: $("pg-style").value === "compact",
   };
 }
 
@@ -374,7 +375,7 @@ async function playground() {
   if (!input) return;
   input.value = EXAMPLES.call.text;
   $("pg-example").addEventListener("change", (e) => loadExample(e.target.value));
-  for (const id of ["pg-lang", "pg-width", "pg-case"]) $(id).addEventListener("change", run);
+  for (const id of ["pg-lang", "pg-width", "pg-case", "pg-style"]) $(id).addEventListener("change", run);
   input.addEventListener("input", () => {
     paintInput();
     schedule();
