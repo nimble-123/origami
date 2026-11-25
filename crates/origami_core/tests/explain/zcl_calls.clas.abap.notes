@@ -1,5 +1,5 @@
 3: ABAP-METHODS-001: each section and parameter on its own line
-14: ABAP-STMT-001: each statement on its own line
-15: ABAP-CALL-001: one parameter per line, because the call would end at column 132 (limit 120)
-22: ABAP-VALUE-001: one row per line, because the constructor expression would end at column 145 (limit 120)
-25: ABAP-COND-001: condition split before AND, OR, because the condition would end at column 121 (limit 120)
+15: ABAP-STMT-001: each statement on its own line
+17: ABAP-CALL-001: one parameter per line, because the call would end at column 132 (limit 120)
+24: ABAP-VALUE-001: one row per line, because the constructor expression would end at column 145 (limit 120)
+27: ABAP-COND-001: condition split before AND, OR, because the condition would end at column 121 (limit 120)

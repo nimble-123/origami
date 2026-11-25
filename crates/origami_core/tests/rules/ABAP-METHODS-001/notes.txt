@@ -1,4 +1,4 @@
 3: ABAP-METHODS-001: each section and parameter on its own line
-9: ABAP-METHODS-001: each section and parameter on its own line
-9: ABAP-METHODS-001: each section and parameter on its own line, because the line would end at column 133 (limit 120)
-12: ABAP-METHODS-001: each section and parameter on its own line
+11: ABAP-METHODS-001: each section and parameter on its own line
+11: ABAP-METHODS-001: each section and parameter on its own line, because the line would end at column 133 (limit 120)
+15: ABAP-METHODS-001: each section and parameter on its own line

@@ -1,0 +1,8 @@
+CLASS lcl DEFINITION FINAL.
+ENDCLASS.
+CLASS lcl IMPLEMENTATION.
+  METHOD constructor.
+    DATA ls_METHOD m.branch TYPE ty_branch.
+    find_changes( ct_features = lt_features ).
+  ENDMETHOD.
+ENDCLASS.

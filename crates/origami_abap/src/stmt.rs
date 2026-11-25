@@ -25,6 +25,9 @@ pub struct Ctx<'a> {
     pub explain: bool,
     /// Constructs and their layout rules; only filled when `explain`.
     pub rule_spans: Vec<RuleSpan>,
+    /// The statement being parsed always spans several lines (a signature
+    /// table, a broken chain); read by ABAP-BLANK-002.
+    pub multi_line: bool,
 }
 
 /// State of a [`Ctx`] before a parse attempt, to roll back a failed one.
@@ -1796,6 +1799,7 @@ mod tests {
             keywords: vec![1],
             explain: true,
             rule_spans: Vec::new(),
+            multi_line: false,
         };
         c.span(0, 3, "ABAP-STMT-001");
         let m = c.mark();

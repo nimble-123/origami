@@ -307,7 +307,7 @@ after:  METHOD run.
 ```
 
 ### ABAP-BLANK-002: Blank lines that are added
-Milestone: M5
+Milestone: M4
 
 Approved by the maintainer, Nils Lutz, on 2026-11-25. As ABAP Cleaner does,
 one blank line is added where none was written:
