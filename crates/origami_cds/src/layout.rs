@@ -331,14 +331,19 @@ pub fn units(text: &str, stream: &TokenStream, lang: Language) -> Vec<CdsUnit> {
                             // so a second run makes the same choice.) A
                             // comment in it, or in front of it in this unit,
                             // ends a line and can make the unit's layout break
-                            // the block, so such a block is split
-                            // (fuzz/found/cds-bdef-comment-block.bin,
-                            // cds-comment-before-block.bin).
+                            // the block, and so can a `case`, which breaks when
+                            // it does not fit (CDS-ELEM-001); such a block is
+                            // split (fuzz/found/cds-bdef-comment-block.bin,
+                            // cds-comment-before-block.bin, cds-case-before-block.bin).
                             match close_of[j] {
                                 Some(close)
                                     if line_of(j - 1) == line_of(j)
                                         && line_of(j) == line_of(close)
-                                        && !eol_comment[i..close].contains(&true) =>
+                                        && !eol_comment[i..close].contains(&true)
+                                        && !(i..close).any(|k| {
+                                            toks[k].kind == IDENT
+                                                && toks[k].text(text).eq_ignore_ascii_case("case")
+                                        }) =>
                                 {
                                     // The block ends the unit
                                     // (`use association _x { with draft; }`).
