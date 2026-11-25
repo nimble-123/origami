@@ -27,5 +27,6 @@ CLASS zcl_doc DEFINITION PUBLIC FINAL CREATE PUBLIC.
                            iv_parameter_with_a_long_name TYPE i.
 ENDCLASS.
 
+
 CLASS zcl_doc IMPLEMENTATION.
 ENDCLASS.

@@ -3,6 +3,7 @@ CLASS zcl_demo DEFINITION PUBLIC FINAL CREATE PUBLIC.
     METHODS run.
 ENDCLASS.
 
+
 CLASS zcl_demo IMPLEMENTATION.
   METHOD run.
     do_it( ).

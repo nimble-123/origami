@@ -35,6 +35,8 @@ pub struct Laid {
     /// start): a blank line between their comment lines and them is kept in
     /// the aligned style (ABAP-BLANK-001).
     pub blank_after_comments: BTreeSet<usize>,
+    /// ABAP-BLANK-002: blank lines added in front of these tokens.
+    pub forced_blanks: std::collections::BTreeMap<usize, u8>,
 }
 
 /// How a statement is printed.
@@ -172,6 +174,7 @@ pub fn layout(
         keywords: Vec::new(),
         explain,
         rule_spans: Vec::new(),
+        multi_line: false,
     };
     let mut entries: Vec<Entry> = Vec::with_capacity(statements.len());
     let mut parsed_ranges = Vec::new();
@@ -181,7 +184,9 @@ pub fn layout(
     let mut bodies = Vec::with_capacity(statements.len());
     let mut prev_role = None;
     let mut blank_after_comments = BTreeSet::new();
+    let mut multi = Vec::with_capacity(statements.len());
     for (id, st) in statements.iter().enumerate() {
+        ctx.multi_line = false;
         let id = id as UnitId;
         let first = TokenIndex(st.tokens.start as u32);
         let last = TokenIndex(st.tokens.end as u32 - 1);
@@ -260,6 +265,12 @@ pub fn layout(
         // A statement glued to the previous one (an opaque AMDP, EXEC SQL or
         // macro body) continues without a line break.
         let glued = stream.tokens[first.0 as usize].glued;
+        let parsed_multi = ctx.multi_line && bodies.last() == Some(&Body::Parsed);
+        let raw_multi = bodies.last() != Some(&Body::Parsed)
+            && text[stream.tokens[first.0 as usize].start as usize
+                ..stream.tokens[last.0 as usize].end as usize]
+                .contains('\n');
+        multi.push(parsed_multi || raw_multi);
         let start = if id == 0 || glued {
             b::empty()
         } else {
@@ -273,6 +284,11 @@ pub fn layout(
         });
         prev_role = st.role;
     }
+    let forced_blanks = if style == Style::Aligned {
+        forced_blanks(text, stream, statements, &multi)
+    } else {
+        Default::default()
+    };
     Laid {
         doc: b::concat(align_statements(entries)),
         diagnostics,
@@ -283,5 +299,171 @@ pub fn layout(
         depth_limited,
         bodies,
         blank_after_comments,
+        forced_blanks,
     }
+}
+
+/// Declaration keywords of class definitions and interfaces
+/// (ABAP-BLANK-002).
+const DEF_DECLS: &[&str] = &[
+    "INTERFACES",
+    "ALIASES",
+    "TYPES",
+    "CONSTANTS",
+    "DATA",
+    "CLASS-DATA",
+    "METHODS",
+    "CLASS-METHODS",
+    "EVENTS",
+    "CLASS-EVENTS",
+];
+
+/// Declarations at the start of a procedure (ABAP-BLANK-002).
+const PROC_DECLS: &[&str] = &["DATA", "TYPES", "CONSTANTS", "STATICS", "FIELD-SYMBOLS"];
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Block {
+    ClassDef,
+    ClassImpl,
+    Interface,
+    /// `METHOD`, `FORM`, `FUNCTION`: `true` while only declarations have
+    /// been seen at its start, `false` once they are over.
+    Proc(bool, bool),
+    Other,
+}
+
+/// ABAP-BLANK-002 (aligned style): blank lines to add, as the number of
+/// blank lines in front of a statement's first token (and its comments).
+fn forced_blanks(
+    text: &str,
+    stream: &TokenStream,
+    statements: &[Statement],
+    multi: &[bool],
+) -> std::collections::BTreeMap<usize, u8> {
+    let mut out = std::collections::BTreeMap::new();
+    let word = |st: &Statement, k: usize| -> String {
+        stream
+            .tokens
+            .get(st.tokens.start + k)
+            .filter(|_| st.tokens.start + k < st.tokens.end)
+            .map(|t| t.text(text).to_ascii_uppercase())
+            .unwrap_or_default()
+    };
+    // A declaration statement: its keyword, unless it is an inline
+    // declaration (`DATA(x) = …`).
+    let decl_kw = |st: &Statement, list: &[&str]| -> Option<String> {
+        let w = word(st, 0);
+        let next = stream.tokens.get(st.tokens.start + 1)?;
+        let inline = next.glued && next.kind != crate::kinds::COLON;
+        (list.contains(&w.as_str()) && !inline).then_some(w)
+    };
+    let structure = |st: &Statement| -> i32 {
+        let (a, b) = (word(st, 1), word(st, 2));
+        let (a, b) = if a == ":" {
+            (word(st, 2), word(st, 3))
+        } else {
+            (a, b)
+        };
+        match (a.as_str(), b.as_str()) {
+            ("BEGIN", "OF") => 1,
+            ("END", "OF") => -1,
+            _ => 0,
+        }
+    };
+    let mut stack: Vec<Block> = Vec::new();
+    // Class definition / interface: the previous declaration of this
+    // section (keyword, spans several lines), and the open structure depth.
+    let mut last: Option<(String, bool)> = None;
+    let mut in_structure = 0i32;
+    let mut prev: Option<&Statement> = None;
+    for (n, st) in statements.iter().enumerate() {
+        let first = st.tokens.start;
+        let w0 = word(st, 0);
+        let prev_w0 = prev.map(|p| word(p, 0)).unwrap_or_default();
+        let mut force = 0u8;
+        match stack.last().copied() {
+            None if matches!(w0.as_str(), "CLASS" | "INTERFACE")
+                && matches!(prev_w0.as_str(), "ENDCLASS" | "ENDINTERFACE") =>
+            {
+                force = 2;
+            }
+            Some(Block::ClassImpl) if w0 == "METHOD" && prev_w0 == "ENDMETHOD" => force = 1,
+            Some(Block::ClassDef | Block::Interface) => {
+                let section = word(st, 1) == "SECTION"
+                    && matches!(w0.as_str(), "PUBLIC" | "PROTECTED" | "PRIVATE");
+                if section {
+                    if prev.is_some_and(|p| word(p, 0) != "CLASS") {
+                        force = 1;
+                    }
+                    last = None;
+                    in_structure = 0;
+                } else if in_structure > 0 {
+                    in_structure += structure(st);
+                    if in_structure <= 0 {
+                        in_structure = 0;
+                        last = Some(("TYPES".into(), true));
+                    }
+                } else if let Some(kw) = decl_kw(st, DEF_DECLS) {
+                    let s = structure(st);
+                    let is_multi = multi[n] || s > 0;
+                    if let Some((lk, lm)) = &last
+                        && (lk != &kw || *lm || is_multi)
+                    {
+                        force = 1;
+                    }
+                    if s > 0 && word(st, 1) != ":" {
+                        in_structure = s;
+                        last = Some((kw, true));
+                    } else {
+                        last = Some((kw, is_multi));
+                    }
+                } else if !matches!(st.role, Some(Role::Closer)) {
+                    last = None;
+                }
+            }
+            Some(Block::Proc(true, seen)) => {
+                if decl_kw(st, PROC_DECLS).is_some() {
+                    if let Some(Block::Proc(_, s)) = stack.last_mut() {
+                        *s = true;
+                    }
+                } else {
+                    if seen && !matches!(st.role, Some(Role::Closer)) {
+                        force = 1;
+                    }
+                    if let Some(Block::Proc(start, _)) = stack.last_mut() {
+                        *start = false;
+                    }
+                }
+            }
+            _ => {}
+        }
+        if force > 0 {
+            out.insert(first, force);
+        }
+        match st.role {
+            Some(Role::Opener(_)) => {
+                let w = |k| word(st, k);
+                let has = |x: &str| (1..st.tokens.len()).any(|k| w(k) == x);
+                stack.push(match w0.as_str() {
+                    "CLASS" if has("DEFINITION") => {
+                        last = None;
+                        Block::ClassDef
+                    }
+                    "CLASS" => Block::ClassImpl,
+                    "INTERFACE" => {
+                        last = None;
+                        Block::Interface
+                    }
+                    "METHOD" | "FORM" | "FUNCTION" => Block::Proc(true, false),
+                    _ => Block::Other,
+                });
+            }
+            Some(Role::Closer) => {
+                stack.pop();
+            }
+            _ => {}
+        }
+        prev = Some(st);
+    }
+    out
 }

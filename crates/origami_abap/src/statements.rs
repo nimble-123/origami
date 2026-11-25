@@ -3616,6 +3616,7 @@ fn declaration(p: &mut P) -> Option<Stmt> {
     // ABAP-DECL-001, aligned style: a chain of two or more items always has
     // one item per line.
     let mut forced = aligned && items.len() > 1;
+    p.c.multi_line |= forced;
     for (n, &(a, e)) in items.iter().enumerate() {
         let comma = if e < p.end && p.kind(e) == COMMA {
             Some(e)
@@ -3636,6 +3637,7 @@ fn declaration(p: &mut P) -> Option<Stmt> {
         }
         let line = if begin || end {
             forced = true;
+            p.c.multi_line = true;
             let mut d = decl_tokens(p, a, e);
             d.extend(tail_end);
             Line::Plain(b::concat(d))
@@ -4442,6 +4444,14 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
             None => (ty, Vec::new()),
         };
         items.push(b::row_cols(vec![kw_cell, r.name], head, tail));
+    }
+    if items
+        .iter()
+        .filter(|i| !matches!(i, AlignItem::Break))
+        .count()
+        > 1
+    {
+        p.c.multi_line = true;
     }
     let table = b::shared(b::align_broken(items));
     Some(b::choice(

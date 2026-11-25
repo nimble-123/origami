@@ -4,6 +4,7 @@ CLASS lcl IMPLEMENTATION.
 
     done( ).
   ENDMETHOD.
+
   METHOD stop.
     " stop everything
 

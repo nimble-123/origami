@@ -160,6 +160,7 @@ fn format_with(
         },
         comment_style: opts.style == Style::Aligned,
         blank_after_comments: laid.blank_after_comments.clone(),
+        forced_blanks: laid.forced_blanks.clone(),
         comment_overrides,
     };
     let limit = max_output_len(src.text().len());

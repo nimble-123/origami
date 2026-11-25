@@ -87,6 +87,7 @@ fn format_with(
         cont_levels: 2,
         comment_style: false,
         blank_after_comments: Default::default(),
+        forced_blanks: Default::default(),
         comment_overrides: Default::default(),
     };
     let limit = max_output_len(src.text().len());

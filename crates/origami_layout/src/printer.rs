@@ -54,6 +54,9 @@ pub struct PrintOptions {
     /// Tokens whose blank line after their comment lines is kept even though
     /// other blank lines before them are not (ABAP-BLANK-001, aligned).
     pub blank_after_comments: std::collections::BTreeSet<usize>,
+    /// Blank lines added in front of these tokens and their comment lines
+    /// (ABAP-BLANK-002); 2 may exceed the usual maximum of one.
+    pub forced_blanks: std::collections::BTreeMap<usize, u8>,
     /// Replacement texts of comment lines, by trivia index (ABAP-DOC-001).
     /// The comment lines in front of one token use them only if no
     /// replacement ends past the width while being longer than the original.
@@ -538,6 +541,30 @@ impl<'c, 'a> Printer<'c, 'a> {
         self.line_empty = true;
     }
 
+    /// At least `n` blank lines before the next line (only `blank_line`
+    /// limits them to one).
+    fn blank_lines(&mut self, n: usize) {
+        if self.out.is_empty() || self.trial.is_some() && self.out.is_empty() {
+            return;
+        }
+        let indent = self.pending_indent.unwrap_or(0);
+        if !self.line_empty {
+            self.newline(indent);
+        }
+        let have = self
+            .out
+            .bytes()
+            .rev()
+            .take_while(|&c| c == b'\n')
+            .count()
+            .saturating_sub(1);
+        for _ in have..n {
+            self.out.push('\n');
+        }
+        self.prev_blank = true;
+        self.pending_indent = Some(indent);
+    }
+
     fn blank_line(&mut self) {
         if !self.prev_blank && !self.out.is_empty() {
             let indent = self.pending_indent.unwrap_or(0);
@@ -607,6 +634,11 @@ impl<'c, 'a> Printer<'c, 'a> {
     }
 
     fn leading_comments(&mut self, i: TokenIndex, indent: usize, blank: bool) {
+        if let Some(&n) = self.ctx.opts.forced_blanks.get(&(i.0 as usize))
+            && !self.ctx.opts.identity
+        {
+            self.blank_lines(n as usize);
+        }
         let leading = &self.ctx.leading[i.0 as usize];
         // A token that starts a line stays in that line's column after its
         // comment lines, as it would without them.
