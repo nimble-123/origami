@@ -31,6 +31,10 @@ pub struct Laid {
     pub depth_limited: u32,
     /// How each statement is printed.
     pub bodies: Vec<Body>,
+    /// First tokens of statements directly after a block opener (or at the
+    /// start): a blank line between their comment lines and them is kept in
+    /// the aligned style (ABAP-BLANK-001).
+    pub blank_after_comments: BTreeSet<usize>,
 }
 
 /// How a statement is printed.
@@ -176,6 +180,7 @@ pub fn layout(
     let mut depth_limited = 0;
     let mut bodies = Vec::with_capacity(statements.len());
     let mut prev_role = None;
+    let mut blank_after_comments = BTreeSet::new();
     for (id, st) in statements.iter().enumerate() {
         let id = id as UnitId;
         let first = TokenIndex(st.tokens.start as u32);
@@ -183,6 +188,9 @@ pub fn layout(
         // One blank line is kept, except directly after an opener and
         // directly before a closer.
         let blank = id > 0 && !opens(prev_role) && !closes(st.role);
+        if style == Style::Aligned && !blank && !closes(st.role) {
+            blank_after_comments.insert(first.0 as usize);
+        }
         // A statement glued to the previous one without being an opaque body
         // (invalid code such as `x.y` split at the period) keeps its bytes:
         // its position depends on the previous statement's layout, so any
@@ -274,5 +282,6 @@ pub fn layout(
         rule_spans: ctx.rule_spans,
         depth_limited,
         bodies,
+        blank_after_comments,
     }
 }

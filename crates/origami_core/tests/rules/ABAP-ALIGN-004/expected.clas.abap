@@ -14,7 +14,7 @@ CLASS lcl_demo IMPLEMENTATION.
 
     " alignment across comments and empty lines:
     ls_struc-component += 1.
-    "comment
+    " comment
     ls_struc-comp2      = 'a'.
 
     ls_struc-c3         = VALUE #( ).

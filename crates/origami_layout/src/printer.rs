@@ -47,6 +47,13 @@ pub struct PrintOptions {
     /// Indent levels of a continuation line (`Doc::cont`): 1 in the aligned
     /// style, 2 in the compact style (ABAP-INDENT-001).
     pub cont_levels: u8,
+    /// Aligned style (ABAP-COMMENT-002/-003, ABAP-BLANK-001): end-of-line
+    /// comments keep the spaces in front of them, `"text` gets a space after
+    /// the `"`.
+    pub comment_style: bool,
+    /// Tokens whose blank line after their comment lines is kept even though
+    /// other blank lines before them are not (ABAP-BLANK-001, aligned).
+    pub blank_after_comments: std::collections::BTreeSet<usize>,
     /// Replacement texts of comment lines, by trivia index (ABAP-DOC-001).
     /// The comment lines in front of one token use them only if no
     /// replacement ends past the width while being longer than the original.
@@ -566,8 +573,37 @@ impl<'c, 'a> Printer<'c, 'a> {
         self.pending_indent.unwrap_or(self.col)
     }
 
-    fn comment_text(&self, k: usize) -> &str {
-        self.ctx.tokens.trivia[k].text(self.ctx.src)
+    fn comment_text(&self, k: usize) -> std::borrow::Cow<'_, str> {
+        let t = &self.ctx.tokens.trivia[k];
+        let text = t.text(self.ctx.src);
+        if self.ctx.opts.comment_style
+            && !self.ctx.opts.identity
+            && matches!(
+                t.kind,
+                TriviaKind::Comment {
+                    syntax: CommentSyntax::AbapQuote,
+                    ..
+                }
+            )
+            && let Some(s) = origami_syntax::spaced_comment(text)
+        {
+            return std::borrow::Cow::Owned(s);
+        }
+        std::borrow::Cow::Borrowed(text)
+    }
+
+    /// Spaces in front of the end-of-line comment `k` that trails token `i`:
+    /// as written (at least one) in the aligned style, else one.
+    fn comment_gap(&self, i: TokenIndex, k: usize) -> usize {
+        if !self.ctx.opts.comment_style {
+            return 1;
+        }
+        let end = self.ctx.tokens.tokens[i.0 as usize].end as usize;
+        let start = self.ctx.tokens.trivia[k].start as usize;
+        match self.ctx.src.get(end..start) {
+            Some(gap) if gap.bytes().all(|b| b == b' ' || b == b'\t') => gap.len().max(1),
+            _ => 1,
+        }
     }
 
     fn leading_comments(&mut self, i: TokenIndex, indent: usize, blank: bool) {
@@ -612,7 +648,10 @@ impl<'c, 'a> Printer<'c, 'a> {
             self.write(&text, indent);
             self.newline(indent);
         }
-        if blank
+        let keep = blank
+            || (!leading.is_empty()
+                && self.ctx.opts.blank_after_comments.contains(&(i.0 as usize)));
+        if keep
             && self
                 .ctx
                 .blank_before_token
@@ -632,8 +671,9 @@ impl<'c, 'a> Printer<'c, 'a> {
             };
             debug_assert_eq!(placement, Placement::EndOfLine);
             let text = self.comment_text(k).to_string();
-            self.out.push(' ');
-            self.col += 1;
+            let gap = self.comment_gap(i, k);
+            self.out.push_str(&" ".repeat(gap));
+            self.col += gap;
             self.out.push_str(&text);
             self.col += text.chars().count();
             self.pending_eol = true;

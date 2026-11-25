@@ -260,3 +260,14 @@ fn abap_doc_lines_keep_every_other_byte() {
     assert!(bad("\"! @parameter a x", "\"! @parameter   a x"));
     assert!(bad("\" @parameter a | x", "\" @parameter   a | x"));
 }
+
+#[test]
+fn comment_space_after_quote() {
+    use origami_syntax::spaced_comment;
+    assert_eq!(spaced_comment("\"tax").as_deref(), Some("\" tax"));
+    assert_eq!(spaced_comment("\"1 more").as_deref(), Some("\" 1 more"));
+    assert_eq!(spaced_comment("\" tax"), None);
+    assert_eq!(spaced_comment("\"---"), None);
+    assert_eq!(spaced_comment("\"\""), None);
+    assert_eq!(spaced_comment("\""), None);
+}
