@@ -554,6 +554,20 @@ pub fn layout(
                         None => clause_doc(text, stream, u, blank),
                     }
                 }
+                None if view && u.kind == Kind::Element && u.depth == 1 => {
+                    match func_call(text, stream, u) {
+                        Some(f) => {
+                            if explain {
+                                spans.push(crate::grammar::G::span(f.lp, f.rp, "CDS-ALIGN-003"));
+                            }
+                            func_element(stream, u, &f, alias_pads.get(&id).copied(), blank)
+                        }
+                        None => match alias_pads.get(&id) {
+                            Some(&(at, pad)) => padded_element(stream, u, at, pad, blank),
+                            None => b::unknown(first, last, blank),
+                        },
+                    }
+                }
                 None => match alias_pads.get(&id) {
                     Some(&(at, pad)) => padded_element(stream, u, at, pad, blank),
                     None => b::unknown(first, last, blank),
@@ -679,9 +693,14 @@ fn alias_pads(
         // A `case` element has its own layout (CDS-ELEM-001), and an element
         // that starts with `define` or `extend` is laid out as a header,
         // which joins its lines; neither is padded, so neither counts.
+        let func = if u.kind == Kind::Element && u.depth == 1 {
+            func_call(text, stream, u)
+        } else {
+            None
+        };
         if u.kind != Kind::Element
             || u.depth != 1
-            || !one_line(text, stream, u)
+            || (func.is_none() && !one_line(text, stream, u))
             || (u.first..=u.last).any(|k| word(text, stream, k) == "case")
             || matches!(word(text, stream, u.first).as_str(), "define" | "extend")
         {
@@ -706,14 +725,40 @@ fn alias_pads(
                 as_at = Some(k);
             }
         }
-        match as_at {
-            Some(a) if a + 1 == last => {
+        match (as_at, &func) {
+            // The function's last line: up to `(`, the widest name, `=>` and
+            // the last value, then `)` and what follows up to `as`.
+            (Some(a), Some(f)) if a + 1 == last && a > f.rp => {
+                let toks = &stream.tokens;
+                let g = |k: usize| usize::from(!toks[k].glued);
+                let names = f
+                    .params
+                    .iter()
+                    .map(|p| width(text, stream, p.0, p.0 + 1))
+                    .max()
+                    .unwrap_or(0);
+                let &(_, arrow, e) = f.params.last().unwrap();
+                let w = offset
+                    + width(text, stream, u.first, f.lp + 1)
+                    + g(f.lp + 1)
+                    + names
+                    + g(arrow)
+                    + 2
+                    + g(arrow + 2)
+                    + width(text, stream, arrow + 2, e)
+                    + g(f.rp)
+                    + width(text, stream, f.rp, a);
+                col = col.max(w);
+                rows.push((id, w, a));
+            }
+            (Some(_), Some(_)) => {}
+            (Some(a), None) if a + 1 == last => {
                 let w = offset + width(text, stream, u.first, a);
                 col = col.max(w);
                 rows.push((id, w, a));
             }
-            Some(_) => {}
-            None => {
+            (Some(_), None) => {}
+            (None, _) => {
                 // A name or a path (`t.customer_id`, `key travel_id`).
                 let plain = (u.first..=last).all(|k| {
                     let t = &stream.tokens[k];
@@ -732,6 +777,140 @@ fn alias_pads(
         out.insert(id, (a, col - w));
     }
     out
+}
+
+/// CDS-ALIGN-003: a function call at depth 0 of a select-list element with
+/// two or more parameters named with `=>`: `(`, `)` and each parameter as
+/// (name, index of `=`, end with its comma).
+struct FuncCall {
+    lp: usize,
+    rp: usize,
+    params: Vec<(usize, usize, usize)>,
+}
+
+fn func_call(text: &str, stream: &TokenStream, u: &CdsUnit) -> Option<FuncCall> {
+    let toks = &stream.tokens;
+    if !no_comments(stream, u)
+        || (u.first..=u.last).any(|k| word(text, stream, k) == "case")
+        || matches!(word(text, stream, u.first).as_str(), "define" | "extend")
+    {
+        return None;
+    }
+    let is_arrow = |k: usize| {
+        k < u.last
+            && toks[k].text(text) == "="
+            && toks[k + 1].text(text) == ">"
+            && toks[k + 1].glued
+    };
+    let mut depth = 0i32;
+    for k in u.first..u.last {
+        match toks[k].kind {
+            LPAREN | LBRACKET => depth += 1,
+            RPAREN | RBRACKET => depth -= 1,
+            _ => {}
+        }
+        // `name(` at depth 0 (the `(` raises the depth on the next step).
+        if depth != 0 || toks[k].kind != IDENT || toks[k + 1].kind != LPAREN || !toks[k + 1].glued {
+            continue;
+        }
+        let lp = k + 1;
+        let (mut d, mut rp) = (0i32, None);
+        for (j, t) in toks.iter().enumerate().take(u.last + 1).skip(lp) {
+            match t.kind {
+                LPAREN | LBRACKET => d += 1,
+                RPAREN | RBRACKET => {
+                    d -= 1;
+                    if d == 0 {
+                        rp = Some(j);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let rp = rp?;
+        let mut items = Vec::new();
+        let (mut a, mut d) = (lp + 1, 0i32);
+        for (j, t) in toks.iter().enumerate().take(rp).skip(lp + 1) {
+            match t.kind {
+                LPAREN | LBRACKET => d += 1,
+                RPAREN | RBRACKET => d -= 1,
+                COMMA if d == 0 => {
+                    items.push((a, j + 1));
+                    a = j + 1;
+                }
+                _ => {}
+            }
+        }
+        if a < rp {
+            items.push((a, rp));
+        }
+        let params: Option<Vec<(usize, usize, usize)>> = items
+            .iter()
+            .map(|&(a, e)| {
+                (a + 2 < e && is_arrow(a + 1) && !toks[a].glued).then_some((a, a + 1, e))
+            })
+            .collect();
+        return match params {
+            Some(p) if p.len() >= 2 && !toks[lp + 1].glued => Some(FuncCall { lp, rp, params: p }),
+            _ => None,
+        };
+    }
+    None
+}
+
+/// The element with its function call as an aligned table (CDS-ALIGN-003)
+/// and `pad` extra spaces in front of `as` (token `at`), if given.
+fn func_element(
+    stream: &TokenStream,
+    u: &CdsUnit,
+    f: &FuncCall,
+    alias: Option<(usize, usize)>,
+    blank: bool,
+) -> Doc {
+    let tok = |k: usize| {
+        let i = TokenIndex(k as u32);
+        if k == u.first && blank {
+            b::token_keep_blank(i)
+        } else {
+            b::token(i)
+        }
+    };
+    let gap = |k: usize| {
+        if stream.tokens[k].glued {
+            b::empty()
+        } else {
+            b::sep(stream, TokenIndex(k as u32))
+        }
+    };
+    let mut docs = Vec::new();
+    for k in u.first..=f.lp {
+        if k > u.first {
+            docs.push(gap(k));
+        }
+        docs.push(tok(k));
+    }
+    let mut rows = Vec::new();
+    for &(name, arrow, e) in &f.params {
+        let mut tail = vec![gap(arrow), tok(arrow), tok(arrow + 1)];
+        for k in arrow + 2..e {
+            tail.push(gap(k));
+            tail.push(tok(k));
+        }
+        rows.push(b::row(vec![tok(name)], tail));
+    }
+    docs.push(gap(f.lp + 1));
+    docs.push(b::hang(vec![b::align_broken(rows)]));
+    docs.push(gap(f.rp));
+    docs.push(tok(f.rp));
+    for k in f.rp + 1..=u.last {
+        match alias {
+            Some((at, pad)) if k == at => docs.push(b::spaces(pad + 1)),
+            _ => docs.push(gap(k)),
+        }
+        docs.push(tok(k));
+    }
+    b::concat(docs)
 }
 
 /// An element printed with `pad` extra spaces in front of its `as` (token
@@ -877,6 +1056,7 @@ fn view_blanks(
                 // lines; it never counts as spanning several lines.
                 let header = matches!(w0_raw.as_str(), "define" | "extend");
                 let multi = annotated.is_some()
+                    || func_call(text, stream, u).is_some()
                     || if has_case {
                         case_breaks(text, stream, u)
                     } else {
