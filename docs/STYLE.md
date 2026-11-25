@@ -531,7 +531,7 @@ levels align separately.
 **Compact:** only `TYPE`/`LIKE` is aligned.
 
 ### ABAP-ALIGN-008: Align `TYPE` across declaration statements
-Milestone: M5
+Milestone: M4
 
 Approved by the maintainer, Nils Lutz, on 2026-11-25. Consecutive one-line
 declarations with the same keyword (`DATA`, `CLASS-DATA`, `CONSTANTS`,
@@ -546,10 +546,10 @@ group; another statement, a chain or a `BEGIN OF` structure does. If
 aligning would push a line past the width, the group uses single spaces.
 
 ```abap
-DATA lv_count   TYPE i                VALUE 1.
+DATA lv_count   TYPE i           VALUE 1.
 DATA lt_flights TYPE STANDARD TABLE OF sflight WITH EMPTY KEY.
 " logging
-DATA lv_text    TYPE c LENGTH 10      VALUE 'abc'.
+DATA lv_text    TYPE c LENGTH 10 VALUE 'abc'.
 DATA lv_rate    TYPE p DECIMALS 2.
 CONSTANTS lc_max  TYPE i      VALUE 10.
 CONSTANTS lc_name TYPE string VALUE `origami`.
