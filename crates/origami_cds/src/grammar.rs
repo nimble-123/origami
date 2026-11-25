@@ -491,6 +491,10 @@ impl G<'_> {
                 }
             }
             let Some(rp) = rp else { continue };
+            // A brace is no parameter syntax (broken code).
+            if (lp..=rp).any(|j| matches!(self.kind(j), LBRACE | RBRACE)) {
+                continue;
+            }
             let mut items = Vec::new();
             let (mut a, mut d) = (lp + 1, 0i32);
             for j in lp + 1..=rp {
@@ -552,7 +556,7 @@ impl G<'_> {
         let mut rp = None;
         for k in lp + 1..=last {
             match self.kind(k) {
-                LPAREN | LBRACKET => return None,
+                LPAREN | LBRACKET | LBRACE | RBRACE => return None,
                 COMMA => {
                     items.push((a, k + 1));
                     a = k + 1;

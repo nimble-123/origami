@@ -115,6 +115,8 @@ fn group_by_doc(text: &str, stream: &TokenStream, u: &CdsUnit, blank: bool) -> O
         || !toks[by].text(text).eq_ignore_ascii_case("by")
         || toks[by].glued
         || !no_comments(stream, u)
+        // A brace is no field syntax (broken code, fuzz/found/cds-group-by-brace.bin).
+        || toks[by..=u.last].iter().any(|t| matches!(t.kind, LBRACE | RBRACE))
     {
         return None;
     }
@@ -834,6 +836,13 @@ fn func_call(text: &str, stream: &TokenStream, u: &CdsUnit) -> Option<FuncCall> 
             }
         }
         let rp = rp?;
+        // A brace is no parameter syntax (broken code).
+        if toks[lp..=rp]
+            .iter()
+            .any(|t| matches!(t.kind, LBRACE | RBRACE))
+        {
+            return None;
+        }
         let mut items = Vec::new();
         let (mut a, mut d) = (lp + 1, 0i32);
         for (j, t) in toks.iter().enumerate().take(rp).skip(lp + 1) {
