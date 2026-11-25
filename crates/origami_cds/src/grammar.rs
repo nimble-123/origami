@@ -12,6 +12,10 @@ use std::cell::RefCell;
 /// from `as` to `on`, and from `on` to the end (CDS-ALIGN-001).
 type AssocRow = (usize, usize, usize, usize, usize);
 
+/// A data source's parameters: `(`, `)` and each parameter as (name, colon,
+/// end with its comma) (CDS-ALIGN-002).
+type SourceParams = (usize, usize, Vec<(usize, usize, usize)>);
+
 /// A name list: `(`, `)` and each name with its comma (CDS-ALIGN-004).
 type NameList = (usize, usize, Vec<(usize, usize)>);
 
@@ -352,9 +356,44 @@ impl G<'_> {
         } else {
             None
         };
+        // CDS-ALIGN-002: parameters of data sources, by the source's name.
+        let sources = if self.aligned && !bdef {
+            self.source_params(first, last)
+        } else {
+            Default::default()
+        };
         // Inside a block written on the header's line (`{ … }`), nothing breaks.
         let mut braces = 0i32;
         while k <= last {
+            if let Some((lp, rp, items)) = sources.get(&k) {
+                let mut rows = Vec::new();
+                for &(a, colon, e) in items {
+                    let mut tail = vec![self.sp(colon), self.t(colon)];
+                    for j in colon + 1..e {
+                        tail.push(self.sp(j));
+                        tail.push(self.t(j));
+                    }
+                    rows.push(b::row(vec![self.t(a)], tail));
+                }
+                if self.explain {
+                    self.spans
+                        .borrow_mut()
+                        .push(G::span(*lp, *rp, "CDS-ALIGN-002"));
+                }
+                segment.push(self.sp(k));
+                segment.push(b::hang(vec![
+                    self.t(k),
+                    self.t(*lp),
+                    b::indent(vec![
+                        b::hard(self.stream, TokenIndex(*lp as u32 + 1)),
+                        b::align_broken(rows),
+                    ]),
+                    self.sp(*rp),
+                    self.t(*rp),
+                ]));
+                k = rp + 1;
+                continue;
+            }
             if let Some((lp, rp, items)) = &names
                 && k == *lp
             {
@@ -409,6 +448,90 @@ impl G<'_> {
         flush(&mut segment, &mut segments, &mut docs);
         docs.extend(segments);
         Some(b::concat(docs))
+    }
+
+    /// CDS-ALIGN-002: data sources with parameters (`from Name( p : v, … )`,
+    /// also after `join` and `projection on`), by the index of the name: the
+    /// brackets and each parameter as (name, colon, end with its comma).
+    /// Only where the first parameter can start a line and no comment stands
+    /// inside.
+    fn source_params(
+        &self,
+        first: usize,
+        last: usize,
+    ) -> std::collections::HashMap<usize, SourceParams> {
+        let mut out = std::collections::HashMap::new();
+        let toks = &self.stream.tokens;
+        for k in first + 1..last {
+            let lp = k + 1;
+            let prev = self.word(k - 1);
+            if self.kind(lp) != LPAREN
+                || !self.glued(lp)
+                || !matches!(prev.as_str(), "from" | "join" | "on")
+                || (prev == "on" && self.word(k - 2) != "projection")
+                || self.glued(lp + 1)
+            {
+                continue;
+            }
+            // The closing bracket and the parameters (split at commas on
+            // depth 0); each must be `name : value`.
+            let mut depth = 0i32;
+            let mut rp = None;
+            for j in lp..=last {
+                match self.kind(j) {
+                    LPAREN | LBRACKET => depth += 1,
+                    RPAREN | RBRACKET => {
+                        depth -= 1;
+                        if depth == 0 {
+                            rp = Some(j);
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            let Some(rp) = rp else { continue };
+            let mut items = Vec::new();
+            let (mut a, mut d) = (lp + 1, 0i32);
+            for j in lp + 1..=rp {
+                match self.kind(j) {
+                    LPAREN | LBRACKET => d += 1,
+                    RPAREN | RBRACKET if j < rp => d -= 1,
+                    COMMA if d == 0 => {
+                        items.push((a, j + 1));
+                        a = j + 1;
+                    }
+                    _ => {}
+                }
+            }
+            if a < rp {
+                items.push((a, rp));
+            }
+            let params: Option<Vec<(usize, usize, usize)>> = items
+                .iter()
+                .map(|&(a, e)| {
+                    (a + 1 < e && self.kind(a + 1) == COLON && !self.glued(a)).then_some((
+                        a,
+                        a + 1,
+                        e,
+                    ))
+                })
+                .collect();
+            let Some(params) = params.filter(|p| !p.is_empty()) else {
+                continue;
+            };
+            let (from, to) = (toks[lp].start, toks[rp].end);
+            if self
+                .stream
+                .trivia
+                .iter()
+                .any(|t| t.is_comment() && t.start > from && t.end < to)
+            {
+                continue;
+            }
+            out.insert(k, (lp, rp, params));
+        }
+        out
     }
 
     /// CDS-ALIGN-004: `define view Name ( a, b )`: the brackets and the
