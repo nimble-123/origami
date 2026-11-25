@@ -4083,6 +4083,17 @@ fn method_item_inner(p: &mut P, name: usize, sections_kw: &[&str]) -> Option<Met
         }
         _ => None,
     };
+    // ABAP-METHODS-001, aligned style: the signature is a table (FORM keeps
+    // the compact form in both styles).
+    if p.c.style == Style::Aligned && sections_kw == SECTIONS && i < p.end {
+        let sections = method_table(p, i)?;
+        return Some(MethodParts {
+            name: name_docs,
+            header,
+            sections,
+            key,
+        });
+    }
     let mut sections = Vec::new();
     while i < p.end {
         if !is_section(p, i, sections_kw) {
@@ -4165,6 +4176,169 @@ fn method_item_inner(p: &mut P, name: usize, sections_kw: &[&str]) -> Option<Met
         sections: b::cont(sections),
         key,
     })
+}
+
+/// One line of an aligned method signature (ABAP-METHODS-001).
+struct SigRow {
+    /// Section keyword, on the first line of its section.
+    kw: Option<Doc>,
+    name: Vec<Doc>,
+    ty: Vec<Doc>,
+    /// `OPTIONAL` / `DEFAULT …`, with the gap before it.
+    opt: Option<(Doc, Vec<Doc>)>,
+    /// The line has a comment line in front of it.
+    brk: bool,
+}
+
+/// `VALUE(x)` / `REFERENCE(x)` or a plain name, `a..ne`.
+fn param_name(p: &mut P, a: usize, ne: usize) -> Vec<Doc> {
+    let mut d = Vec::new();
+    for k in a..ne {
+        if k > a {
+            d.push(p.sp(k));
+        }
+        let w = p.upper(k);
+        if k == a && (w == "VALUE" || w == "REFERENCE") && p.kind(k + 1) == LPAREN {
+            d.push(p.kw(k));
+        } else {
+            d.push(p.t(k));
+        }
+    }
+    d
+}
+
+/// The sections of a method signature from `i` to `p.end` as an aligned
+/// table: the first keyword behind the method name, the further keywords
+/// below it and padded to the longest, the names, `TYPE`, and `OPTIONAL` /
+/// `DEFAULT` in columns. A table that does not fit behind the name starts on
+/// the next line at the continuation indent.
+fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
+    let first_kw = i;
+    let mut rows: Vec<SigRow> = Vec::new();
+    while i < p.end {
+        if !is_section(p, i, SECTIONS) {
+            return None;
+        }
+        let kw = p.kw(i);
+        let commented_kw = i > first_kw && p.c.commented[i];
+        let j = i + 1;
+        let section_end = (j..p.end)
+            .find(|&k| is_section(p, k, SECTIONS))
+            .unwrap_or(p.end);
+        for k in j..section_end {
+            if p.is(k, "PREFERRED") && p.is(k + 1, "PARAMETER") {
+                p.c.keywords.push(k);
+                p.c.keywords.push(k + 1);
+            }
+        }
+        if p.is(i, "RAISING") || p.is(i, "EXCEPTIONS") || !param_start(p, j) {
+            // A list of exceptions (or content that is not a parameter
+            // list) stays on one line.
+            if (j..section_end).any(|k| k > j && p.c.commented[k]) {
+                return None;
+            }
+            let mut name = Vec::new();
+            for k in j..section_end {
+                if k > j {
+                    name.push(p.sp(k));
+                }
+                name.push(p.t(k));
+            }
+            rows.push(SigRow {
+                kw: Some(kw),
+                name,
+                ty: Vec::new(),
+                opt: None,
+                brk: commented_kw,
+            });
+            i = section_end;
+            continue;
+        }
+        let mut params: Vec<(usize, usize)> = Vec::new();
+        let mut s = j;
+        for k in j + 1..section_end {
+            if param_start(p, k) {
+                params.push((s, k));
+                s = k;
+            }
+        }
+        params.push((s, section_end));
+        let mut kw = Some(kw);
+        for (n, (a, e)) in params.into_iter().enumerate() {
+            let ne = name_end(p, a, e);
+            let name = param_name(p, a, ne);
+            let mut ty = Vec::new();
+            let mut opt = None;
+            if ne < e {
+                if p.is(ne, "FOR") || p.is(ne, "REQUEST") {
+                    mark_phrase_keywords(p, ne, e, RAP_PARAM_WORDS, RAP_PARAM_OPERAND);
+                } else if p.is(a, "REQUEST") && p.is(a + 2, "FOR") {
+                    mark_phrase_keywords(p, a, e, RAP_PARAM_WORDS, RAP_PARAM_OPERAND);
+                }
+                // `OPTIONAL` / `DEFAULT x` (not `WITH DEFAULT KEY`).
+                let o = (ne + 1..e).find(|&k| {
+                    p.kind(k) == WORD
+                        && !p.glued(k)
+                        && (p.is(k, "OPTIONAL") || p.is(k, "DEFAULT"))
+                        && !p.is(k - 1, "WITH")
+                });
+                ty.push(p.sp(ne));
+                ty.extend(decl_tokens(p, ne, o.unwrap_or(e)));
+                if let Some(o) = o {
+                    opt = Some((p.sp(o), decl_tokens(p, o, e)));
+                }
+            }
+            rows.push(SigRow {
+                kw: kw.take(),
+                name,
+                ty,
+                opt,
+                brk: if n == 0 {
+                    commented_kw
+                } else {
+                    p.c.commented[a]
+                },
+            });
+        }
+        i = section_end;
+    }
+    // A column for OPTIONAL / DEFAULT if at least 40 % of the parameters
+    // have one (ABAP Cleaner's fill ratio).
+    let params = rows.iter().filter(|r| !r.ty.is_empty()).count();
+    let with_opt = rows.iter().filter(|r| r.opt.is_some()).count();
+    let opt_col = with_opt > 0 && with_opt * 100 >= params * 40;
+    let mut items = Vec::new();
+    for r in rows {
+        if r.brk && !items.is_empty() {
+            items.push(AlignItem::Break);
+        }
+        let kw_cell = r.kw.map_or_else(Vec::new, |k| vec![k]);
+        // The type cell starts with its own gap; strip it, the name cell
+        // brings the separator space.
+        let mut ty = r.ty;
+        if !ty.is_empty() {
+            ty.remove(0);
+        }
+        let (head, tail) = match r.opt {
+            Some((gap, o)) if opt_col => {
+                let mut t = vec![gap];
+                t.extend(o);
+                (ty, t)
+            }
+            Some((gap, o)) => {
+                ty.push(gap);
+                ty.extend(o);
+                (ty, Vec::new())
+            }
+            None => (ty, Vec::new()),
+        };
+        items.push(b::row_cols(vec![kw_cell, r.name], head, tail));
+    }
+    let table = b::shared(b::align_broken(items));
+    Some(b::choice(
+        b::concat(vec![p.sp(first_kw), b::hang(vec![table.clone()])]),
+        b::cont(vec![p.hl(first_kw), table]),
+    ))
 }
 
 // ---- EML ------------------------------------------------------------------

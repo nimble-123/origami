@@ -140,13 +140,20 @@ pub fn row_right(head: Vec<Doc>, anchor: usize, tail: Vec<Doc>) -> AlignItem {
     })
 }
 
-/// A row with leading columns. Each non-empty cell gets a trailing space; an
-/// empty cell is padding only (see `AlignRow`).
+/// A row with leading columns. Each non-empty cell with content after it
+/// gets a trailing space; an empty cell is padding only (see `AlignRow`).
 pub fn row_cols(lead: Vec<Vec<Doc>>, head: Vec<Doc>, tail: Vec<Doc>) -> AlignItem {
+    let n = lead.len();
+    let more: Vec<bool> = (0..n)
+        .map(|c| {
+            lead[c + 1..].iter().any(|x| !x.is_empty()) || !head.is_empty() || !tail.is_empty()
+        })
+        .collect();
     let lead = lead
         .into_iter()
-        .map(|mut c| {
-            if !c.is_empty() {
+        .zip(more)
+        .map(|(mut c, more)| {
+            if !c.is_empty() && more {
                 c.push(Doc(Inner::Space));
             }
             c
