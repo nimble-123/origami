@@ -634,8 +634,16 @@ impl<'c, 'a> Printer<'c, 'a> {
     }
 
     fn leading_comments(&mut self, i: TokenIndex, indent: usize, blank: bool) {
+        // Never in front of a glued token (a statement glued to the period
+        // of the one before stays on its line).
         if let Some(&n) = self.ctx.opts.forced_blanks.get(&(i.0 as usize))
             && !self.ctx.opts.identity
+            && !self
+                .ctx
+                .tokens
+                .tokens
+                .get(i.0 as usize)
+                .is_some_and(|t| t.glued)
         {
             self.blank_lines(n as usize);
         }
