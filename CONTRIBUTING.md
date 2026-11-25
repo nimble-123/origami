@@ -18,8 +18,10 @@ show the problem are enough.
   example and a test directory in `crates/origami_core/tests/rules/<ID>/`.
   New rules and rule changes are approved by the maintainer before the layout
   code is merged ("How rules work" in STYLE.md).
-* **No new knobs.** The style is fixed apart from line width, indentation and
-  keyword case. Proposals for options are discussed in an issue first.
+* **No new knobs.** The style is fixed apart from line width, indentation,
+  keyword case and the choice between the two styles `aligned` and `compact`
+  (`style`, see "Styles" in STYLE.md). Proposals for options are discussed in
+  an issue first.
 
 ## Set up
 
