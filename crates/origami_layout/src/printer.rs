@@ -325,7 +325,10 @@ impl<'a> Ctx<'a> {
                 lead || self.src[a..b].contains('\n') || trailing(*last)
             }
             Inner::AlignGroup(items, _, broken) => {
-                let rows = items.iter().filter(|i| !matches!(i, AlignItem::Break)).count();
+                let rows = items
+                    .iter()
+                    .filter(|i| !matches!(i, AlignItem::Break))
+                    .count();
                 (*broken && rows > 1)
                     | items
                         .iter()
