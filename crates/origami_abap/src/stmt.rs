@@ -8,10 +8,12 @@
 
 use crate::kinds::*;
 use origami_layout::{AlignItem, Doc, builder as b};
-use origami_syntax::{RuleId, RuleSpan, TokenIndex, TokenStream};
+use origami_syntax::{RuleId, RuleSpan, Style, TokenIndex, TokenStream};
 
 pub struct Ctx<'a> {
     pub text: &'a str,
+    /// The style (STYLE.md, "Styles").
+    pub style: Style,
     pub stream: &'a TokenStream,
     /// Tokens with a leading own-line comment (they end alignment segments).
     pub commented: &'a [bool],
@@ -1076,6 +1078,36 @@ impl<'c, 'a> P<'c, 'a> {
                     self.c.span(*k, last, "ABAP-CALL-001");
                 }
             }
+            if call && self.c.style == Style::Aligned {
+                // Aligned style: one table for all groups, the keywords
+                // padded to the longest, `=` aligned across the groups.
+                let several = groups.len() > 1;
+                let mut items = Vec::new();
+                for (k, rows) in groups {
+                    let mut first = true;
+                    for it in rows {
+                        items.push(match it {
+                            AlignItem::Row(mut r) => {
+                                r.lead = vec![if first {
+                                    vec![self.t(k), b::space()]
+                                } else {
+                                    Vec::new()
+                                }];
+                                first = false;
+                                AlignItem::Row(r)
+                            }
+                            other => other,
+                        });
+                    }
+                }
+                // ABAP-CALL-002: two or more keywords always break.
+                let a = b::shared(if several {
+                    b::align_broken(items)
+                } else {
+                    b::align(items)
+                });
+                return Some(self.hanging(lp, rp, a.clone(), a));
+            }
             let mut hang = Vec::new();
             let mut fall = Vec::new();
             for (n, (k, rows)) in groups.into_iter().enumerate() {
@@ -1682,6 +1714,7 @@ mod tests {
         let stream = TokenStream::default();
         let mut c = Ctx {
             text: "",
+            style: origami_syntax::Style::Aligned,
             stream: &stream,
             commented: &[],
             eol_commented: &[],

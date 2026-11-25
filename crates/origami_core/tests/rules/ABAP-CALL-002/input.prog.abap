@@ -2,3 +2,4 @@ lo_service->read( EXPORTING iv_id = lv_id iv_lang = sy-langu iv_with_texts = aba
 lo_service->read( EXPORTING iv_id = lv_id IMPORTING es_data = ls_data ).
 lo_service->update( iv_id = lv_id ).
 lo_service->check( EXPORTING iv_id = lv_id ).
+lo_service->read( EXPORTING iv_identifier = lv_id CHANGING ct_log = lt_log ).

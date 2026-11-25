@@ -68,6 +68,11 @@ pub fn keep(tokens: &TokenStream, i: TokenIndex) -> Doc {
     }
 }
 
+/// One space.
+pub fn space() -> Doc {
+    Doc(Inner::Space)
+}
+
 pub fn empty() -> Doc {
     Doc(Inner::Concat(Vec::new()))
 }
@@ -101,18 +106,24 @@ pub fn choice(first: Doc, second: Doc) -> Doc {
 }
 
 pub fn align(items: Vec<AlignItem>) -> Doc {
-    Doc(Inner::AlignGroup(items, AlignFit::FirstLine))
+    Doc(Inner::AlignGroup(items, AlignFit::FirstLine, false))
 }
 
 /// Aligned rows that fall back to single spaces when alignment would push a
 /// row past the width ([`AlignFit::KeepLines`]); for rows that are whole
 /// statements or chain items.
+/// Like `align`, but always one row per line.
+pub fn align_broken(items: Vec<AlignItem>) -> Doc {
+    Doc(Inner::AlignGroup(items, AlignFit::FirstLine, true))
+}
+
 pub fn align_lines(items: Vec<AlignItem>) -> Doc {
-    Doc(Inner::AlignGroup(items, AlignFit::KeepLines))
+    Doc(Inner::AlignGroup(items, AlignFit::KeepLines, false))
 }
 
 pub fn row(head: Vec<Doc>, tail: Vec<Doc>) -> AlignItem {
     AlignItem::Row(AlignRow {
+        lead: Vec::new(),
         head,
         tail,
         anchor: 0,
@@ -121,7 +132,32 @@ pub fn row(head: Vec<Doc>, tail: Vec<Doc>) -> AlignItem {
 
 /// A row whose anchor (`anchor` characters wide) is aligned at its right end.
 pub fn row_right(head: Vec<Doc>, anchor: usize, tail: Vec<Doc>) -> AlignItem {
-    AlignItem::Row(AlignRow { head, tail, anchor })
+    AlignItem::Row(AlignRow {
+        lead: Vec::new(),
+        head,
+        tail,
+        anchor,
+    })
+}
+
+/// A row with leading columns. Each non-empty cell gets a trailing space; an
+/// empty cell is padding only (see `AlignRow`).
+pub fn row_cols(lead: Vec<Vec<Doc>>, head: Vec<Doc>, tail: Vec<Doc>) -> AlignItem {
+    let lead = lead
+        .into_iter()
+        .map(|mut c| {
+            if !c.is_empty() {
+                c.push(Doc(Inner::Space));
+            }
+            c
+        })
+        .collect();
+    AlignItem::Row(AlignRow {
+        lead,
+        head,
+        tail,
+        anchor: 0,
+    })
 }
 
 /// An unaligned line inside an alignment group.
