@@ -9,7 +9,7 @@
 use crate::block_pairs::Role;
 use crate::kinds::*;
 use crate::statements;
-use crate::stmt::{AlignKey, Ctx, P, Row, Stmt};
+use crate::stmt::{AlignKey, Ctx, DeclCols, P, Row, Stmt, decl_columns};
 use crate::structure::Statement;
 use origami_layout::{Doc, builder as b};
 use origami_syntax::{
@@ -116,6 +116,19 @@ fn align_statements(entries: Vec<Entry>) -> Vec<Doc> {
             depth, start, body, ..
         } = e;
         let body = match body {
+            Stmt::Row(r) if !group.is_empty() && matches!(r.key, AlignKey::Decl(_)) => {
+                let all: Vec<Row> = std::iter::once(r).chain(group).collect();
+                let cols: Vec<&DeclCols> = all.iter().filter_map(|r| r.decl.as_deref()).collect();
+                let (value_col, ro_col) = decl_columns(&cols);
+                let rows = all
+                    .into_iter()
+                    .map(|r| match r.decl {
+                        Some(d) => (*d).row(value_col, ro_col),
+                        None => r.aligned(),
+                    })
+                    .collect();
+                b::align_lines(rows)
+            }
             Stmt::Row(r) if !group.is_empty() => {
                 let rows = std::iter::once(r).chain(group).map(Row::aligned).collect();
                 b::align_lines(rows)

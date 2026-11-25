@@ -12,7 +12,7 @@
 //! statement falls back to the generic layout.
 
 use crate::kinds::*;
-use crate::stmt::{AlignKey, P, Row, Stmt};
+use crate::stmt::{AlignKey, DeclCols, P, Row, Stmt, decl_columns};
 use origami_layout::{AlignItem, Doc, builder as b};
 use origami_syntax::Style;
 
@@ -50,7 +50,7 @@ pub fn parse(p: &mut P) -> Option<Stmt> {
         if DECL_LEADS.contains(&w0.as_str()) {
             if let Some(d) = declaration(p) {
                 p.c.span(start, p.end, "ABAP-DECL-001");
-                return Some(Stmt::Doc(d));
+                return Some(d);
             }
             p.pos = start;
             return None;
@@ -3478,23 +3478,74 @@ fn name_end(p: &P, from: usize, to: usize) -> usize {
 enum Line {
     /// An aligned row: name, then the rest starting with a keyword.
     Row(Vec<Doc>, Vec<Doc>, bool),
+    /// Aligned style: a row in columns (ABAP-ALIGN-003).
+    Cols(DeclCols, bool),
     /// A line without an anchor.
     Plain(Doc),
 }
 
-fn declaration(p: &mut P) -> Option<Doc> {
+/// The type, `VALUE …` and `READ-ONLY` of a declaration item `ne..e` (after
+/// its name), each optional part with the gap before it. `None` if the parts
+/// are not in this order.
+fn decl_parts(p: &mut P, ne: usize, e: usize) -> Option<DeclCols> {
+    let find = |p: &P, w: &str| (ne..e).find(|&k| p.kind(k) == WORD && !p.glued(k) && p.is(k, w));
+    let v = find(p, "VALUE");
+    let r = find(p, "READ-ONLY");
+    if let (Some(v), Some(r)) = (v, r)
+        && r < v
+    {
+        return None;
+    }
+    let ty_end = v.or(r).unwrap_or(e);
+    let ty = if ne < ty_end {
+        decl_tokens(p, ne, ty_end)
+    } else {
+        Vec::new()
+    };
+    let value = v.map(|v| (p.sp(v), decl_tokens(p, v, r.unwrap_or(e))));
+    let ro = r.map(|r| (p.sp(r), decl_tokens(p, r, e)));
+    Some(DeclCols {
+        name: Vec::new(),
+        ty,
+        value,
+        ro,
+    })
+}
+
+fn declaration(p: &mut P) -> Option<Stmt> {
     let start = p.pos;
     let lead = p.kw(start);
     let chain = p.kind(start + 1) == COLON;
+    let aligned = p.c.style == Style::Aligned;
     if !chain {
         if start + 1 >= p.end {
             return None;
         }
         // `TYPES BEGIN OF s.` / `DATA END OF s.`
-        if (p.is(start + 1, "BEGIN") || p.is(start + 1, "END")) && p.is(start + 2, "OF") {
+        let structure =
+            (p.is(start + 1, "BEGIN") || p.is(start + 1, "END")) && p.is(start + 2, "OF");
+        if structure {
             p.c.keywords.push(start + 1);
         }
         let ne = name_end(p, start + 1, p.end);
+        // ABAP-ALIGN-008: a one-line declaration is aligned with its
+        // neighbors of the same keyword.
+        let cols = if aligned && !structure && ne < p.end {
+            decl_parts(p, ne, p.end).map(|mut d| {
+                let mut name = vec![lead.clone(), p.sp(start + 1)];
+                for i in start + 1..ne {
+                    if i > start + 1 {
+                        name.push(p.sp(i));
+                    }
+                    name.push(p.t(i));
+                }
+                d.name = name;
+                d.end_with(vec![p.period()]);
+                d
+            })
+        } else {
+            None
+        };
         let mut docs = vec![lead, p.sp(start + 1)];
         for i in start + 1..ne {
             if i > start + 1 {
@@ -3516,7 +3567,20 @@ fn declaration(p: &mut P) -> Option<Doc> {
         );
         docs.push(p.period());
         p.pos = p.end;
-        return Some(b::group(docs));
+        if let Some(cols) = cols {
+            let key = AlignKey::Decl(p.upper(start));
+            let mut docs = docs.into_iter();
+            let head: Vec<Doc> = docs.by_ref().take(1).collect();
+            return Some(Stmt::Row(Row {
+                key,
+                head,
+                gap: b::empty(),
+                rest: docs.collect(),
+                anchor: 0,
+                decl: Some(Box::new(cols)),
+            }));
+        }
+        return Some(Stmt::Doc(b::group(docs)));
     }
     let colon = start + 1;
     // Split items at commas on bracket depth 0.
@@ -3549,7 +3613,9 @@ fn declaration(p: &mut P) -> Option<Doc> {
     }
     let mut lines: Vec<(u32, Line, usize)> = Vec::new(); // (level, line, first token)
     let mut level = 0u32;
-    let mut forced = false;
+    // ABAP-DECL-001, aligned style: a chain of two or more items always has
+    // one item per line.
+    let mut forced = aligned && items.len() > 1;
     for (n, &(a, e)) in items.iter().enumerate() {
         let comma = if e < p.end && p.kind(e) == COMMA {
             Some(e)
@@ -3582,11 +3648,21 @@ fn declaration(p: &mut P) -> Option<Doc> {
                 }
                 head.push(p.t(i));
             }
-            if ne < e {
+            let brk = n > 0 && p.c.commented[a];
+            let cols = if aligned && ne < e {
+                decl_parts(p, ne, e)
+            } else {
+                None
+            };
+            if let Some(mut d) = cols {
+                d.name = head;
+                d.end_with(tail_end);
+                Line::Cols(d, brk)
+            } else if ne < e {
                 let mut tail = vec![p.sp(ne)];
                 tail.extend(decl_tokens(p, ne, e));
                 tail.extend(tail_end);
-                Line::Row(head, tail, n > 0 && p.c.commented[a])
+                Line::Row(head, tail, brk)
             } else {
                 head.extend(tail_end);
                 Line::Plain(b::concat(head))
@@ -3603,7 +3679,38 @@ fn declaration(p: &mut P) -> Option<Doc> {
     while k < lines.len() {
         let (lvl, _, first_tok) = lines[k];
         let mut content: Vec<Doc>;
-        if matches!(lines[k].1, Line::Row(..)) {
+        if matches!(lines[k].1, Line::Cols(..)) {
+            let from = k;
+            while k < lines.len() && lines[k].0 == lvl && matches!(lines[k].1, Line::Cols(..)) {
+                k += 1;
+            }
+            let (value_col, ro_col) = {
+                let cols: Vec<&DeclCols> = lines[from..k]
+                    .iter()
+                    .filter_map(|l| match &l.1 {
+                        Line::Cols(d, _) => Some(d),
+                        _ => None,
+                    })
+                    .collect();
+                decl_columns(&cols)
+            };
+            let mut items: Vec<AlignItem> = Vec::new();
+            for l in &mut lines[from..k] {
+                let Line::Cols(d, brk) = std::mem::replace(&mut l.1, Line::Plain(b::empty()))
+                else {
+                    unreachable!()
+                };
+                if brk {
+                    items.push(AlignItem::Break);
+                }
+                items.push(d.row(value_col, ro_col));
+            }
+            content = vec![if forced {
+                b::align_broken(items)
+            } else {
+                b::align(items)
+            }];
+        } else if matches!(lines[k].1, Line::Row(..)) {
             let mut items: Vec<AlignItem> = Vec::new();
             while k < lines.len() && lines[k].0 == lvl && matches!(lines[k].1, Line::Row(..)) {
                 let Line::Row(head, tail, brk) =
@@ -3637,14 +3744,14 @@ fn declaration(p: &mut P) -> Option<Doc> {
     }
     p.pos = p.end;
     let body = b::hang(docs);
-    Some(b::group(vec![
+    Some(Stmt::Doc(b::group(vec![
         lead,
         p.sp(colon),
         p.t(colon),
         p.sp(colon + 1),
         body,
         p.period(),
-    ]))
+    ])))
 }
 
 // ---- aliases -----------------------------------------------------------------
@@ -3686,6 +3793,7 @@ fn aliases(p: &mut P) -> Option<Stmt> {
         let (x, f, e) = items[0];
         let for_kw = p.kw(f);
         return Some(Stmt::Row(Row {
+            decl: None,
             key: AlignKey::Aliases,
             head: vec![lead, p.sp(x), p.flat(x, f - 1)],
             gap: p.sp(f),
@@ -3874,6 +3982,7 @@ fn methods(p: &mut P) -> Option<Stmt> {
             let mut head = vec![lead, p.sp(start + 1)];
             head.extend(name);
             return Some(Stmt::Row(Row {
+                decl: None,
                 key,
                 head,
                 gap,

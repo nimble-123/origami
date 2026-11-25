@@ -1264,7 +1264,11 @@ impl<'c, 'a> Printer<'c, 'a> {
                 let mut tail: &[Doc] = &r.tail;
                 if aligned && !r.tail.is_empty() {
                     let h = self.ctx.flat_width(&r.head).unwrap_or(0);
-                    let spaces = " ".repeat(pad(r, h) + 1);
+                    // Without any head in the segment, the last lead cell's
+                    // space already separates the tail.
+                    let gap =
+                        usize::from(!(max == 0 && h == 0 && r.lead.iter().any(|c| !c.is_empty())));
+                    let spaces = " ".repeat(pad(r, h) + gap);
                     self.write(&spaces, col);
                     tail = &r.tail[1..];
                 }

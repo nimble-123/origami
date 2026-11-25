@@ -80,6 +80,78 @@ pub enum AlignKey {
     Redefinition,
     /// `ALIASES name FOR intf~comp`
     Aliases,
+    /// A one-line declaration with this keyword (`DATA`, `CONSTANTS`, …;
+    /// ABAP-ALIGN-008).
+    Decl(String),
+}
+
+/// A declaration in columns (ABAP-ALIGN-003, ABAP-ALIGN-008): the name, the
+/// type, `VALUE …` and `READ-ONLY`, each optional part with the gap before
+/// it. The last part ends with the statement's period or the item's comma.
+#[derive(Clone)]
+pub struct DeclCols {
+    pub name: Vec<Doc>,
+    pub ty: Vec<Doc>,
+    pub value: Option<(Doc, Vec<Doc>)>,
+    pub ro: Option<(Doc, Vec<Doc>)>,
+}
+
+impl DeclCols {
+    /// Appends `end` (period or comma) to the last part.
+    pub fn end_with(&mut self, end: Vec<Doc>) {
+        if let Some((_, r)) = &mut self.ro {
+            r.extend(end);
+        } else if let Some((_, v)) = &mut self.value {
+            v.extend(end);
+        } else if !self.ty.is_empty() {
+            self.ty.extend(end);
+        } else {
+            self.name.extend(end);
+        }
+    }
+
+    /// The row, with a `VALUE` and a `READ-ONLY` column if `value_col` and
+    /// `ro_col`; a part without its own column follows the part before it
+    /// after one space.
+    pub fn row(self, value_col: bool, ro_col: bool) -> AlignItem {
+        let mut ty = self.ty;
+        let mut head = Vec::new();
+        let mut tail = Vec::new();
+        if let Some((gap, v)) = self.value {
+            if value_col {
+                head.extend(v);
+            } else {
+                ty.push(gap);
+                ty.extend(v);
+            }
+        }
+        if let Some((gap, r)) = self.ro {
+            if ro_col && !value_col {
+                // The READ-ONLY column follows the type column directly.
+                head.extend(r);
+            } else if ro_col {
+                tail.push(gap);
+                tail.extend(r);
+            } else if !head.is_empty() {
+                head.push(gap);
+                head.extend(r);
+            } else {
+                ty.push(gap);
+                ty.extend(r);
+            }
+        }
+        b::row_cols(vec![self.name, ty], head, tail)
+    }
+}
+
+/// Which columns a group of declarations gets: `VALUE` and `READ-ONLY` each
+/// when at least a fifth of the declarations have it (ABAP Cleaner's fill
+/// ratio).
+pub fn decl_columns(rows: &[&DeclCols]) -> (bool, bool) {
+    let n = rows.len();
+    let v = rows.iter().filter(|r| r.value.is_some()).count();
+    let r = rows.iter().filter(|r| r.ro.is_some()).count();
+    (v > 0 && v * 5 >= n, r > 0 && r * 5 >= n)
 }
 
 /// A statement that can be aligned with its neighbors: the part before the
@@ -92,6 +164,8 @@ pub struct Row {
     pub rest: Vec<Doc>,
     /// Width of the anchor for right alignment (assignment operators), else 0.
     pub anchor: usize,
+    /// A declaration's columns (key `Decl`), used when aligned.
+    pub decl: Option<Box<DeclCols>>,
 }
 
 impl Row {
@@ -1614,6 +1688,7 @@ impl<'c, 'a> P<'c, 'a> {
                 if let Some(key) = self.assign_key(start, op) {
                     let gap = docs.remove(0);
                     return Some(Stmt::Row(Row {
+                        decl: None,
                         key,
                         head: vec![target],
                         gap,
