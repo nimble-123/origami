@@ -762,6 +762,7 @@ fn view_blanks(
             }
             Kind::Element => {
                 let w0 = word(text, stream, u.first);
+                let w0_raw = w0.clone();
                 let key = w0 == "key";
                 let name = if key {
                     word(text, stream, u.first + 1)
@@ -777,11 +778,15 @@ fn view_blanks(
                 // A `case` element is printed by its rule (CDS-ELEM-001: two
                 // or more `when` always break); others keep their lines.
                 let has_case = (u.first..=u.last).any(|k| word(text, stream, k) == "case");
+                // An element that starts with `define` or `extend` (broken
+                // code) is laid out as a header, which may break or join its
+                // lines; it never counts as spanning several lines.
+                let header = matches!(w0_raw.as_str(), "define" | "extend");
                 let multi = annotated.is_some()
                     || if has_case {
                         case_breaks(text, stream, u)
                     } else {
-                        !one_line(text, stream, u)
+                        !header && !one_line(text, stream, u)
                     };
                 groups.push((annotated.take().unwrap_or(u.first), key, assoc, multi));
             }
