@@ -42,6 +42,9 @@ pub(crate) enum Inner {
     Group(Vec<Doc>),
     /// Adds one indent level to breaks inside it.
     Indent(Vec<Doc>),
+    /// Adds the continuation indent (`PrintOptions::cont_levels` levels) to
+    /// breaks inside it (ABAP-INDENT-001).
+    Cont(Vec<Doc>),
     /// Breaks inside it continue at the current column (hanging indent).
     Hang(Vec<Doc>),
     /// Clauses: each separator breaks only when the content after it does not

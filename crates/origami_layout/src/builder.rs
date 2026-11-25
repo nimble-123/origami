@@ -81,8 +81,9 @@ pub fn indent(docs: Vec<Doc>) -> Doc {
 }
 
 /// Continuation indent: two levels.
+/// The continuation indent of ABAP-INDENT-001.
 pub fn cont(docs: Vec<Doc>) -> Doc {
-    indent(vec![indent(docs)])
+    Doc(Inner::Cont(docs))
 }
 
 pub fn hang(docs: Vec<Doc>) -> Doc {

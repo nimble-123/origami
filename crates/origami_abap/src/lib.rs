@@ -19,7 +19,7 @@ pub mod verbatim;
 
 use origami_layout::{PrintOptions, print_bounded};
 use origami_syntax::{
-    LangOptions, LangResult, SourceText, Stats, TokenIndex, TokenStream, Unit, UnitId,
+    LangOptions, LangResult, SourceText, Stats, Style, TokenIndex, TokenStream, Unit, UnitId,
     max_output_len, output_limit_diagnostic,
 };
 use std::collections::BTreeSet;
@@ -153,6 +153,10 @@ fn format_with(
         indent: opts.indent_width,
         keyword_case: Some(opts.abap_keyword_case),
         identity,
+        cont_levels: match opts.style {
+            Style::Aligned => 1,
+            Style::Compact => 2,
+        },
         comment_overrides,
     };
     let limit = max_output_len(src.text().len());

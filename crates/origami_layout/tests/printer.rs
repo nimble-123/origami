@@ -82,6 +82,7 @@ fn opts(width: u16) -> PrintOptions {
         indent: 2,
         keyword_case: Some(Case::Upper),
         identity: false,
+        cont_levels: 2,
         comment_overrides: Default::default(),
     }
 }

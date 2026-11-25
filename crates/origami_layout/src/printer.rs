@@ -44,6 +44,9 @@ pub struct PrintOptions {
     pub keyword_case: Option<Case>,
     /// Return the source text unchanged.
     pub identity: bool,
+    /// Indent levels of a continuation line (`Doc::cont`): 1 in the aligned
+    /// style, 2 in the compact style (ABAP-INDENT-001).
+    pub cont_levels: u8,
     /// Replacement texts of comment lines, by trivia index (ABAP-DOC-001).
     /// The comment lines in front of one token use them only if no
     /// replacement ends past the width while being longer than the original.
@@ -263,9 +266,11 @@ impl<'a> Ctx<'a> {
                 }
                 Inner::Space => w += 1,
                 Inner::SoftLine | Inner::SoftBreak | Inner::HardLine => return w,
-                Inner::Group(ds) | Inner::Indent(ds) | Inner::Hang(ds) | Inner::Concat(ds) => {
-                    stack.extend(ds.iter().rev())
-                }
+                Inner::Group(ds)
+                | Inner::Indent(ds)
+                | Inner::Cont(ds)
+                | Inner::Hang(ds)
+                | Inner::Concat(ds) => stack.extend(ds.iter().rev()),
                 Inner::Choice(a, _) => stack.push(a),
                 Inner::Shared(d) => stack.push(d),
                 Inner::Fill(items) => {
@@ -323,9 +328,11 @@ impl<'a> Ctx<'a> {
                 .iter()
                 .filter_map(AlignItem::docs)
                 .any(|mut docs| docs.any(|d| self.forced(d, first, end))),
-            Inner::Group(ds) | Inner::Indent(ds) | Inner::Hang(ds) | Inner::Concat(ds) => {
-                ds.iter().any(|d| self.forced(d, first, end))
-            }
+            Inner::Group(ds)
+            | Inner::Indent(ds)
+            | Inner::Cont(ds)
+            | Inner::Hang(ds)
+            | Inner::Concat(ds) => ds.iter().any(|d| self.forced(d, first, end)),
             Inner::Choice(a, _) => self.forced(a, first, end),
             Inner::Shared(d) => self.forced(d, first, end),
             Inner::Fill(items) => items.iter().any(|(_, c)| self.forced(c, first, end)),
@@ -352,9 +359,11 @@ impl<'a> Ctx<'a> {
                 Inner::Space | Inner::SoftLine => w += 1,
                 Inner::SoftBreak => {}
                 Inner::HardLine => return None,
-                Inner::Group(ds) | Inner::Indent(ds) | Inner::Hang(ds) | Inner::Concat(ds) => {
-                    stack.extend(ds.iter().rev())
-                }
+                Inner::Group(ds)
+                | Inner::Indent(ds)
+                | Inner::Cont(ds)
+                | Inner::Hang(ds)
+                | Inner::Concat(ds) => stack.extend(ds.iter().rev()),
                 Inner::Choice(a, _) => stack.push(a),
                 Inner::Shared(d) => stack.push(d),
                 Inner::Fill(items) => {
@@ -817,7 +826,11 @@ impl<'c, 'a> Printer<'c, 'a> {
                 Inner::SoftLine => remaining -= 1,
                 Inner::SoftBreak => {}
                 Inner::HardLine => return true,
-                Inner::Group(ds) | Inner::Indent(ds) | Inner::Hang(ds) | Inner::Concat(ds) => {
+                Inner::Group(ds)
+                | Inner::Indent(ds)
+                | Inner::Cont(ds)
+                | Inner::Hang(ds)
+                | Inner::Concat(ds) => {
                     let m = if matches!(d.0, Inner::Group(_))
                         && mode == Mode::Break
                         && rest_idx < rest.len()
@@ -897,6 +910,13 @@ impl<'c, 'a> Printer<'c, 'a> {
                 Inner::Indent(ds) => {
                     stack.extend(ds.iter().rev().map(|d| Cmd {
                         indent: indent + step,
+                        mode,
+                        doc: d,
+                    }));
+                }
+                Inner::Cont(ds) => {
+                    stack.extend(ds.iter().rev().map(|d| Cmd {
+                        indent: indent + step * self.ctx.opts.cont_levels as usize,
                         mode,
                         doc: d,
                     }));
@@ -1246,9 +1266,11 @@ fn last_token(doc: &Doc) -> Option<TokenIndex> {
         Inner::Unknown { last, .. } | Inner::Verbatim { last, .. } | Inner::Opaque { last, .. } => {
             Some(*last)
         }
-        Inner::Group(ds) | Inner::Indent(ds) | Inner::Hang(ds) | Inner::Concat(ds) => {
-            ds.iter().rev().find_map(last_token)
-        }
+        Inner::Group(ds)
+        | Inner::Indent(ds)
+        | Inner::Cont(ds)
+        | Inner::Hang(ds)
+        | Inner::Concat(ds) => ds.iter().rev().find_map(last_token),
         Inner::Choice(a, _) => last_token(a),
         Inner::Shared(d) => last_token(d),
         Inner::Fill(items) => items.iter().rev().find_map(|(_, c)| last_token(c)),
