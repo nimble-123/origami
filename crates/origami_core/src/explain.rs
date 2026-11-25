@@ -180,6 +180,21 @@ pub const RULE_PHRASES: &[(RuleId, &str, &str)] = &[
         "condition split before AND, OR",
         "access condition",
     ),
+    (
+        "CDS-ALIGN-002",
+        "each parameter of the data source on its own line",
+        "data source",
+    ),
+    (
+        "CDS-ALIGN-003",
+        "each function parameter on its own line",
+        "function call",
+    ),
+    (
+        "CDS-ALIGN-004",
+        "each name of the list on its own line",
+        "list",
+    ),
 ];
 
 /// Rules that break whatever the width; all other rules break a construct
@@ -194,6 +209,9 @@ const ALWAYS_BREAKS: &[RuleId] = &[
     "CDS-HEAD-001",
     "CDS-ELEM-001",
     "CDS-CLAUSE-001",
+    "CDS-ALIGN-002",
+    "CDS-ALIGN-003",
+    "CDS-ALIGN-004",
 ];
 
 /// Rule phrase and construct noun of `rule`.
