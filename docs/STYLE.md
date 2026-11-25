@@ -1300,7 +1300,7 @@ define view entity ZI_Booking
 **Compact:** the parameters stay as written (CDS-CONT-001).
 
 ### CDS-ALIGN-003: Function parameters after `=>`
-Milestone: M5
+Milestone: M4
 Explanation: each function parameter on its own line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-25. As ABAP Cleaner's
