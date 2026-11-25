@@ -6,8 +6,10 @@
 //!
 //! Both sides are brought into one form for the two changes the self-check
 //! allows (docs/INVARIANTS.md, section 3): a period or comma that follows
-//! comments stands in front of them (ABAP-SPACE-001), and an ABAP Doc tag
-//! line has one blank after the tag and one before `|` (ABAP-DOC-001).
+//! comments stands in front of them (ABAP-SPACE-001), an ABAP Doc tag
+//! line has one blank after the tag and one before `|` (ABAP-DOC-001), and
+//! a `"` comment that continues with a letter or digit has one space after
+//! the `"` (ABAP-COMMENT-003).
 
 use crate::corpus::{files, manifest};
 use crate::root;
@@ -40,13 +42,24 @@ fn normalize(t: &Tok) -> (String, String) {
             | "Comment"
     );
     let text = if t.kind == "Comment" {
-        abap_doc_line(&t.text).unwrap_or_else(|| t.text.clone())
+        abap_doc_line(&t.text)
+            .or_else(|| spaced_comment(&t.text))
+            .unwrap_or_else(|| t.text.clone())
     } else if literal {
         t.text.clone()
     } else {
         t.text.to_ascii_uppercase()
     };
     (t.kind.clone(), text)
+}
+
+/// ABAP-COMMENT-003: `"text` as `" text`; `None` for other comments.
+fn spaced_comment(s: &str) -> Option<String> {
+    let rest = s.strip_prefix('"')?;
+    rest.chars()
+        .next()
+        .filter(|c| c.is_alphanumeric())
+        .map(|_| format!("\" {rest}"))
 }
 
 /// `"! @parameter name | text` (or `@raising`, `@exception`) with one blank
