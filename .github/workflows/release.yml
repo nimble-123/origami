@@ -521,8 +521,9 @@ jobs:
     name: Publish the extension
     needs: release
     runs-on: ubuntu-latest
-    # The Marketplace publisher `nimble-123` trusts this workflow file in this
-    # environment (OIDC trusted publishing): no Marketplace token is stored.
+    # The Marketplace publisher and the Open VSX namespace `nimble-123` trust
+    # this workflow file in this environment (OIDC trusted publishing): no
+    # publishing token is stored.
     environment: vscode-marketplace
     permissions:
       contents: read
@@ -531,12 +532,6 @@ jobs:
       # Install scripts of the publishing tools do not run.
       npm_config_ignore_scripts: "true"
     steps:
-      - id: tokens
-        env:
-          HAVE_OVSX: ${{ secrets.OVSX_PAT != '' }}
-        run: |
-          echo "ovsx=$HAVE_OVSX" >> "$GITHUB_OUTPUT"
-          [ "$HAVE_OVSX" = true ] || echo "::notice::OVSX_PAT is not set; not published to Open VSX."
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
@@ -552,13 +547,10 @@ jobs:
             npx --yes @vscode/vsce@4.1.1 publish --packagePath "$f" --oidc || failed=1
           done
           exit $failed
-      - name: Publish to Open VSX
-        if: steps.tokens.outputs.ovsx == 'true'
-        env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+      - name: Publish to Open VSX (trusted publishing)
         run: |
           failed=0
           for f in vsix/*.vsix; do
-            npx --yes ovsx@1.4.0 publish "$f" --pat "$OVSX_PAT" || failed=1
+            npx --yes ovsx@1.4.0 publish "$f" --trusted-publishing || failed=1
           done
           exit $failed
