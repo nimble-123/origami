@@ -376,11 +376,36 @@ fn forced_blanks(
     let mut last: Option<(String, bool)> = None;
     let mut in_structure = 0i32;
     let mut prev: Option<&Statement> = None;
+    // A file that starts with declarations (an include, a code snippet) is
+    // treated like the start of a procedure.
+    let mut file_start = (true, false);
+    // Open `BEGIN OF` structures among the declarations at the start: every
+    // statement inside one (`INCLUDE STRUCTURE …`) is part of them.
+    let mut start_struct = 0i32;
     for (n, st) in statements.iter().enumerate() {
         let first = st.tokens.start;
         let w0 = word(st, 0);
         let prev_w0 = prev.map(|p| word(p, 0)).unwrap_or_default();
         let mut force = 0u8;
+        let in_decls = |st: &Statement, depth: &mut i32| -> bool {
+            let decl = decl_kw(st, PROC_DECLS).is_some();
+            if decl {
+                *depth = (*depth + structure(st)).max(0);
+            }
+            decl || *depth > 0
+        };
+        if stack.is_empty() && file_start.0 {
+            if in_decls(st, &mut start_struct) {
+                file_start.1 = true;
+            } else {
+                if file_start.1 && !matches!(st.role, Some(Role::Closer)) {
+                    force = 1;
+                }
+                file_start.0 = false;
+            }
+        } else if !stack.is_empty() {
+            file_start.0 = false;
+        }
         match stack.last().copied() {
             None if matches!(w0.as_str(), "CLASS" | "INTERFACE")
                 && matches!(prev_w0.as_str(), "ENDCLASS" | "ENDINTERFACE") =>
@@ -422,7 +447,7 @@ fn forced_blanks(
                 }
             }
             Some(Block::Proc(true, seen)) => {
-                if decl_kw(st, PROC_DECLS).is_some() {
+                if in_decls(st, &mut start_struct) {
                     if let Some(Block::Proc(_, s)) = stack.last_mut() {
                         *s = true;
                     }
@@ -454,7 +479,10 @@ fn forced_blanks(
                         last = None;
                         Block::Interface
                     }
-                    "METHOD" | "FORM" | "FUNCTION" => Block::Proc(true, false),
+                    "METHOD" | "FORM" | "FUNCTION" => {
+                        start_struct = 0;
+                        Block::Proc(true, false)
+                    }
                     _ => Block::Other,
                 });
             }

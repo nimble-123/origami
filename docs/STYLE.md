@@ -320,9 +320,10 @@ one blank line is added where none was written:
   `TYPES` declaration;
 * in the same places, before and after a declaration that spans two or more
   lines (for example a method signature table);
-* in a `METHOD`, `FORM` or `FUNCTION`, between the declarations at its start
-  (`DATA`, `TYPES`, `CONSTANTS`, `STATICS`, `FIELD-SYMBOLS`) and the first
-  other statement;
+* in a `METHOD`, `FORM` or `FUNCTION`, and in a file that starts with
+  declarations (an include or a code snippet), between the declarations at
+  its start (`DATA`, `TYPES`, `CONSTANTS`, `STATICS`, `FIELD-SYMBOLS`) and
+  the first other statement;
 * in a class implementation, between `ENDMETHOD` and the next `METHOD`.
 
 Between two classes or interfaces (`ENDCLASS` or `ENDINTERFACE` and the next
