@@ -125,7 +125,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: nimble-123/origami@v0.3.1
+      - uses: nimble-123/origami@v0.4.0
         with:
           args: --check --changed origin/${{ github.base_ref }}
           sarif: "true"
@@ -135,7 +135,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/nimble-123/origami
-    rev: v0.3.1
+    rev: v0.4.0
     hooks:
       - id: origami        # check only
       # - id: origami-fix  # rewrite files

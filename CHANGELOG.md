@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.4.0](https://github.com/nimble-123/origami/compare/v0.3.1...v0.4.0) (2026-11-25)
+
+
+### Features
+
+* add the style option (aligned, compact) ([#60](https://github.com/nimble-123/origami/issues/60)) ([f96a7ea](https://github.com/nimble-123/origami/commit/f96a7ea764d204836d4a835c4f454989928f6b1d))
+
+
+### Fixes
+
+* **cds:** no alias padding for elements laid out as a header ([#71](https://github.com/nimble-123/origami/issues/71)) ([56aaf72](https://github.com/nimble-123/origami/commit/56aaf729ce8f8064fc471d39fa59bb323e5759f2))
+
+
+### Formatting output
+
+* **abap:** add blank lines between sections, groups and classes (ABAP-BLANK-002) ([#68](https://github.com/nimble-123/origami/issues/68)) ([6b891a0](https://github.com/nimble-123/origami/commit/6b891a020df813c07351c923ea32f1da3e769399))
+* **abap:** align declarations in columns (ABAP-ALIGN-008, ABAP-DECL-001) ([#66](https://github.com/nimble-123/origami/issues/66)) ([f914f5f](https://github.com/nimble-123/origami/commit/f914f5f2858e8f03a7ae2dac711b13e5857c5fdf))
+* **abap:** align parameter keywords and = across groups (ABAP-CALL-002) ([#63](https://github.com/nimble-123/origami/issues/63)) ([bf6f1e5](https://github.com/nimble-123/origami/commit/bf6f1e54d7730567b048cd0c3ce6af17f9818d37))
+* **abap:** blank line after the declarations at the start of a file (ABAP-BLANK-002) ([#70](https://github.com/nimble-123/origami/issues/70)) ([5043104](https://github.com/nimble-123/origami/commit/504310440dfcece76600e2812bb21ac085b6f8a8))
+* **abap:** CALL FUNCTION groups as one aligned table (ABAP-CALL-003) ([#64](https://github.com/nimble-123/origami/issues/64)) ([47d3f1c](https://github.com/nimble-123/origami/commit/47d3f1c8b87019c0e8a30b536c1a0f2354009c4b))
+* **abap:** comment spacing and blank lines after comments (ABAP-COMMENT-003) ([#67](https://github.com/nimble-123/origami/issues/67)) ([5be0770](https://github.com/nimble-123/origami/commit/5be0770f64abb6e4f2af44024745f06c6dd3a9a6))
+* **abap:** indent continuation lines by one level (ABAP-INDENT-001) ([#62](https://github.com/nimble-123/origami/issues/62)) ([cd21c27](https://github.com/nimble-123/origami/commit/cd21c279a4eeb1eb8e374838651d7a7687468832))
+* **abap:** method signatures as tables behind the name (ABAP-METHODS-001) ([#65](https://github.com/nimble-123/origami/issues/65)) ([d3f2258](https://github.com/nimble-123/origami/commit/d3f22588ebd19df01f78443f5879bc7e98ebfd32))
+* **cds:** aligned aliases and blank lines between view sections (CDS-ALIGN-001, CDS-BLANK-002) ([#69](https://github.com/nimble-123/origami/issues/69)) ([8f42d5e](https://github.com/nimble-123/origami/commit/8f42d5e517e5fb81d125183ed649f76c5c2c11df))
+
 ## [0.3.1](https://github.com/nimble-123/origami/compare/v0.3.0...v0.3.1) (2026-11-24)
 
 
