@@ -31,10 +31,10 @@ STYLE = "https://github.com/nimble-123/origami/blob/main/docs/STYLE.md"
 
 EXAMPLES = [
     ("01-calls.abap", "Method calls",
-     "Both hang the parameters behind the opening bracket and align the "
-     "<code>=</code> signs. A call with two or more parameter keywords puts "
-     "each keyword on its own line in both tools. origami aligns the "
-     "<code>=</code> signs per keyword, ABAP Cleaner across all of them."),
+     "Both hang the parameters behind the opening bracket, pad the parameter "
+     "keywords to the longest one and align the <code>=</code> signs across "
+     "all of them. A call with two or more parameter keywords puts each "
+     "keyword on its own line in both tools."),
     ("02-long-lines.abap", "Lines longer than the limit",
      "origami breaks every statement that does not fit into the line width: "
      "before <code>AND</code> and <code>OR</code>, and before each SQL clause. "
@@ -45,43 +45,37 @@ EXAMPLES = [
      "two authors always get the same result. ABAP Cleaner keeps the author's "
      "breaks and aligns around them."),
     ("04-declarations.abap", "Declarations",
-     "ABAP Cleaner aligns <code>TYPE</code> across separate "
-     "<code>DATA</code> statements and puts each item of a chain on its own "
-     "line. origami aligns only inside a chain it has to break, and keeps a "
-     "chain that fits on one line."),
-    ("05-signatures.abap", "Method signatures",
-     "ABAP Cleaner keeps <code>IMPORTING</code> behind the method name and "
-     "aligns the types in a table. origami gives each section keyword its own "
-     "line and does not align types, so renaming one parameter changes one "
+     "Both align <code>TYPE</code> and <code>VALUE</code> across consecutive "
+     "<code>DATA</code> statements and put each item of a chain on its own "
      "line."),
+    ("05-signatures.abap", "Method signatures",
+     "Both keep the first section keyword behind the method name and align "
+     "the names and types in a table. When the table does not fit behind the "
+     "name, origami starts it on the next line; ABAP Cleaner lets the line "
+     "run past the width."),
     ("06-comments-blank-lines.abap", "Comments and blank lines",
-     "origami puts exactly one space before an end-of-line comment and never "
-     "changes comment text, apart from aligning ABAP Doc. ABAP Cleaner keeps aligned comments, adds a space "
-     "after <code>\"</code> and adds blank lines, for example after "
-     "declarations."),
+     "Both keep the spaces in front of an end-of-line comment, add a space "
+     "after <code>\"</code> when a letter or digit follows, and keep at most "
+     "one blank line."),
     ("07-call-function.abap", "CALL FUNCTION",
-     "Same structure, two details: origami indents the parameter groups by "
-     "four spaces, ABAP Cleaner by two and also aligns the keywords and "
-     "<code>=</code> signs across groups."),
+     "Both put each parameter group on its own line, indented by two, and "
+     "align the keywords and <code>=</code> signs across the groups."),
     ("08-letter-case.abap", "Letter case",
      "Both write keywords in upper case and identifiers without a lower-case "
      "letter in lower case; an identifier in mixed case keeps it. Literals and "
-     "comments are never changed. The only difference here is the blank line "
-     "ABAP Cleaner adds after the declarations."),
+     "comments are never changed, and both add a blank line after the "
+     "declarations."),
     ("09-cds-view.asddls", "CDS view entity",
-     "Both put each clause of the header and each element on its own line. "
-     "ABAP Cleaner also aligns <code>as</code> aliases and adds blank lines "
-     "between sections; origami lines up names after <code>key</code> and "
-     "keeps single spaces."),
+     "Both put each clause of the header and each element on its own line, "
+     "align the <code>as</code> aliases and add blank lines between the "
+     "sections."),
     ("10-aligned-statements.abap", "Aligned statements, COND and SELECT lists",
      "Both tools align consecutive <code>ALIASES</code>, "
      "<code>REDEFINITION</code> and <code>FOR TESTING</code> declarations, "
      "assignments to the same structure, ABAP Doc parameters, the branches of "
-     "<code>COND</code> and a <code>SELECT</code> list with aliases, and both "
-     "remove the space before the period. The differences: origami indents "
-     "the SQL clauses by four spaces and keeps a method signature that fits "
-     "on one line; ABAP Cleaner indents by two, aligns the signature in a "
-     "table and adds blank lines."),
+     "<code>COND</code> and a <code>SELECT</code> list with aliases, indent "
+     "the SQL clauses by two, align the method signature in a table and add "
+     "blank lines between the sections and declaration groups."),
 ]
 
 # ---- origami's answer to each ABAP Cleaner rule ----------------------------
@@ -90,51 +84,51 @@ EXAMPLES = [
 # listed change code, comments or names, which origami never does.
 
 MAP = {
-    "EMPTY_LINES_WITHIN_METHODS": ("own", ["ABAP-BLANK-001"],
-        "Removes blank lines after a block opener and before its closer and keeps at most one in a row; never adds one."),
-    "EMPTY_LINES_OUTSIDE_METHODS": ("own", ["ABAP-BLANK-001"],
-        "Keeps the blank lines between methods and classes (at most one); does not add any."),
-    "EMPTY_LINES_IN_CLASS_DEFINITION": ("own", ["ABAP-BLANK-001"],
-        "Does not add blank lines above sections."),
+    "EMPTY_LINES_WITHIN_METHODS": ("yes", ["ABAP-BLANK-001", "ABAP-BLANK-002"],
+        "At most one blank line in a row; one after the declarations at the start of a method."),
+    "EMPTY_LINES_OUTSIDE_METHODS": ("yes", ["ABAP-BLANK-002"],
+        "One blank line between methods, two between classes and interfaces."),
+    "EMPTY_LINES_IN_CLASS_DEFINITION": ("yes", ["ABAP-BLANK-002"],
+        "Above sections, between declaration kinds and around multi-line declarations."),
     "ONE_COMMAND_PER_LINE": ("yes", ["ABAP-STMT-001"], ""),
     "SPACES_IN_EMPTY_BRACKETS": ("no", [],
         "Tokens that touch in the input stay together, because in ABAP a space can change the meaning."),
     "CLOSING_BRACKETS_POSITION": ("yes", ["ABAP-CALL-001", "ABAP-VALUE-001"], ""),
     "SPACE_BEFORE_PERIOD": ("yes", ["ABAP-SPACE-001"],
         "Also before commas in SQL lists; a lone period or comma moves up across comment lines."),
-    "SPACE_AROUND_COMMENT_SIGN": ("own", ["ABAP-COMMENT-002"],
-        "One space before an end-of-line comment; the comment text is never changed."),
+    "SPACE_AROUND_COMMENT_SIGN": ("yes", ["ABAP-COMMENT-002", "ABAP-COMMENT-003"],
+        "The space after \" is added only in front of a letter or digit."),
     "NEEDLESS_SPACES": ("yes", ["ABAP-COMMENT-002"],
-        "Single spaces between tokens; hand-aligned end-of-line comments are not kept."),
+        "Single spaces between tokens; the spaces in front of end-of-line comments are kept."),
     "UPPER_AND_LOWER_CASE": ("yes", ["ABAP-CASE-001", "ABAP-CASE-002"],
         "Keywords in upper case; identifiers without lower-case letters in lower case, mixed case kept."),
     "INSET": ("yes", ["ABAP-BLOCK-001", "ABAP-CLASS-001"], ""),
     "ALIGN_ABAP_DOC": ("yes", ["ABAP-DOC-001"],
         "Only the blanks after the tag and before | change; not aligned if a line would exceed the width."),
-    "ALIGN_METHODS_DECLARATION": ("own", ["ABAP-METHODS-001"],
-        "Each section keyword on its own line, parameters one level deeper, types not aligned."),
+    "ALIGN_METHODS_DECLARATION": ("yes", ["ABAP-METHODS-001"],
+        "A table that does not fit behind the method name starts on the next line."),
     "ALIGN_METHODS_FOR_TESTING": ("yes", ["ABAP-ALIGN-005"],
         "Not aligned if a line would exceed the width."),
     "ALIGN_METHODS_REDEFINITION": ("yes", ["ABAP-ALIGN-006"],
         "Not aligned if a line would exceed the width."),
     "ALIGN_ALIASES_FOR": ("yes", ["ABAP-ALIGN-007"],
         "Not aligned if a line would exceed the width."),
-    "ALIGN_DECLARATIONS": ("own", ["ABAP-DECL-001", "ABAP-ALIGN-003"],
-        "TYPE is aligned inside a broken chain, not across separate DATA statements."),
+    "ALIGN_DECLARATIONS": ("yes", ["ABAP-DECL-001", "ABAP-ALIGN-003", "ABAP-ALIGN-008"],
+        "TYPE, VALUE and READ-ONLY columns; LENGTH and DECIMALS stay part of the type."),
     "ALIGN_ASSIGNMENTS": ("yes", ["ABAP-ALIGN-004"],
         "Not across a chain; not aligned if a line would exceed the width."),
     "ALIGN_WITH_SECOND_WORD": ("own", ["ABAP-INDENT-001"],
-        "Continuation lines use a fixed indent of two levels."),
+        "Continuation lines use a fixed indent of one level."),
     "ALIGN_CLEAR_FREE_AND_SORT": ("own", ["ABAP-CHAIN-001"],
         "A chain that fits stays on one line; otherwise one item per line, aligned after the colon."),
-    "ALIGN_SELECT_CLAUSES": ("own", ["ABAP-SQL-001"],
-        "Each clause starts its own line when the statement does not fit."),
+    "ALIGN_SELECT_CLAUSES": ("own", ["ABAP-SQL-001", "ABAP-INDENT-001"],
+        "Each clause starts its own line, one level deeper, when the statement does not fit."),
     "ALIGN_SELECT_FROM": ("own", ["ABAP-SQL-001"],
         "A JOIN starts its own clause line; ON conditions are not aligned."),
     "ALIGN_SELECT_LISTS": ("own", ["ABAP-SQL-003"],
         "Lists with complex fields one field per line, AS aligned; simple lists on one line if they fit (not derived from the rest of the file)."),
     "ALIGN_PARAMETERS": ("yes", ["ABAP-CALL-001", "ABAP-CALL-002", "ABAP-ALIGN-001", "ABAP-ALIGN-002", "ABAP-VALUE-001"],
-        "With several parameter keywords, origami aligns = per keyword."),
+        "A call with several parameters stays on one line if it fits."),
     "ALIGN_LOGICAL_EXPRESSIONS": ("own", ["ABAP-COND-001"],
         "Breaks before AND and OR at a fixed indent; operands are not aligned in columns."),
     "LOGICAL_OPERATOR_POSITION": ("yes", ["ABAP-COND-001"], "AND and OR always start the line."),
@@ -154,14 +148,13 @@ MAP = {
     "DDL_ALIGN_LOGICAL_EXPRESSIONS": ("own", ["CDS-HEAD-001", "DCL-GRANT-001"],
         "A long condition breaks before and / or; operands are not aligned in columns."),
     "DDL_ALIGN_FIELD_LISTS": ("no", [], "Name lists and GROUP BY lists are not aligned."),
-    "DDL_ALIGN_DATA_SOURCES": ("own", ["CDS-HEAD-001"],
-        "Each join and association starts its own line one level deeper."),
-    "DDL_ALIGN_SELECT_LIST": ("own", ["CDS-KEY-001", "CDS-SPACE-001"],
-        "Names line up after key; aliases are not aligned."),
-    "DDL_EMPTY_LINES_BETWEEN": ("own", ["CDS-BLANK-001"],
-        "Keeps blank lines as written (at most one); does not add any."),
-    "DDL_EMPTY_LINES_WITHIN": ("own", ["CDS-BLANK-001"],
-        "Keeps blank lines as written (at most one); does not add any."),
+    "DDL_ALIGN_DATA_SOURCES": ("own", ["CDS-HEAD-001", "CDS-ALIGN-001"],
+        "Associations align as and on; joins are not aligned."),
+    "DDL_ALIGN_SELECT_LIST": ("yes", ["CDS-KEY-001", "CDS-ALIGN-001"],
+        "A case element is not padded."),
+    "DDL_EMPTY_LINES_BETWEEN": ("yes", ["CDS-BLANK-002"], ""),
+    "DDL_EMPTY_LINES_WITHIN": ("own", ["CDS-BLANK-002"],
+        "After the key elements, before the associations and around multi-line elements; not around multi-line parameters, joins or associations."),
     "DDL_POSITION_DEFINE": ("yes", ["CDS-UNIT-001"], ""),
     "DDL_POSITION_SELECT": ("yes", ["CDS-HEAD-001"], ""),
     "DDL_POSITION_JOIN": ("yes", ["CDS-HEAD-001"], ""),
@@ -353,7 +346,7 @@ def page(examples, rows, cleaner, origami, profile_count):
         <dt>ABAP Cleaner</dt>
         <dd>{cleaner}, default profile reduced to its {profile_count} layout rules with their default options (<a href="https://github.com/nimble-123/origami/tree/main/scripts/abap-cleaner-compare">how</a>). Checked on 2026-11-23 on the 1,964 ABAP and 144 CDS files of the test corpus: these rules change no code and delete no comment; the only reordering is a closing bracket moved in front of a comment or pragma.</dd>
         <dt>origami</dt>
-        <dd>{origami}, default settings.</dd>
+        <dd>{origami}, default settings (style <code>aligned</code>).</dd>
         <dt>Both</dt>
         <dd>Line width 120, keywords in upper case, indent 2.</dd>
       </dl>
@@ -362,7 +355,7 @@ def page(examples, rows, cleaner, origami, profile_count):
     <section id="examples" class="band" aria-labelledby="examples-title">
       <div class="section-head">
         <h2 id="examples-title">The same code, twice</h2>
-        <p>Each input was run through both tools as it is. The differences come from two choices: origami breaks every line that is too long and ignores the author's line breaks, and it aligns columns only inside one statement.</p>
+        <p>Each input was run through both tools as it is. Since 0.4, origami's default style follows ABAP Cleaner's layout; the differences that remain come from one choice: origami breaks every line that is too long and ignores the author's line breaks. <code>style = "compact"</code> keeps the layout of origami 0.3.</p>
       </div>
       {"".join(cmp)}
     </section>
