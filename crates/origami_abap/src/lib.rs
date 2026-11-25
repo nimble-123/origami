@@ -109,6 +109,7 @@ fn format_with(
         quarantine,
         opaque,
         explain,
+        opts.style,
     );
     drop(laid_stream);
     if !identity {

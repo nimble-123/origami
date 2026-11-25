@@ -13,7 +13,7 @@ use crate::stmt::{AlignKey, Ctx, P, Row, Stmt};
 use crate::structure::Statement;
 use origami_layout::{Doc, builder as b};
 use origami_syntax::{
-    Code, Diagnostic, MAX_NESTING, RuleSpan, TokenIndex, TokenStream, TriviaPosition, UnitId,
+    Code, Diagnostic, MAX_NESTING, RuleSpan, Style, TokenIndex, TokenStream, TriviaPosition, UnitId,
 };
 use std::collections::BTreeSet;
 
@@ -134,6 +134,7 @@ pub fn layout(
     quarantine: &BTreeSet<UnitId>,
     opaque: &BTreeSet<UnitId>,
     explain: bool,
+    style: Style,
 ) -> Laid {
     let mut commented = vec![false; stream.tokens.len() + 1];
     let mut eol_commented = vec![false; stream.tokens.len() + 1];
@@ -147,6 +148,7 @@ pub fn layout(
     }
     let mut ctx = Ctx {
         text,
+        style,
         stream,
         commented: &commented,
         eol_commented: &eol_commented,

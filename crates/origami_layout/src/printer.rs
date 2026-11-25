@@ -279,7 +279,7 @@ impl<'a> Ctx<'a> {
                         stack.push(sep);
                     }
                 }
-                Inner::AlignGroup(items, _) => {
+                Inner::AlignGroup(items, ..) => {
                     if let Some(docs) = items.iter().find_map(AlignItem::docs) {
                         stack.extend(docs.rev());
                     }
@@ -324,10 +324,17 @@ impl<'a> Ctx<'a> {
                 let (a, b) = self.raw_range(*f, *last);
                 lead || self.src[a..b].contains('\n') || trailing(*last)
             }
-            Inner::AlignGroup(items, _) => items
-                .iter()
-                .filter_map(AlignItem::docs)
-                .any(|mut docs| docs.any(|d| self.forced(d, first, end))),
+            Inner::AlignGroup(items, _, broken) => {
+                let rows = items
+                    .iter()
+                    .filter(|i| !matches!(i, AlignItem::Break))
+                    .count();
+                (*broken && rows > 1)
+                    | items
+                        .iter()
+                        .filter_map(AlignItem::docs)
+                        .any(|mut docs| docs.any(|d| self.forced(d, first, end)))
+            }
             Inner::Group(ds)
             | Inner::Indent(ds)
             | Inner::Cont(ds)
@@ -372,7 +379,7 @@ impl<'a> Ctx<'a> {
                         stack.push(sep);
                     }
                 }
-                Inner::AlignGroup(items, _) => {
+                Inner::AlignGroup(items, ..) => {
                     let rows = items.iter().filter_map(AlignItem::docs).count();
                     w += rows.saturating_sub(1);
                     for docs in items.iter().rev().filter_map(AlignItem::docs) {
@@ -851,7 +858,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                         stack.push((Mode::Flat, sep));
                     }
                 }
-                Inner::AlignGroup(items, _) if mode == Mode::Flat => {
+                Inner::AlignGroup(items, ..) if mode == Mode::Flat => {
                     let mut flat: Vec<(Mode, &Doc)> = Vec::new();
                     for (k, docs) in items.iter().filter_map(AlignItem::docs).enumerate() {
                         if k > 0 {
@@ -1011,7 +1018,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                         k += 2;
                     }
                 }
-                Inner::AlignGroup(items, _) if mode == Mode::Flat => {
+                Inner::AlignGroup(items, ..) if mode == Mode::Flat => {
                     let mut flat: Vec<Cmd> = Vec::new();
                     for (k, docs) in items.iter().filter_map(AlignItem::docs).enumerate() {
                         if k > 0 {
@@ -1029,7 +1036,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                     }
                     stack.extend(flat.into_iter().rev());
                 }
-                Inner::AlignGroup(items, fit) => self.align_group(items, *fit, indent, width),
+                Inner::AlignGroup(items, fit, _) => self.align_group(items, *fit, indent, width),
                 Inner::Unknown { first, last, blank } => {
                     self.raw(RawKind::Unknown, *first, *last, indent, *blank)
                 }
@@ -1130,32 +1137,77 @@ impl<'c, 'a> Printer<'c, 'a> {
                 .collect();
             let heads: Vec<Option<usize>> =
                 rows.iter().map(|r| self.ctx.flat_width(&r.head)).collect();
-            let anchor_glued = rows
-                .iter()
-                .any(|r| !matches!(r.tail.first().map(|d| &d.0), Some(Inner::Space)));
+            // A row without lead columns and without a tail (`OTHERS` in
+            // `EXCEPTIONS`) has no anchor and blocks alignment; with lead
+            // columns, a row may end early (a declaration without `VALUE`).
+            let open_row = |r: &crate::ir::AlignRow| r.tail.is_empty() && !r.lead.is_empty();
+            let anchor_glued = rows.iter().any(|r| {
+                !open_row(r) && !matches!(r.tail.first().map(|d| &d.0), Some(Inner::Space))
+            });
+            // Lead columns: each as wide as its widest cell among the rows
+            // with content after it.
+            let n_cols = rows.iter().map(|r| r.lead.len()).max().unwrap_or(0);
+            let after = |r: &crate::ir::AlignRow, c: usize| {
+                r.lead.iter().skip(c + 1).any(|x| !x.is_empty())
+                    || !r.head.is_empty()
+                    || !r.tail.is_empty()
+            };
+            let mut cells_flat = true;
+            let mut col_w = vec![0usize; n_cols];
+            for r in &rows {
+                for (c, cell) in r.lead.iter().enumerate() {
+                    match self.ctx.flat_width(cell) {
+                        Some(w) if after(r, c) => col_w[c] = col_w[c].max(w),
+                        Some(_) => {}
+                        None => cells_flat = false,
+                    }
+                }
+            }
+            // Width of a row's lead part when aligned, and unaligned.
+            let lead_w = |r: &crate::ir::AlignRow, aligned: bool| -> usize {
+                r.lead
+                    .iter()
+                    .enumerate()
+                    .map(|(c, cell)| {
+                        let w = self.ctx.flat_width(cell).unwrap_or(0);
+                        if aligned && after(r, c) { col_w[c] } else { w }
+                    })
+                    .sum()
+            };
             // Heads are padded to the widest head, and anchors of different
             // widths are right-aligned in a column as wide as the widest.
-            let max = heads.iter().flatten().copied().max().unwrap_or(0);
+            let max = rows
+                .iter()
+                .zip(&heads)
+                .filter(|(r, _)| !open_row(r))
+                .filter_map(|(_, h)| *h)
+                .max()
+                .unwrap_or(0);
             let max_anchor = rows.iter().map(|r| r.anchor).max().unwrap_or(0);
             let pad = |r: &crate::ir::AlignRow, h: usize| max - h + max_anchor - r.anchor;
-            let overflow = rows.iter().zip(&heads).any(|(r, h)| match (h, fit) {
-                (None, _) => true,
-                // Only rows whose tail can be flat count for overflow; a tail
-                // that breaks anyway (a nested multi-line expression) does not
-                // block alignment.
-                (Some(h), AlignFit::FirstLine) => {
-                    col + h + pad(r, *h) + self.ctx.min_first_line(&r.tail) > width
-                }
-                // A row that fits on one line must still fit; otherwise its
-                // first line must still fit if it did.
-                (Some(h), AlignFit::KeepLines) => {
-                    let line = match self.ctx.flat_width(&r.tail) {
-                        Some(t) if col + h + t <= width => t,
-                        _ => self.ctx.min_first_line(&r.tail),
-                    };
-                    col + h + line <= width && col + h + pad(r, *h) + line > width
-                }
-            });
+            let overflow = !cells_flat
+                || rows.iter().zip(&heads).any(|(r, h)| {
+                    let (la, lu) = (lead_w(r, true), lead_w(r, false));
+                    match (h, fit) {
+                        (None, _) => true,
+                        _ if open_row(r) => col + la + h.unwrap_or(0) > width,
+                        // Only rows whose tail can be flat count for overflow; a
+                        // tail that breaks anyway (a nested multi-line
+                        // expression) does not block alignment.
+                        (Some(h), AlignFit::FirstLine) => {
+                            col + la + h + pad(r, *h) + self.ctx.min_first_line(&r.tail) > width
+                        }
+                        // A row that fits on one line must still fit; otherwise
+                        // its first line must still fit if it did.
+                        (Some(h), AlignFit::KeepLines) => {
+                            let line = match self.ctx.flat_width(&r.tail) {
+                                Some(t) if col + lu + h + t <= width => t,
+                                _ => self.ctx.min_first_line(&r.tail),
+                            };
+                            col + lu + h + line <= width && col + la + h + pad(r, *h) + line > width
+                        }
+                    }
+                });
             let aligned = !anchor_glued && !overflow;
             for it in seg {
                 if self.stopped() {
@@ -1182,6 +1234,22 @@ impl<'c, 'a> Printer<'c, 'a> {
                     }
                     AlignItem::Break => continue,
                 };
+                for (c, cell) in r.lead.iter().enumerate() {
+                    self.run(
+                        cell.iter()
+                            .rev()
+                            .map(|d| Cmd {
+                                indent: col,
+                                mode: Mode::Flat,
+                                doc: d,
+                            })
+                            .collect(),
+                    );
+                    if aligned && after(r, c) {
+                        let w = self.ctx.flat_width(cell).unwrap_or(0);
+                        self.write(&" ".repeat(col_w[c] - w), col);
+                    }
+                }
                 self.run(
                     r.head
                         .iter()
@@ -1194,7 +1262,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                         .collect(),
                 );
                 let mut tail: &[Doc] = &r.tail;
-                if aligned {
+                if aligned && !r.tail.is_empty() {
                     let h = self.ctx.flat_width(&r.head).unwrap_or(0);
                     let spaces = " ".repeat(pad(r, h) + 1);
                     self.write(&spaces, col);
@@ -1274,7 +1342,7 @@ fn last_token(doc: &Doc) -> Option<TokenIndex> {
         Inner::Choice(a, _) => last_token(a),
         Inner::Shared(d) => last_token(d),
         Inner::Fill(items) => items.iter().rev().find_map(|(_, c)| last_token(c)),
-        Inner::AlignGroup(items, _) => items
+        Inner::AlignGroup(items, ..) => items
             .iter()
             .rev()
             .filter_map(AlignItem::docs)

@@ -52,8 +52,9 @@ pub(crate) enum Inner {
     Fill(Vec<(Doc, Doc)>),
     /// `first` if every line of it fits into the width, else `second`.
     Choice(Box<Doc>, Box<Doc>),
-    /// Aligned rows (design decision D7); printed one row per line.
-    AlignGroup(Vec<AlignItem>, AlignFit),
+    /// Aligned rows (design decision D7); printed one row per line. With
+    /// `true`, never printed flat (one row per line even when it would fit).
+    AlignGroup(Vec<AlignItem>, AlignFit, bool),
     /// Unknown statement: re-indent and shrink runs of spaces to one.
     Unknown {
         first: TokenIndex,
@@ -95,20 +96,37 @@ impl AlignItem {
     /// segment break.
     pub(crate) fn docs(&self) -> Option<impl DoubleEndedIterator<Item = &Doc>> {
         match self {
-            AlignItem::Row(r) => Some(r.head.iter().chain(r.tail.iter())),
-            AlignItem::Line(d) => Some(d.iter().chain([].iter())),
+            AlignItem::Row(r) => Some(
+                r.lead
+                    .iter()
+                    .flatten()
+                    .chain(r.head.iter())
+                    .chain(r.tail.iter()),
+            ),
+            AlignItem::Line(d) => Some(
+                (&[] as &[Vec<Doc>])
+                    .iter()
+                    .flatten()
+                    .chain(d.iter())
+                    .chain([].iter()),
+            ),
             AlignItem::Break => None,
         }
     }
 }
 
-/// One row: `head` is padded to the widest head of its segment, then `tail`
-/// follows. `tail` starts with the gap before the anchor token (for example
+/// One row: the `lead` cells are columns in front of the head, each padded to
+/// the widest cell of its column in the segment; a cell ends with its own
+/// separator space, and an empty cell is just padding. A cell counts for its
+/// column only if the row has content after it (a long type with nothing
+/// behind it does not push a `VALUE` column). Then `head` is padded to the
+/// widest head of its segment, and `tail` follows. `tail` starts with the gap before the anchor token (for example
 /// `=` or `TYPE`). With `anchor > 0` (the anchor's width), anchors of
 /// different widths are right-aligned in a column as wide as the widest one
 /// (` =` above `-=`), as ABAP Cleaner aligns assignment operators.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AlignRow {
+    pub lead: Vec<Vec<Doc>>,
     pub head: Vec<Doc>,
     pub tail: Vec<Doc>,
     pub anchor: usize,
