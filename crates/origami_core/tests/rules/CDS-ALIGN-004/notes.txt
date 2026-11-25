@@ -1,0 +1,4 @@
+1: CDS-HEAD-001: each clause of the header on its own line
+8: CDS-UNIT-001: each annotation and element on its own line
+12: CDS-CLAUSE-001: each query clause on its own line
+14: CDS-ALIGN-004: each name of the list on its own line

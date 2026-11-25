@@ -82,6 +82,85 @@ fn clause_doc(text: &str, stream: &TokenStream, u: &CdsUnit, blank: bool) -> Doc
     ])
 }
 
+/// The unit has no comment after its first token.
+fn no_comments(stream: &TokenStream, u: &CdsUnit) -> bool {
+    let (a, b) = (stream.tokens[u.first].start, stream.tokens[u.last].end);
+    !stream
+        .trivia
+        .iter()
+        .any(|t| t.is_comment() && t.start > a && t.end <= b)
+}
+
+/// `from..to` printed on one line with single spaces (glued tokens stay
+/// glued).
+fn flat_tokens(stream: &TokenStream, from: usize, to: usize) -> Vec<Doc> {
+    let mut docs = Vec::new();
+    for k in from..to {
+        if k > from && !stream.tokens[k].glued {
+            docs.push(b::sep(stream, TokenIndex(k as u32)));
+        }
+        docs.push(b::token(TokenIndex(k as u32)));
+    }
+    docs
+}
+
+/// CDS-ALIGN-004: `group by a, b` with two or more fields, one field per
+/// line behind `group by`. `None` for other clauses, lists with one field,
+/// or units with comments.
+fn group_by_doc(text: &str, stream: &TokenStream, u: &CdsUnit, blank: bool) -> Option<Doc> {
+    let toks = &stream.tokens;
+    let by = u.first + 1;
+    if by >= u.last
+        || !toks[u.first].text(text).eq_ignore_ascii_case("group")
+        || !toks[by].text(text).eq_ignore_ascii_case("by")
+        || toks[by].glued
+        || !no_comments(stream, u)
+    {
+        return None;
+    }
+    // Fields: split at commas on bracket depth 0.
+    let mut items: Vec<(usize, usize)> = Vec::new();
+    let (mut depth, mut a) = (0i32, by + 1);
+    for (k, t) in toks.iter().enumerate().take(u.last + 1).skip(by + 1) {
+        match t.kind {
+            LPAREN | LBRACKET => depth += 1,
+            RPAREN | RBRACKET => depth -= 1,
+            COMMA if depth == 0 => {
+                items.push((a, k));
+                a = k + 1;
+            }
+            _ => {}
+        }
+    }
+    items.push((a, u.last + 1));
+    if items.len() < 2 || items.iter().any(|&(a, e)| a >= e || toks[a].glued) {
+        return None;
+    }
+    let first = TokenIndex(u.first as u32);
+    let mut list = Vec::new();
+    for (n, &(a, e)) in items.iter().enumerate() {
+        if n > 0 {
+            list.push(b::hard(stream, TokenIndex(a as u32)));
+        }
+        list.extend(flat_tokens(stream, a, e));
+        // The comma after the field.
+        if e <= u.last {
+            list.extend(flat_tokens(stream, e, e + 1));
+        }
+    }
+    Some(b::concat(vec![
+        if blank {
+            b::token_keep_blank(first)
+        } else {
+            b::token(first)
+        },
+        b::sep(stream, TokenIndex(by as u32)),
+        b::token(TokenIndex(by as u32)),
+        b::sep(stream, TokenIndex(by as u32 + 1)),
+        b::hang(list),
+    ]))
+}
+
 /// Index after the annotation value starting at `k` (after the colon).
 fn skip_value(toks: &[origami_syntax::Token], mut k: usize) -> usize {
     if k >= toks.len() {
@@ -461,7 +540,19 @@ pub fn layout(
                             "CDS-CLAUSE-001",
                         ));
                     }
-                    clause_doc(text, stream, u, blank)
+                    match group_by_doc(text, stream, u, blank).filter(|_| view) {
+                        Some(d) => {
+                            if explain {
+                                spans.push(crate::grammar::G::span(
+                                    u.first,
+                                    u.last,
+                                    "CDS-ALIGN-004",
+                                ));
+                            }
+                            d
+                        }
+                        None => clause_doc(text, stream, u, blank),
+                    }
                 }
                 None => match alias_pads.get(&id) {
                     Some(&(at, pad)) => padded_element(stream, u, at, pad, blank),

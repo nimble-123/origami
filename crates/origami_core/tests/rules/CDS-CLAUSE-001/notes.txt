@@ -1,3 +1,4 @@
 13: CDS-CLAUSE-001: each query clause on its own line
-17: CDS-CLAUSE-001: each query clause on its own line
-20: CDS-CLAUSE-001: each query clause on its own line
+14: CDS-ALIGN-004: each name of the list on its own line
+19: CDS-CLAUSE-001: each query clause on its own line
+22: CDS-CLAUSE-001: each query clause on its own line

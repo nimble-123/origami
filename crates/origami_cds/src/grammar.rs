@@ -12,6 +12,9 @@ use std::cell::RefCell;
 /// from `as` to `on`, and from `on` to the end (CDS-ALIGN-001).
 type AssocRow = (usize, usize, usize, usize, usize);
 
+/// A name list: `(`, `)` and each name with its comma (CDS-ALIGN-004).
+type NameList = (usize, usize, Vec<(usize, usize)>);
+
 pub struct G<'a> {
     pub text: &'a str,
     pub stream: &'a TokenStream,
@@ -343,9 +346,36 @@ impl G<'_> {
                 segments.push(b::indent(vec![head, b::group(rest)]));
             }
         };
+        // CDS-ALIGN-004: the name list of a `define view`, one name per line.
+        let names = if self.aligned && !bdef {
+            self.name_list(first, last)
+        } else {
+            None
+        };
         // Inside a block written on the header's line (`{ … }`), nothing breaks.
         let mut braces = 0i32;
         while k <= last {
+            if let Some((lp, rp, items)) = &names
+                && k == *lp
+            {
+                let mut inner = Vec::new();
+                for &(a, e) in items {
+                    inner.push(b::hard(self.stream, TokenIndex(a as u32)));
+                    for j in a..e {
+                        if j > a {
+                            inner.push(self.sp(j));
+                        }
+                        inner.push(self.t(j));
+                    }
+                }
+                segment.push(b::hard(self.stream, TokenIndex(*lp as u32)));
+                segment.push(self.t(*lp));
+                segment.push(b::indent(inner));
+                segment.push(b::hard(self.stream, TokenIndex(*rp as u32)));
+                segment.push(self.t(*rp));
+                k = rp + 1;
+                continue;
+            }
             match self.kind(k) {
                 LBRACE => braces += 1,
                 RBRACE => braces -= 1,
@@ -379,6 +409,53 @@ impl G<'_> {
         flush(&mut segment, &mut segments, &mut docs);
         docs.extend(segments);
         Some(b::concat(docs))
+    }
+
+    /// CDS-ALIGN-004: `define view Name ( a, b )`: the brackets and the
+    /// names with their commas (`(start, end)` per name). `None` unless every
+    /// bracket and name can start a line (none of them glued) and no comment
+    /// stands inside.
+    fn name_list(&self, first: usize, last: usize) -> Option<NameList> {
+        if self.word(first + 1) != "view" || self.word(first + 2) == "entity" {
+            return None;
+        }
+        let lp = first + 3;
+        if lp > last || self.kind(lp) != LPAREN || self.glued(lp) {
+            return None;
+        }
+        let toks = &self.stream.tokens;
+        let mut items = Vec::new();
+        let mut a = lp + 1;
+        let mut rp = None;
+        for k in lp + 1..=last {
+            match self.kind(k) {
+                LPAREN | LBRACKET => return None,
+                COMMA => {
+                    items.push((a, k + 1));
+                    a = k + 1;
+                }
+                RPAREN => {
+                    items.push((a, k));
+                    rp = Some(k);
+                    break;
+                }
+                _ => {}
+            }
+        }
+        let rp = rp?;
+        if self.glued(rp) || items.iter().any(|&(a, e)| a >= e || self.glued(a)) {
+            return None;
+        }
+        let (from, to) = (toks[lp].start, toks[rp].end);
+        if self
+            .stream
+            .trivia
+            .iter()
+            .any(|t| t.is_comment() && t.start > from && t.end < to)
+        {
+            return None;
+        }
+        Some((lp, rp, items))
     }
 
     /// CDS-ALIGN-001: padding in front of `as` and `on` of consecutive
