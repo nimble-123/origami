@@ -33,7 +33,6 @@ repository.
 | `APPLE_CERT_P12`, `APPLE_CERT_PASSWORD`, `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` | macOS signing and notarization (all five) | macOS binaries are not signed |
 | `WINDOWS_CERT_PFX`, `WINDOWS_CERT_PASSWORD` | Windows signing (both) | Windows binaries are not signed |
 | `CARGO_REGISTRY_TOKEN` | publishing to crates.io | crates are checked with a dry run but not published |
-| `OVSX_PAT` | Open VSX, namespace `nimble-123` | not published there |
 | `HOMEBREW_TAP_TOKEN` | the Homebrew formula in `nimble-123/homebrew-tap` | formula not updated |
 
 ### RELEASE_PLEASE_TOKEN
@@ -123,14 +122,29 @@ so no Marketplace token is stored. The job runs in the GitHub environment
    reviewers. GitHub creates the environment on the first run if it does not
    exist.
 
-### Open VSX: OVSX_PAT
+### Open VSX: trusted publishing (no secret)
+
+The extension is published to Open VSX the same way: the namespace
+`nimble-123` trusts the `vscode-publish` job of `release.yml` in the
+environment `vscode-marketplace`, and the job calls
+`ovsx publish --trusted-publishing`.
 
 1. Log in at [open-vsx.org](https://open-vsx.org) with GitHub and sign the
    Eclipse Foundation publisher agreement in your profile.
-2. Create an access token at [open-vsx.org/user-settings/tokens](https://open-vsx.org/user-settings/tokens)
-   and save it as `OVSX_PAT`.
-3. Create the namespace once: `npx ovsx@1.4.0 create-namespace nimble-123 -p <token>`.
-   See [Publishing Extensions](https://github.com/eclipse/openvsx/wiki/Publishing-Extensions).
+2. Create the namespace once: `npx ovsx@1.4.0 create-namespace nimble-123 -p <token>`
+   with an access token from [open-vsx.org/user-settings/tokens](https://open-vsx.org/user-settings/tokens).
+   The token is not needed after that.
+3. At [open-vsx.org/user-settings/trusted-publishers](https://open-vsx.org/user-settings/trusted-publishers),
+   register a trusted publisher:
+
+   | Field | Value |
+   | --- | --- |
+   | Publisher | GitHub |
+   | Extension | `abap-origami` |
+   | Organization or user name | `nimble-123` |
+   | Repository name | `origami` |
+   | Workflow filename | `release.yml` |
+   | Environment name | `vscode-marketplace` |
 
 ### Homebrew tap: HOMEBREW_TAP_TOKEN
 
