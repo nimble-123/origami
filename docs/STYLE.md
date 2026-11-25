@@ -279,8 +279,9 @@ ENDCLASS.
 ### ABAP-BLANK-001: Blank lines
 Milestone: M1
 
-Blank lines between statements are kept as written, at most one in a row.
-Blank lines directly after a block opener (`METHOD`, `IF`, `LOOP`, …) and
+Blank lines between statements are kept as written, at most one in a row
+(two between classes and interfaces, ABAP-BLANK-002). Blank lines directly
+after a block opener (`METHOD`, `IF`, `LOOP`, …) and
 directly before its closer are removed. Blank lines inside a statement are
 removed. A blank line between comment lines and the statement they lead is
 kept, also directly after a block opener; only blank lines in front of the
@@ -321,10 +322,15 @@ one blank line is added where none was written:
   lines (for example a method signature table);
 * in a `METHOD`, `FORM` or `FUNCTION`, between the declarations at its start
   (`DATA`, `TYPES`, `CONSTANTS`, `STATICS`, `FIELD-SYMBOLS`) and the first
-  other statement.
+  other statement;
+* in a class implementation, between `ENDMETHOD` and the next `METHOD`.
 
-A blank line is never added directly after a block opener or before a closer,
-and never more than one in a row.
+Between two classes or interfaces (`ENDCLASS` or `ENDINTERFACE` and the next
+`CLASS` or `INTERFACE`, with any comment lines in front of it), there are
+exactly two blank lines.
+
+Apart from that, a blank line is never added directly after a block opener or
+before a closer, and never more than one in a row.
 
 ```abap
 CLASS zcl_rates DEFINITION PUBLIC.
@@ -341,11 +347,15 @@ CLASS zcl_rates DEFINITION PUBLIC.
     DATA mv_rate TYPE p.
 ENDCLASS.
 
+
 CLASS zcl_rates IMPLEMENTATION.
   METHOD reset.
     DATA lv_count TYPE i.
 
     CLEAR mv_rate.
+  ENDMETHOD.
+
+  METHOD calculate_all.
   ENDMETHOD.
 ENDCLASS.
 ```
@@ -514,27 +524,37 @@ Milestone: M1
 
 In a broken `DATA:`, `TYPES:`, `CONSTANTS:` or `CLASS-DATA:` chain, the
 `TYPE`/`LIKE` keyword of consecutive items is aligned (see the example in
-ABAP-DECL-001). A blank line or comment line ends the group; nested
-`BEGIN OF` levels align separately.
+ABAP-DECL-001), and so are `VALUE` and `READ-ONLY` as ABAP-ALIGN-008
+describes. A blank line or comment line ends the group; nested `BEGIN OF`
+levels align separately.
+
+**Compact:** only `TYPE`/`LIKE` is aligned.
 
 ### ABAP-ALIGN-008: Align `TYPE` across declaration statements
 Milestone: M5
 
 Approved by the maintainer, Nils Lutz, on 2026-11-25. Consecutive one-line
 declarations with the same keyword (`DATA`, `CLASS-DATA`, `CONSTANTS`,
-`TYPES`, `STATICS`, `FIELD-SYMBOLS`) at the same block level align their
-`TYPE`/`LIKE` keyword, as ABAP Cleaner does. Blank lines and comment lines
-between them do not end the group; another statement, a chain or a
-`BEGIN OF` structure does. If aligning would push a line past the width, the
-group uses single spaces. Only `TYPE`/`LIKE` is aligned, not `VALUE` or
-`LENGTH`.
+`TYPES`, `STATICS`, `FIELD-SYMBOLS`) at the same block level are aligned in
+columns, as ABAP Cleaner does: the `TYPE`/`LIKE` keyword, then `VALUE` and
+then `READ-ONLY`. The type part (`TYPE c LENGTH 10`, `TYPE STANDARD TABLE OF
+…`) is one column. A `VALUE` or `READ-ONLY` column is made only if at least a
+fifth of the declarations in the group have one; its position is set by the
+declarations that have it, so a long type without a value does not push it.
+Blank lines and comment lines between the declarations do not end the
+group; another statement, a chain or a `BEGIN OF` structure does. If
+aligning would push a line past the width, the group uses single spaces.
 
 ```abap
-DATA lv_count   TYPE i.
+DATA lv_count   TYPE i                VALUE 1.
 DATA lt_flights TYPE STANDARD TABLE OF sflight WITH EMPTY KEY.
 " logging
-DATA lo_logger  TYPE REF TO zcl_logger.
-CONSTANTS lc_max TYPE i VALUE 10.
+DATA lv_text    TYPE c LENGTH 10      VALUE 'abc'.
+DATA lv_rate    TYPE p DECIMALS 2.
+CONSTANTS lc_max  TYPE i      VALUE 10.
+CONSTANTS lc_name TYPE string VALUE `origami`.
+DATA mv_id    TYPE i         READ-ONLY.
+DATA mv_count TYPE i VALUE 3 READ-ONLY.
 ```
 
 **Compact:** not aligned.
