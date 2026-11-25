@@ -25,6 +25,17 @@ own (step 2). From 1.0, new and changed rules come behind `--preview` first and
 become the default only with a new style edition; see [STYLE.md](STYLE.md),
 "Stability".
 
+origami has two styles ([STYLE.md](STYLE.md), "Styles"). The default,
+`aligned`, follows ABAP Cleaner's layout: parameter keywords, declarations and
+method signatures aligned in columns, continuation lines indented by one
+level, and blank lines between sections. `compact` is the layout of origami
+0.3; a team that already formatted with 0.3 and wants to keep that layout
+sets it once:
+
+```toml
+style = "compact"
+```
+
 ## 2. Format everything once, in its own commit
 
 Look first: `origami --review` shows every change origami would make, with a
