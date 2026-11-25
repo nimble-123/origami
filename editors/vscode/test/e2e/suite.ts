@@ -80,7 +80,7 @@ const tests: Test[] = [
     "formats an ABAP file",
     async () => {
       const doc = await openAndFormat("z_e2e.prog.abap", "data lv_a type i.\nlv_a   =   1.\n");
-      assert.equal(doc.getText(), "DATA lv_a TYPE i.\nlv_a = 1.\n");
+      assert.equal(doc.getText(), "DATA lv_a TYPE i.\n\nlv_a = 1.\n");
     },
   ],
   [
@@ -153,10 +153,10 @@ const tests: Test[] = [
       const left = await vscode.workspace.openTextDocument(diff.original);
       const right = await vscode.workspace.openTextDocument(diff.modified);
       assert.equal(left.getText(), "data lv_a type i.\nlv_a   =   1.\n");
-      assert.equal(right.getText(), "DATA lv_a TYPE i.\nlv_a = 1.\n");
+      assert.equal(right.getText(), "DATA lv_a TYPE i.\n\nlv_a = 1.\n");
       assert.equal(doc.getText(), "data lv_a type i.\nlv_a   =   1.\n", "preview changed the document");
       assert.equal(await vscode.commands.executeCommand<string>("origami.applyPreview"), "applied");
-      assert.equal(doc.getText(), "DATA lv_a TYPE i.\nlv_a = 1.\n");
+      assert.equal(doc.getText(), "DATA lv_a TYPE i.\n\nlv_a = 1.\n");
       assert.ok(doc.isDirty, "document should stay unsaved");
       await waitFor(() => (previewTabs() === 0 ? true : undefined));
     },
