@@ -250,13 +250,16 @@ pub fn units(text: &str, stream: &TokenStream, lang: Language) -> Vec<CdsUnit> {
                             // right after the previous token, stays part of
                             // this unit. (Both conditions survive formatting,
                             // so a second run makes the same choice.) A
-                            // comment in it ends the line, so such a block is
-                            // split (fuzz/found/cds-bdef-comment-block.bin).
+                            // comment in it, or in front of it in this unit,
+                            // ends a line and can make the unit's layout break
+                            // the block, so such a block is split
+                            // (fuzz/found/cds-bdef-comment-block.bin,
+                            // cds-comment-before-block.bin).
                             match close_of[j] {
                                 Some(close)
                                     if line_of(j - 1) == line_of(j)
                                         && line_of(j) == line_of(close)
-                                        && !eol_comment[j - 1..close].contains(&true) =>
+                                        && !eol_comment[i..close].contains(&true) =>
                                 {
                                     // The block ends the unit
                                     // (`use association _x { with draft; }`).
