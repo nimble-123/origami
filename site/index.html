@@ -138,11 +138,12 @@
             <span id="pg-out-label">Formatted</span>
             <button id="pg-copy" class="copy text" type="button" data-copy="#pg-output-text" aria-label="Copy formatted code" disabled>Copy</button>
           </div>
-          <div id="pg-output" class="sheet code output" tabindex="0" aria-labelledby="pg-out-label" aria-describedby="pg-status"></div>
+          <div id="pg-output" class="sheet code output" role="region" tabindex="0" aria-labelledby="pg-out-label" aria-describedby="pg-status"></div>
           <pre id="pg-output-text" hidden></pre>
         </div>
       </div>
-      <p id="pg-status" class="status" role="status" aria-live="polite">Loading origami…</p>
+      <p id="pg-status" class="status">Loading origami…</p>
+      <p id="announce" class="sr-only" role="status" aria-live="polite"></p>
     </section>
 
     <section id="safety" class="band" aria-labelledby="safety-title">

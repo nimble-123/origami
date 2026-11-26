@@ -205,6 +205,7 @@ p, li, dd { text-wrap: pretty; }
 .copy.done .icon-copy { opacity: 0; scale: 0.25; filter: blur(4px); }
 .copy.done .icon-done { opacity: 1; scale: 1; filter: blur(0); }
 .copy.text.done { color: var(--valley); }
+.copy.failed { color: var(--mountain); }
 
 .hero-links { margin: 1rem 0 0; font-weight: 500; }
 

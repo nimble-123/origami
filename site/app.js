@@ -126,19 +126,45 @@ function hero() {
 
 // ---- copy buttons ---------------------------------------------------------
 
+// A visually hidden live region: the page says what changed, but only for
+// state changes the visitor asked for (a copy, an error, a finished run).
+const announcer = document.getElementById("announce");
+let announceTimer = 0;
+function announce(message, delay = 0) {
+  clearTimeout(announceTimer);
+  // Emptied first, so the same message twice is announced twice.
+  if (announcer) announcer.textContent = "";
+  announceTimer = setTimeout(() => {
+    if (announcer) announcer.textContent = message;
+  }, delay);
+}
+
 for (const b of document.querySelectorAll("[data-copy]")) {
+  const label = b.getAttribute("aria-label");
+  let reset = 0;
   b.addEventListener("click", async () => {
     const src = document.querySelector(b.dataset.copy);
+    const isText = b.classList.contains("text");
+    let ok = true;
     try {
       await navigator.clipboard.writeText(src.textContent);
     } catch {
-      return;
+      ok = false;
     }
-    b.classList.add("done");
-    if (b.classList.contains("text")) b.textContent = "Copied";
-    setTimeout(() => {
-      b.classList.remove("done");
-      if (b.classList.contains("text")) b.textContent = "Copy";
+    clearTimeout(reset);
+    b.classList.toggle("done", ok);
+    b.classList.toggle("failed", !ok);
+    if (isText) {
+      b.textContent = ok ? "Copied" : "Copy failed";
+      b.setAttribute("aria-label", ok ? "Copied" : "Copy failed");
+    }
+    announce(ok ? "Copied to the clipboard." : "Copying failed. Select the text and copy it by hand.");
+    reset = setTimeout(() => {
+      b.classList.remove("done", "failed");
+      if (isText) {
+        b.textContent = "Copy";
+        b.setAttribute("aria-label", label);
+      }
     }, 1600);
   });
 }
@@ -197,6 +223,9 @@ const copyButton = $("pg-copy");
 // origami runs in a Web Worker (worker.js). A run that takes longer than
 // RUN_TIMEOUT_MS terminates the worker and starts a new one.
 const RUN_TIMEOUT_MS = 5000;
+// A finished run is announced to screen readers only after this pause, so
+// typing is not interrupted by a message per keystroke.
+const ANNOUNCE_PAUSE_MS = 1500;
 const LOAD_ERROR = "The playground could not load origami.wasm. Install origami to try it locally.";
 
 let worker = null;
@@ -244,6 +273,7 @@ function render(r, opts) {
     status.textContent = d
       ? `${d.code} at line ${d.line}, column ${d.column}: ${d.message}`
       : "origami could not format this code.";
+    announce(status.textContent);
     return;
   }
   status.classList.remove("error");
@@ -261,6 +291,7 @@ function render(r, opts) {
     output.classList.add("plain");
     output.textContent = r.output;
     status.innerHTML = `${parts.join(", ")}. ${tail} Shown as plain text because the output is large.`;
+    announce(status.textContent, ANNOUNCE_PAUSE_MS);
     return;
   }
   const lines = r.output.replace(/\n$/, "").split("\n");
@@ -294,6 +325,7 @@ function render(r, opts) {
   });
   output.append(frag);
   status.innerHTML = `${parts.join(", ")}. ${tail}`;
+  announce(status.textContent, ANNOUNCE_PAUSE_MS);
 }
 
 // Inputs and outputs larger than this are shown without colors, so typing
@@ -328,6 +360,7 @@ function options() {
 let timer = 0;
 function schedule() {
   clearTimeout(timer);
+  clearTimeout(announceTimer);
   timer = setTimeout(run, 120);
 }
 
@@ -335,6 +368,7 @@ function showError(message) {
   clearOutput("Nothing to show: origami did not format this code.");
   status.classList.add("error");
   status.textContent = message;
+  announce(message);
 }
 
 function startWorker() {
