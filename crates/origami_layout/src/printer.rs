@@ -278,6 +278,7 @@ impl<'a> Ctx<'a> {
                 Inner::SoftLine | Inner::SoftBreak | Inner::HardLine => return w,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
+                | Inner::IndentBy(_, ds)
                 | Inner::Cont(ds)
                 | Inner::Hang(ds)
                 | Inner::Concat(ds) => stack.extend(ds.iter().rev()),
@@ -347,6 +348,7 @@ impl<'a> Ctx<'a> {
             }
             Inner::Group(ds)
             | Inner::Indent(ds)
+            | Inner::IndentBy(_, ds)
             | Inner::Cont(ds)
             | Inner::Hang(ds)
             | Inner::Concat(ds) => ds.iter().any(|d| self.forced(d, first, end)),
@@ -378,6 +380,7 @@ impl<'a> Ctx<'a> {
                 Inner::HardLine => return None,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
+                | Inner::IndentBy(_, ds)
                 | Inner::Cont(ds)
                 | Inner::Hang(ds)
                 | Inner::Concat(ds) => stack.extend(ds.iter().rev()),
@@ -915,6 +918,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                 Inner::HardLine => return true,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
+                | Inner::IndentBy(_, ds)
                 | Inner::Cont(ds)
                 | Inner::Hang(ds)
                 | Inner::Concat(ds) => {
@@ -997,6 +1001,13 @@ impl<'c, 'a> Printer<'c, 'a> {
                 Inner::Indent(ds) => {
                     stack.extend(ds.iter().rev().map(|d| Cmd {
                         indent: indent + step,
+                        mode,
+                        doc: d,
+                    }));
+                }
+                Inner::IndentBy(n, ds) => {
+                    stack.extend(ds.iter().rev().map(|d| Cmd {
+                        indent: indent + step * *n as usize,
                         mode,
                         doc: d,
                     }));
@@ -1420,6 +1431,7 @@ fn last_token(doc: &Doc) -> Option<TokenIndex> {
         }
         Inner::Group(ds)
         | Inner::Indent(ds)
+        | Inner::IndentBy(_, ds)
         | Inner::Cont(ds)
         | Inner::Hang(ds)
         | Inner::Concat(ds) => ds.iter().rev().find_map(last_token),

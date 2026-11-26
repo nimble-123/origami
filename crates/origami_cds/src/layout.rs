@@ -219,21 +219,30 @@ fn matching_braces(toks: &[origami_syntax::Token]) -> Vec<Option<usize>> {
     close
 }
 
-/// Nesting of every token in brackets of any kind: tokens inside one pair
-/// are at 1; a bracket is at the level of the tokens around it.
-fn nesting(toks: &[origami_syntax::Token]) -> Vec<u32> {
-    let mut depth = 0u32;
+/// Nesting of every token in brackets of any kind and in `case … end`: tokens
+/// inside one pair are at 1; a bracket, `case` or `end` is at the level of the
+/// tokens around it.
+fn nesting(text: &str, toks: &[origami_syntax::Token]) -> Vec<u32> {
+    let (mut depth, mut cases) = (0u32, 0u32);
     toks.iter()
         .map(|t| match t.kind {
             LBRACE | LPAREN | LBRACKET => {
                 depth += 1;
-                depth - 1
+                depth + cases - 1
             }
             RBRACE | RPAREN | RBRACKET => {
                 depth = depth.saturating_sub(1);
-                depth
+                depth + cases
             }
-            _ => depth,
+            IDENT if t.text(text).eq_ignore_ascii_case("case") => {
+                cases += 1;
+                depth + cases - 1
+            }
+            IDENT if t.text(text).eq_ignore_ascii_case("end") => {
+                cases = cases.saturating_sub(1);
+                depth + cases
+            }
+            _ => depth + cases,
         })
         .collect()
 }
@@ -473,7 +482,7 @@ pub fn layout(
     let mut spans = Vec::new();
     let mut diagnostics = Vec::new();
     let mut depth_limited = 0;
-    let nest = nesting(&stream.tokens);
+    let nest = nesting(text, &stream.tokens);
     for (id, u) in units.iter().enumerate() {
         let first = TokenIndex(u.first as u32);
         let last = TokenIndex(u.last as u32);

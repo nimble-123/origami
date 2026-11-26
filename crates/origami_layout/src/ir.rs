@@ -42,6 +42,9 @@ pub(crate) enum Inner {
     Group(Vec<Doc>),
     /// Adds one indent level to breaks inside it.
     Indent(Vec<Doc>),
+    /// Adds `n` indent levels to breaks inside it (one node instead of `n`
+    /// nested `Indent`s).
+    IndentBy(u32, Vec<Doc>),
     /// Adds the continuation indent (`PrintOptions::cont_levels` levels) to
     /// breaks inside it (ABAP-INDENT-001).
     Cont(Vec<Doc>),

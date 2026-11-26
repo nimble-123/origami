@@ -90,6 +90,11 @@ pub fn indent(docs: Vec<Doc>) -> Doc {
     Doc(Inner::Indent(docs))
 }
 
+/// `n` indent levels, as one node.
+pub fn indent_by(n: u32, docs: Vec<Doc>) -> Doc {
+    Doc(Inner::IndentBy(n, docs))
+}
+
 /// Continuation indent: two levels.
 /// The continuation indent of ABAP-INDENT-001.
 pub fn cont(docs: Vec<Doc>) -> Doc {

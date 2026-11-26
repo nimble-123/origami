@@ -703,7 +703,7 @@ impl G<'_> {
         if !stack.is_empty() {
             return None;
         }
-        let nest = |d: usize, doc: Doc| (0..d).fold(doc, |x, _| b::indent(vec![x]));
+        let nest = |d: usize, doc: Doc| b::indent_by(d as u32, vec![doc]);
         let mut docs = vec![self.t(first)];
         let mut spans = Vec::new();
         let mut cases: Vec<(usize, bool)> = Vec::new(); // (case index, multi-when)
