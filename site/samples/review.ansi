@@ -3,16 +3,16 @@
 [2m 2[0m [2m 2[0m [2m│[0m   METHOD check.
 [2m 3[0m [2m  [0m [2m│[0m[31m-[0m[31m    DATA(ls_rule) = zcl_flight_rules=>get( iv_carrier = is_flight-carrid[0m[31;7m [0m[31miv_date[0m[31;7m [0m[31m= sy-datum[0m[31;7m [0m[31miv_mode[0m[31;7m [0m[31m= 'A' ).[0m
 [2m 4[0m [2m  [0m [2m│[0m[31m-[0m[31m    [0m[31;7mdata[0m[31m lv_count [0m[31;7mtype[0m[31m i.[0m
-[2m 5[0m [2m  [0m [2m│[0m[31m-[0m[31m    [0m[31;7mif[0m[31m ls_rule-active = abap_true[0m[31;7m and[0m[31m lv_count = 0[0m[31;7m and[0m[31m is_flight-seatsmax > 0.[0m
+[2m 5[0m [2m  [0m [2m│[0m[31m-[0m[31m    [0m[31;7mif [0m[31mls_rule-active[0m[31;7m [0m[31m= abap_true[0m[31m [0m[31;7mand [0m[31mlv_count[0m[31;7m [0m[31m= 0[0m[31;7m and[0m[31m is_flight-seatsmax > 0.[0m
 [2m  [0m [2m 3[0m [2m│[0m[32m+[0m[32m    DATA(ls_rule) = zcl_flight_rules=>get( iv_carrier = is_flight-carrid[0m
 [2m  [0m [2m 4[0m [2m│[0m[32m+[0m[32;7m                                           [0m[32miv_date[0m[32;7m    [0m[32m= sy-datum[0m
 [2m  [0m [2m 5[0m [2m│[0m[32m+[0m[32;7m                                           [0m[32miv_mode[0m[32;7m    [0m[32m= 'A' ).[0m
       [2m│[0m   [36m↳ ABAP-CALL-001: one parameter per line[0m
 [2m  [0m [2m 6[0m [2m│[0m[32m+[0m[32m    [0m[32;7mDATA[0m[32m lv_count [0m[32;7mTYPE[0m[32m i.[0m
-[2m  [0m [2m 7[0m [2m│[0m[32m+[0m[32m    [0m[32;7mIF[0m[32m ls_rule-active = abap_true[0m
-[2m  [0m [2m 8[0m [2m│[0m[32m+[0m[32;7m      AND[0m[32m lv_count = 0[0m
-[2m  [0m [2m 9[0m [2m│[0m[32m+[0m[32;7m      AND[0m[32m is_flight-seatsmax > 0.[0m
-      [2m│[0m   [36m↳ ABAP-COND-001: condition split before AND, OR, because the condition would end at column 77 (limit 72)[0m
+[2m  [0m [2m 7[0m [2m│[0m[32m+[0m[32m    [0m[32;7mIF     [0m[32mls_rule-active[0m[32;7m     [0m[32m= abap_true[0m
+[2m  [0m [2m 8[0m [2m│[0m[32m+[0m[32;7m       AND[0m[32m [0m[32mlv_count[0m[32;7m           [0m[32m= 0[0m
+[2m  [0m [2m 9[0m [2m│[0m[32m+[0m[32;7m       AND[0m[32m is_flight-seatsmax > 0.[0m
+      [2m│[0m   [36m↳ ABAP-COND-001: condition split before AND, OR[0m
 [2m 6[0m [2m10[0m [2m│[0m       rv_ok = abap_true.
 [2m 7[0m [2m  [0m [2m│[0m[31m-[0m[31m    [0m[31;7mendif.[0m
 [2m  [0m [2m11[0m [2m│[0m[32m+[0m[32m    [0m[32;7mENDIF.[0m
