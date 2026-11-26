@@ -5172,10 +5172,12 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
     if aligned && !table.is_empty() {
         // ABAP-CALL-003: each group on its own line, even when it would fit.
         return Some(b::group(vec![
-            b::concat(head),
+            b::cont(head),
             b::cont(vec![p.hl(first_group), b::align_broken(table)]),
             p.period(),
         ]));
     }
-    Some(b::group(vec![b::concat(head), b::cont(groups), p.period()]))
+    // The header at the continuation indent too, where an end-of-line
+    // comment breaks it.
+    Some(b::group(vec![b::cont(head), b::cont(groups), p.period()]))
 }

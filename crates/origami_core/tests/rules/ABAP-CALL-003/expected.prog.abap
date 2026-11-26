@@ -27,3 +27,8 @@ CALL FUNCTION 'SCMS_STRING_TO_XSTRING'
   EXPORTING text   = lv_text
 *     MIMETYPE = ' '
   IMPORTING buffer = lv_buffer.
+IF lv_remote = abap_true.
+  CALL FUNCTION 'Z_FLIGHT_READ' " remote
+    DESTINATION lv_dest
+    EXPORTING iv_id = lv_id.
+ENDIF.

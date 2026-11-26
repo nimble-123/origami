@@ -27,3 +27,9 @@ call function 'Z_FLIGHT_TRAVEL_CREATE' exporting is_travel = ls_travel it_bookin
 *     MIMETYPE = ' '
     IMPORTING
       buffer   = lv_buffer.
+IF lv_remote = abap_true.
+  CALL FUNCTION 'Z_FLIGHT_READ' " remote
+    DESTINATION lv_dest
+    EXPORTING
+      iv_id = lv_id.
+ENDIF.
