@@ -7,7 +7,6 @@
 
 import {
   BufferGeometry,
-  CanvasTexture,
   Color,
   DirectionalLight,
   Float32BufferAttribute,
@@ -17,12 +16,15 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  MirroredRepeatWrapping,
+  NoColorSpace,
   PerspectiveCamera,
   PlaneGeometry,
-  RepeatWrapping,
-  SRGBColorSpace,
+  PointLight,
   Scene,
   ShadowMaterial,
+  SRGBColorSpace,
+  TextureLoader,
   Vector3,
   VSMShadowMap,
   WebGLRenderer,
@@ -71,7 +73,7 @@ function facetGeometry(pts) {
   const tri = (p, q, r) => {
     for (const v of [p, q, r]) {
       pos.push(...v);
-      uv.push(v[0] * 1.6, v[1] * 1.6);
+      uv.push(v[0] * 0.5, v[1] * 0.5);
     }
   };
   // Winding so that the front faces +z.
@@ -135,50 +137,21 @@ function creaseLine(f, parent) {
 
 // ---- paper -------------------------------------------------------------------
 
-/** A tileable paper texture drawn on a canvas: fine grain and a few long
- * fibres, grey around the middle, used as a bump map. */
-function paperTexture() {
-  const size = 256;
-  const c = document.createElement("canvas");
-  c.width = c.height = size;
-  const g = c.getContext("2d");
-  g.fillStyle = "rgb(128,128,128)";
-  g.fillRect(0, 0, size, size);
-  const img = g.getImageData(0, 0, size, size);
-  let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const v = 128 + (rnd() - 0.5) * 34;
-    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-  }
-  g.putImageData(img, 0, 0);
-  g.lineCap = "round";
-  for (let i = 0; i < 260; i++) {
-    const x = rnd() * size;
-    const y = rnd() * size;
-    const a = rnd() * Math.PI;
-    const len = 6 + rnd() * 26;
-    const light = rnd() > 0.5;
-    g.strokeStyle = light ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.16)";
-    g.lineWidth = 0.6 + rnd() * 0.8;
-    // Drawn three times, shifted by the tile size, so the tile is seamless.
-    for (const dx of [-size, 0, size]) {
-      for (const dy of [-size, 0, size]) {
-        g.beginPath();
-        g.moveTo(x + dx, y + dy);
-        g.quadraticCurveTo(
-          x + dx + Math.cos(a) * len * 0.5 + (rnd() - 0.5) * 4,
-          y + dy + Math.sin(a) * len * 0.5 + (rnd() - 0.5) * 4,
-          x + dx + Math.cos(a) * len,
-          y + dy + Math.sin(a) * len,
-        );
-        g.stroke();
-      }
-    }
-  }
-  const t = new CanvasTexture(c);
-  t.wrapS = t.wrapT = RepeatWrapping;
-  return t;
+/** The paper fibre (docs/assets/paper-fibre.webp, see brand.md): a bump map,
+ * and a faint grain in the color. Mirrored, so the tile has no seam. The
+ * crane is drawn without it until it has loaded. */
+function paperTexture(onLoad) {
+  const url = new URL("assets/paper-fibre.webp", document.baseURI).href;
+  return new TextureLoader().load(
+    url,
+    (t) => {
+      t.wrapS = t.wrapT = MirroredRepeatWrapping;
+      t.colorSpace = NoColorSpace;
+      onLoad(t);
+    },
+    undefined,
+    () => {},
+  );
 }
 
 // ---- motion helpers ------------------------------------------------------------
@@ -225,18 +198,28 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
   key.shadow.bias = -0.0004;
   Object.assign(key.shadow.camera, { left: -2.2, right: 2.2, top: 2.2, bottom: -2.2, near: 1, far: 12 });
   scene.add(key, key.target);
+  // Close to the crane, so light falls off across each facet, as on paper
+  // by a window.
+  const near = new PointLight(0xffffff, 5, 0, 2);
+  near.position.set(-1.7, 2.1, 2.3);
+  scene.add(near);
 
   const ground = new Mesh(new PlaneGeometry(12, 12), new ShadowMaterial({ opacity: 0.2 }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const bump = paperTexture();
-  const materials = {
-    ink: new MeshStandardMaterial({ roughness: 0.92, metalness: 0, bumpMap: bump, bumpScale: 0.35 }),
-    valley: new MeshStandardMaterial({ roughness: 0.92, metalness: 0, bumpMap: bump, bumpScale: 0.35 }),
-    crease: new MeshStandardMaterial({ roughness: 0.92, metalness: 0, bumpMap: bump, bumpScale: 0.35 }),
-  };
+  const paper = () => new MeshStandardMaterial({ roughness: 0.9, metalness: 0 });
+  const materials = { ink: paper(), valley: paper(), crease: paper() };
+  const bump = paperTexture((t) => {
+    for (const m of Object.values(materials)) {
+      m.bumpMap = t;
+      m.bumpScale = 0.6;
+      m.map = t;
+      m.needsUpdate = true;
+    }
+    wake();
+  });
   const dash = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 
   // The crane turns as one; the facets fold inside it.
@@ -300,8 +283,9 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     dash.color.copy(get("--valley"));
     ground.material.color.copy(dark.matches ? new Color(0x000000) : get("--ink"));
     ground.material.opacity = dark.matches ? 0.55 : 0.2;
-    hemi.intensity = dark.matches ? 1.25 : 1.6;
-    key.intensity = dark.matches ? 2.0 : 2.2;
+    hemi.intensity = dark.matches ? 1.0 : 1.45;
+    key.intensity = dark.matches ? 1.5 : 1.6;
+    near.intensity = dark.matches ? 5 : 6;
     wake();
   }
 

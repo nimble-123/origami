@@ -293,7 +293,7 @@ p, li, dd { text-wrap: pretty; }
   background: var(--sheet); border: 1px solid var(--crease); border-radius: 6px;
   padding: 0.25rem 0.25rem 0.25rem 1rem; max-width: 100%;
 }
-.install-line code { font-size: 0.85rem; white-space: nowrap; overflow-x: auto; min-width: 0; scrollbar-width: none; }
+.install-line code { font-size: clamp(11px, 1.6vw, 0.85rem); white-space: nowrap; overflow-x: auto; min-width: 0; scrollbar-width: none; }
 .install-line code::before { content: "$ "; color: var(--valley); }
 
 .hero-links { margin: 1rem 0 0; font-weight: 500; }
@@ -315,7 +315,7 @@ p, li, dd { text-wrap: pretty; }
 .crane-still { display: none; }
 .crane-still img { display: block; width: auto; height: 100%; margin-inline: auto; }
 @media (scripting: none) { .crane-still { display: block; height: 100%; } }
-.crane.still .crane-still { display: block; height: 82%; margin-top: 4%; }
+.crane.still .crane-still { display: block; height: 62%; margin-top: 12%; }
 
 @media (min-width: 48rem) {
   .hero {
@@ -461,6 +461,10 @@ p, li, dd { text-wrap: pretty; }
   .hero-canvas, .hero-static { font-size: 10.5px; }
   .hero-note { margin-inline: 1rem; font-size: 0.72rem; }
   .hero-static { padding-inline: 1rem; }
+}
+/* The smallest phones: 40 columns still fit beside the margin. */
+@media (max-width: 24rem) {
+  .hero-canvas, .hero-static { font-size: 9.75px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
