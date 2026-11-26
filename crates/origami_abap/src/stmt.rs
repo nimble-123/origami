@@ -9,6 +9,7 @@
 use crate::kinds::*;
 use origami_layout::{AlignItem, Doc, builder as b};
 use origami_syntax::{RuleId, RuleSpan, Style, TokenIndex, TokenStream};
+use std::collections::HashMap;
 
 pub struct Ctx<'a> {
     pub text: &'a str,
@@ -31,6 +32,20 @@ pub struct Ctx<'a> {
     /// Aligned style, ABAP-DECL-002: spaces in front of the `END OF` that
     /// starts the statement being parsed, so `END` stands under `BEGIN`.
     pub end_gap: Option<usize>,
+    /// Brackets already parsed by [`P::parens`], by opening bracket and
+    /// kind: a parser that tries two readings of the brackets around them
+    /// parses each inner bracket once, not once per attempt (which doubles
+    /// at every level).
+    pub parens: HashMap<(usize, bool), Parsed>,
+}
+
+/// A bracket parsed by [`P::parens`]: its closing bracket, its doc, and the
+/// keywords and spans it recorded.
+pub struct Parsed {
+    rp: usize,
+    doc: Doc,
+    keywords: Vec<usize>,
+    spans: Vec<RuleSpan>,
 }
 
 /// State of a [`Ctx`] before a parse attempt, to roll back a failed one.
@@ -782,7 +797,27 @@ impl<'c, 'a> P<'c, 'a> {
         if rp == lp + 1 {
             return Some(self.flat(lp, rp));
         }
+        let key = (lp, constructor);
+        if let Some(m) = self.c.parens.get(&key).filter(|m| m.rp == rp) {
+            let doc = m.doc.clone();
+            self.c.keywords.extend_from_slice(&m.keywords);
+            self.c.rule_spans.extend_from_slice(&m.spans);
+            return Some(doc);
+        }
         let saved_kw = self.c.mark();
+        let doc = self.parse_parens(lp, rp, constructor, saved_kw);
+        let parsed = Parsed {
+            rp,
+            doc: doc.clone(),
+            keywords: self.c.keywords[saved_kw.keywords..].to_vec(),
+            spans: self.c.rule_spans[saved_kw.spans..].to_vec(),
+        };
+        self.c.parens.insert(key, parsed);
+        Some(doc)
+    }
+
+    /// [`Self::parens`] for `lp..=rp`, not yet parsed.
+    fn parse_parens(&mut self, lp: usize, rp: usize, constructor: bool, saved_kw: Mark) -> Doc {
         let mut inner = P {
             c: &mut *self.c,
             pos: lp + 1,
@@ -798,11 +833,11 @@ impl<'c, 'a> P<'c, 'a> {
             inner.call_args(lp, rp, true)
         };
         match parsed {
-            Some(d) => Some(d),
+            Some(d) => d,
             None => {
                 self.c.reset(saved_kw);
                 self.mark_raw_args(lp, rp);
-                Some(self.raw(lp, rp))
+                self.raw(lp, rp)
             }
         }
     }
@@ -2119,6 +2154,7 @@ mod tests {
             rule_spans: Vec::new(),
             multi_line: false,
             end_gap: None,
+            parens: Default::default(),
         };
         c.span(0, 3, "ABAP-STMT-001");
         let m = c.mark();

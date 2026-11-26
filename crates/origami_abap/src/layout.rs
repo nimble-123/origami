@@ -176,6 +176,7 @@ pub fn layout(
         rule_spans: Vec::new(),
         multi_line: false,
         end_gap: None,
+        parens: Default::default(),
     };
     // Aligned style, ABAP-DECL-002: for each structure opened by one
     // declaration and closed by a later one, the width in front of its
