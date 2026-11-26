@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.4](https://github.com/nimble-123/origami/compare/v0.4.3...v0.4.4) (2026-11-26)
+
+
+### Fixes
+
+* **cds:** keep a one-line block comment in front of a token in a unit left as written ([#123](https://github.com/nimble-123/origami/issues/123)) ([a9e36a0](https://github.com/nimble-123/origami/commit/a9e36a0f4d404c997e9cbdf7cfd8754289a3d2f5))
+
+
+### Formatting output
+
+* **abap:** align method signatures, COND and logical expressions with ABAP Cleaner (ABAP-METHODS-001, ABAP-COND-001, ABAP-COND-002) ([#122](https://github.com/nimble-123/origami/issues/122)) ([e5dbfdf](https://github.com/nimble-123/origami/commit/e5dbfdf9962014f98375fd54e9de75aeda94d026))
+
 ## [0.4.3](https://github.com/nimble-123/origami/compare/v0.4.2...v0.4.3) (2026-11-26)
 
 
