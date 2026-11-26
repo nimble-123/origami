@@ -63,7 +63,7 @@
   --t-lead: 1.1875rem;
   --t-h3: 1.25rem;
   --t-h2s: 2rem;
-  --t-h2: clamp(2rem, 4.4vw, 3.25rem);
+  --t-h2: clamp(1.875rem, 3.8vw, 2.75rem);
   --t-h1: clamp(2.75rem, 7vw, 4.75rem);
 
   /* Space: a 4px grid. */
@@ -496,7 +496,7 @@ textarea.code-area:focus-visible { outline-offset: -2px; border-radius: 0; }
 .output .note-mark { color: var(--cyan); }
 .output.plain { padding-inline: 20px; white-space: pre; }
 .output .empty { padding: 0 20px; color: var(--text-2); font: 400 var(--t-s) var(--sans); }
-.status { margin: 0; min-height: 40px; display: flex; align-items: center; padding: 0 20px; border-top: 1px solid var(--line); background: rgba(26, 27, 38, 0.6); font-size: var(--t-xs); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.status { margin: 0; min-height: 40px; padding: 11px 20px; line-height: 18px; border-top: 1px solid var(--line); background: rgba(26, 27, 38, 0.6); font-size: var(--t-xs); color: var(--text-2); font-variant-numeric: tabular-nums; }
 .status.error { color: var(--red); }
 @media (max-width: 56rem) { .code-area { height: clamp(20rem, 56vh, 28rem); font-size: 12px; } }
 
@@ -530,7 +530,7 @@ textarea.code-area:focus-visible { outline-offset: -2px; border-radius: 0; }
 
 /* ---- install ---------------------------------------------------------------------- */
 
-.install-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.install-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 56rem) { .install-grid { grid-template-columns: minmax(0, 1fr); } }
 .inst { padding: 8px 24px 24px; border-radius: 20px; background: var(--tile); box-shadow: inset 0 0 0 1px rgba(192, 202, 245, 0.12), var(--highlight); min-width: 0; }
 .inst-tabs { display: flex; overflow-x: auto; scrollbar-width: none; margin: 0 -12px 18px; border-bottom: 1px solid var(--line); }
@@ -554,7 +554,7 @@ main > .closing { width: 100%; }
 .spot { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: radial-gradient(ellipse 80% 70% at 70% 40%, rgba(8, 9, 14, 0), var(--bg) 75%), var(--bg-deep); }
 .beam { position: absolute; right: 8%; top: -200px; width: 900px; height: 1000px; background: conic-gradient(from 168deg at 62% 0%, transparent 0deg, rgba(192, 202, 245, 0.18) 14deg, rgba(122, 162, 247, 0.28) 24deg, rgba(192, 202, 245, 0.14) 34deg, transparent 48deg); filter: blur(26px); }
 .floor { position: absolute; right: 6%; top: 62%; width: 760px; height: 190px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(122, 162, 247, 0.45), rgba(122, 162, 247, 0.1) 45%, transparent 70%); }
-.horizon { position: absolute; left: 0; right: 0; top: 68%; height: 1px; background: linear-gradient(90deg, transparent, rgba(192, 202, 245, 0.22) 40%, rgba(192, 202, 245, 0.22) 80%, transparent); }
+.horizon { position: absolute; left: 50%; right: 0; top: 68%; height: 1px; background: linear-gradient(90deg, transparent, rgba(192, 202, 245, 0.22) 40%, rgba(192, 202, 245, 0.22) 80%, transparent); }
 .closing-copy { grid-column: 1; grid-row: 1; padding: var(--s-9) var(--gutter) var(--s-9) max(var(--gutter), calc((100vw - var(--page)) / 2)); display: flex; flex-direction: column; gap: 22px; align-items: flex-start; }
 .closing-copy h2 { font-size: var(--t-h2); line-height: 1.02; letter-spacing: -0.045em; max-width: 11ch; }
 .closing-copy p { margin: 0; font-size: var(--t-lead); color: var(--text-2); max-width: 28rem; }
@@ -615,6 +615,10 @@ main > .closing { width: 100%; }
   h2.two { margin-bottom: var(--s-6); }
   .tile { padding: 20px; }
   .pipe-no { padding-left: 0; }
+  .tile-term, .tile-check { padding: 10px; }
+  .tile-check .tamper { padding: 6px 8px 8px; }
+  .pg-bar { flex-wrap: wrap; padding-block: 10px; }
+  .pg-controls { flex-wrap: wrap; overflow: visible; padding-block: 0; }
 }
 @media (max-width: 40rem) {
   .code, .check-out, .check-in, .term-body { font-size: 11.5px; }

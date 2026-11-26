@@ -179,6 +179,10 @@ export function hero() {
   const activate = () => {
     margin.setAttribute("aria-disabled", "false");
     $("hero-hint").hidden = false;
+    // On a narrow screen the margin starts where the pane ends, so it can be
+    // seen and dragged; the class folds again at that width.
+    const fit = Math.floor((scroll.clientWidth - 14 - 22) / chOf() - 4.2);
+    if (fit < st.w) setWidth(Math.max(MIN, fit));
     format();
   };
   if (formatter.ready) activate();

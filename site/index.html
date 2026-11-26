@@ -263,7 +263,7 @@ line_width = <span class="num" id="toml-width">72</span></pre>
           <div class="pg-pane" id="pg-pane-in">
             <div class="pane-label">
               <label for="pg-input">Your code</label>
-              <button id="pg-open" class="link-btn" type="button">Open file</button>
+              <button id="pg-open" class="copy link-btn" type="button">Open file</button>
               <input id="pg-file" type="file" accept=".abap,.asddls,.asddlxs,.asdcls,.asbdef,.srvdsrv,.acds,.txt" hidden>
             </div>
             <div class="editor" id="pg-editor">
@@ -396,10 +396,14 @@ repos:
         </div>
         <div class="usage tile">
           <h3>Then, in a repository</h3>
-          <pre class="usage-code">origami                  <span class="com"># format all ABAP and CDS files below .</span>
-origami --review         <span class="com"># show what would change, and why lines break</span>
-origami --check          <span class="com"># CI: exit 1 if anything would change</span>
-origami --changed main   <span class="com"># only lines changed against main (+ new files)</span></pre>
+          <pre class="usage-code"><span class="com"># format all ABAP and CDS files below .</span>
+origami
+<span class="com"># show what would change, and why lines break</span>
+origami --review
+<span class="com"># CI: exit 1 if anything would change</span>
+origami --check
+<span class="com"># only lines changed against main (+ new files)</span>
+origami --changed main</pre>
         </div>
       </div>
     </section>
