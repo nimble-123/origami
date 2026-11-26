@@ -280,6 +280,7 @@ impl<'a> Ctx<'a> {
                 | Inner::Indent(ds)
                 | Inner::IndentBy(_, ds)
                 | Inner::LeadIndent(ds)
+                | Inner::IndentCols(_, ds)
                 | Inner::Cont(ds)
                 | Inner::Hang(ds)
                 | Inner::Concat(ds) => stack.extend(ds.iter().rev()),
@@ -351,6 +352,7 @@ impl<'a> Ctx<'a> {
             | Inner::Indent(ds)
             | Inner::IndentBy(_, ds)
             | Inner::LeadIndent(ds)
+            | Inner::IndentCols(_, ds)
             | Inner::Cont(ds)
             | Inner::Hang(ds)
             | Inner::Concat(ds) => ds.iter().any(|d| self.forced(d, first, end)),
@@ -384,6 +386,7 @@ impl<'a> Ctx<'a> {
                 | Inner::Indent(ds)
                 | Inner::IndentBy(_, ds)
                 | Inner::LeadIndent(ds)
+                | Inner::IndentCols(_, ds)
                 | Inner::Cont(ds)
                 | Inner::Hang(ds)
                 | Inner::Concat(ds) => stack.extend(ds.iter().rev()),
@@ -959,6 +962,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                 | Inner::Indent(ds)
                 | Inner::IndentBy(_, ds)
                 | Inner::LeadIndent(ds)
+                | Inner::IndentCols(_, ds)
                 | Inner::Cont(ds)
                 | Inner::Hang(ds)
                 | Inner::Concat(ds) => {
@@ -1048,6 +1052,13 @@ impl<'c, 'a> Printer<'c, 'a> {
                 Inner::IndentBy(n, ds) => {
                     stack.extend(ds.iter().rev().map(|d| Cmd {
                         indent: indent + step * *n as usize,
+                        mode,
+                        doc: d,
+                    }));
+                }
+                Inner::IndentCols(n, ds) => {
+                    stack.extend(ds.iter().rev().map(|d| Cmd {
+                        indent: indent + *n as usize,
                         mode,
                         doc: d,
                     }));
@@ -1482,6 +1493,7 @@ fn last_token(doc: &Doc) -> Option<TokenIndex> {
         | Inner::Indent(ds)
         | Inner::IndentBy(_, ds)
         | Inner::LeadIndent(ds)
+        | Inner::IndentCols(_, ds)
         | Inner::Cont(ds)
         | Inner::Hang(ds)
         | Inner::Concat(ds) => ds.iter().rev().find_map(last_token),

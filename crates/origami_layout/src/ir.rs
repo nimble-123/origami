@@ -49,6 +49,8 @@ pub(crate) enum Inner {
     /// level deeper than that token (a closing bracket: its comments belong
     /// to the content it closes). Otherwise as `Concat`.
     LeadIndent(Vec<Doc>),
+    /// Adds `n` columns (not indent levels) to breaks inside it.
+    IndentCols(u32, Vec<Doc>),
     /// Adds the continuation indent (`PrintOptions::cont_levels` levels) to
     /// breaks inside it (ABAP-INDENT-001).
     Cont(Vec<Doc>),

@@ -1393,8 +1393,8 @@ define behavior for ZI_Travel alias Travel
 Milestone: M2
 
 In a block that contains `key` elements, the other elements and their
-annotations are indented two more levels, so that element names line up with
-the names after `key `.
+annotations are indented by the width of `key ` (four columns, whatever the
+indent width), so that element names line up with the names after `key `.
 
 ```cds
 {

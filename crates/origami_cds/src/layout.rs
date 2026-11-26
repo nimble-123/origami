@@ -16,6 +16,9 @@ use origami_syntax::{
 };
 use std::collections::BTreeSet;
 
+/// Columns of `key ` (CDS-KEY-001).
+const KEY_COLS: u32 = 4;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Kind {
     Annotation,
@@ -30,8 +33,8 @@ pub struct CdsUnit {
     pub last: usize,
     kind: Kind,
     depth: u32,
-    /// Extra indent (in indent steps) for non-key elements in a block with
-    /// key elements.
+    /// Extra indent (in columns, whatever the indent width) for non-key
+    /// elements in a block with key elements: the width of `key `.
     extra: u32,
 }
 
@@ -438,10 +441,10 @@ fn mark_key_blocks(text: &str, stream: &TokenStream, units: &mut [CdsUnit]) {
                     Kind::Element => {
                         next_is_key = is_key(&units[m]);
                         if !next_is_key {
-                            units[m].extra = 2;
+                            units[m].extra = KEY_COLS;
                         }
                     }
-                    Kind::Annotation if !next_is_key => units[m].extra = 2,
+                    Kind::Annotation if !next_is_key => units[m].extra = KEY_COLS,
                     _ => {}
                 }
             }
@@ -474,7 +477,7 @@ pub fn layout(
     let aligned = opts.style == origami_syntax::Style::Aligned;
     let view = aligned && lang == Language::Ddls && is_view(text, stream, units);
     let alias_pads = if view {
-        alias_pads(text, stream, units, opts.indent_width)
+        alias_pads(text, stream, units)
     } else {
         Default::default()
     };
@@ -596,10 +599,10 @@ pub fn layout(
         } else {
             b::hard(stream, first)
         };
-        let level = if too_deep {
-            (u.depth + u.extra).min(MAX_NESTING)
+        let (level, extra) = if too_deep {
+            (u.depth.min(MAX_NESTING), 0)
         } else {
-            u.depth + u.extra
+            (u.depth, u.extra)
         };
         // Comment lines before a closing brace belong to the block's content.
         let body = if u.kind == Kind::Close {
@@ -607,7 +610,10 @@ pub fn layout(
         } else {
             body
         };
-        docs.push((0..level).fold(b::concat(vec![start, body]), |d, _| b::indent(vec![d])));
+        docs.push(b::indent_by(
+            level,
+            vec![b::indent_cols(extra, vec![start, body])],
+        ));
     }
     let forced_blanks = if view {
         view_blanks(text, stream, units)
@@ -695,7 +701,6 @@ fn alias_pads(
     text: &str,
     stream: &TokenStream,
     units: &[CdsUnit],
-    indent_width: u8,
 ) -> std::collections::HashMap<usize, (usize, usize)> {
     let mut out = std::collections::HashMap::new();
     let Some(open) = units
@@ -728,7 +733,7 @@ fn alias_pads(
         {
             continue;
         }
-        let offset = u.extra as usize * indent_width as usize;
+        let offset = u.extra as usize;
         let mut last = u.last;
         if stream.tokens[last].kind == COMMA {
             last -= 1;
