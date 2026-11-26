@@ -68,8 +68,8 @@ fn run_at(
         return done(first, empty.clone(), empty.clone(), false);
     }
     let output = apply_fault(first.output.clone(), opts, 0);
-    let (mismatch_units, length_units) = problems(src, lang, &first, &output);
-    if mismatch_units.is_empty() && length_units.is_empty() {
+    let found = problems(src, lang, &first, &output);
+    if found.is_empty() {
         return done(
             LangResult { output, ..first },
             empty.clone(),
@@ -79,26 +79,30 @@ fn run_at(
     }
 
     // Quarantine.
-    let quarantine: BTreeSet<UnitId> = mismatch_units.union(&length_units).copied().collect();
+    let mismatch_units = &found.bad;
+    let quarantine: BTreeSet<UnitId> = mismatch_units.union(&found.long).copied().collect();
     let mut second = format(src, lang, opts, &quarantine, &empty, identity, explain);
     let mut output = apply_fault(second.output.clone(), opts, 1);
     let mut opaque = BTreeSet::new();
-    let (still_bad, still_long) = problems(src, lang, &second, &output);
-    if still_bad.is_empty() && !still_long.is_empty() {
-        let third = format(src, lang, opts, &quarantine, &still_long, identity, explain);
+    let still = problems(src, lang, &second, &output);
+    if still.bad.is_empty() && !still.long.is_empty() {
+        let third = format(src, lang, opts, &quarantine, &still.long, identity, explain);
         output = apply_fault(third.output.clone(), opts, 2);
         second = third;
-        opaque = still_long;
+        opaque = still.long;
     }
-    let (final_bad, final_long) = problems(src, lang, &second, &output);
+    let mut last = problems(src, lang, &second, &output);
     // Last resort for the 255 rule: the joins between opaque units can still
-    // lengthen a line. Then the whole file stays as written (INVARIANTS 1.5).
-    let whole_file_fallback = final_bad.is_empty() && !final_long.is_empty();
+    // lengthen a line, and a line no unit owns cannot be quarantined. Then
+    // the whole file stays as written (INVARIANTS 1.5), checked like any
+    // other output.
+    let whole_file_fallback = last.bad.is_empty() && (!last.long.is_empty() || last.unowned_long);
     if whole_file_fallback {
         output = src.text().to_string();
+        last = problems(src, lang, &second, &output);
     }
     let mut result = LangResult { output, ..second };
-    if !final_bad.is_empty() {
+    if !last.is_empty() {
         result.diagnostics.push(Diagnostic::new(
             Code::X001,
             "Self-check failed after quarantine; no output written",
@@ -106,15 +110,22 @@ fn run_at(
         ));
         return done(result, quarantine, opaque, whole_file_fallback);
     }
-    for u in &mismatch_units {
+    for u in mismatch_units {
         result.diagnostics.push(unit_diagnostic(&result, *u, Code::W001, "Unit left as written: the self-check found a layout change that would alter tokens or comments"));
     }
-    for u in length_units.difference(&mismatch_units) {
+    for u in found.long.difference(mismatch_units) {
         result.diagnostics.push(unit_diagnostic(
             &result,
             *u,
             Code::W002,
             "Unit left as written: formatting would exceed 255 characters per line",
+        ));
+    }
+    if found.unowned_long && found.long.is_empty() {
+        result.diagnostics.push(Diagnostic::new(
+            Code::W002,
+            "File left as written: formatting would exceed 255 characters per line",
+            0..0,
         ));
     }
     result.stats.quarantined = quarantine.len() as u32;
@@ -129,11 +140,9 @@ fn run_at(
         );
         let failed = again.result.has_error();
         let settled = again.result.output;
-        if !failed && settled != result.output {
-            let (bad, long) = problems(src, lang, &result, &settled);
-            if bad.is_empty() && long.is_empty() {
-                result.output = settled;
-            }
+        if !failed && settled != result.output && problems(src, lang, &result, &settled).is_empty()
+        {
+            result.output = settled;
         }
     }
     done(result, quarantine, opaque, whole_file_fallback)
@@ -194,20 +203,37 @@ pub(crate) fn relex(lang: Language, text: &str) -> Result<TokenStream, Diagnosti
     }
 }
 
+/// What the self-check found in one output.
+#[derive(Debug, Default)]
+struct Problems {
+    /// Units with token mismatches.
+    bad: BTreeSet<UnitId>,
+    /// (ABAP) Units with new overlong lines.
+    long: BTreeSet<UnitId>,
+    /// (ABAP) A new overlong line that no unit owns (a file without units).
+    unowned_long: bool,
+}
+
+impl Problems {
+    fn is_empty(&self) -> bool {
+        self.bad.is_empty() && self.long.is_empty() && !self.unowned_long
+    }
+}
+
 /// Units with token mismatches, and (ABAP) units with new overlong lines.
-fn problems(
-    src: &SourceText,
-    lang: Language,
-    r: &LangResult,
-    output: &str,
-) -> (BTreeSet<UnitId>, BTreeSet<UnitId>) {
+fn problems(src: &SourceText, lang: Language, r: &LangResult, output: &str) -> Problems {
     let mut bad = BTreeSet::new();
     let mut long = BTreeSet::new();
+    let mut unowned_long = false;
     let out_stream = match relex(lang, output) {
         Ok(s) => s,
         Err(_) => {
             bad.extend(r.units.iter().map(|u| u.id));
-            return (bad, long);
+            return Problems {
+                bad,
+                long,
+                unowned_long,
+            };
         }
     };
     if let Err(ms) = equivalent(&r.input_tokens, src.text(), &out_stream, output) {
@@ -241,6 +267,14 @@ fn problems(
                 long
             }
         };
+        let comments = |s: &TokenStream| -> Vec<(u32, TokenIndex)> {
+            s.trivia
+                .iter()
+                .filter(|t| t.is_comment())
+                .map(|t| (t.start, t.anchor))
+                .collect()
+        };
+        let (in_comments, out_comments) = (comments(&r.input_tokens), comments(&out_stream));
         for line in 0..out_index.line_count() {
             let range = out_index.line_range(line);
             if output[range.clone()].chars().count() <= ABAP_MAX_LINE {
@@ -258,13 +292,39 @@ fn problems(
                 if long_in(in_index.line_of(input_tok.start)) {
                     continue;
                 }
-                if let Some(u) = r.unit_of(TokenIndex(k as u32)) {
-                    long.insert(u);
+                match r.unit_of(TokenIndex(k as u32)) {
+                    Some(u) => {
+                        long.insert(u);
+                    }
+                    None => unowned_long = true,
+                }
+            }
+            // A line can hold comments only (an own-line comment). Comments
+            // are equivalent too, so output comment j is input comment j; it
+            // belongs to the unit of its anchor.
+            let from = out_comments.partition_point(|&(start, _)| (start as usize) < range.start);
+            for (j, &(start, _)) in out_comments.iter().enumerate().skip(from) {
+                if (start as usize) >= range.end {
+                    break;
+                }
+                let (input_start, anchor) = in_comments[j];
+                if long_in(in_index.line_of(input_start)) {
+                    continue;
+                }
+                match r.unit_of(anchor) {
+                    Some(u) => {
+                        long.insert(u);
+                    }
+                    None => unowned_long = true,
                 }
             }
         }
     }
-    (bad, long)
+    Problems {
+        bad,
+        long,
+        unowned_long,
+    }
 }
 
 fn unit_diagnostic(r: &LangResult, unit: UnitId, code: Code, msg: &str) -> Diagnostic {

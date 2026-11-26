@@ -20,18 +20,21 @@ equal when all of these hold:
 | 1.2 | Same `glued` flag on every token: two tokens that touch in the input touch in the output, and two tokens separated by whitespace stay separated. One exception (ABAP-SPACE-001): an ABAP statement's closing period and a comma outside brackets, which the ABAP crate marks `may_glue`, may become glued to the token before them. | `compare.rs`, `crates/origami_abap/tests/lexer.rs::glued_flags` |
 | 1.3 | Same comments: same text, same syntax (`*`, `"`, `"!`, `"#EC`, `//`/`--`, `/* */`), same placement (own line / end of line), attached to the same token in the same position. Three exceptions (section 3): comments in front of a period or comma that 1.2 glues move behind it (ABAP-SPACE-001), ABAP Doc tag lines may change two runs of blanks (ABAP-DOC-001), and a `"` comment may get one space after the `"` (ABAP-COMMENT-003). | `compare.rs`, `crates/origami_syntax/tests/trivia.rs` |
 | 1.4 | Verbatim regions (AMDP, `EXEC SQL`, macro bodies) are single opaque tokens, so rule 1.1 compares them byte for byte. | `lexer.rs::verbatim_regions` |
-| 1.5 | No ABAP output line exceeds 255 characters unless the same input line already did. | `crates/origami_core/src/check.rs` |
+| 1.5 | No ABAP output line exceeds 255 characters unless the same input line already did. | `crates/origami_core/tests/line_limit.rs` |
 
 ## 2. What happens on a violation
 
 1. The core finds the units (ABAP: one statement or chain; CDS family: see
-   below) that contain the mismatching tokens or the new overlong lines.
+   below) that contain the mismatching tokens or the new overlong lines (a
+   line of comments only belongs to the unit of the token its comments are
+   attached to).
 2. It prints them again as written (quarantine), reports W001 (mismatch) or
    W002 (length), and checks again. A unit still over 255 characters is
    printed byte for byte. If a new line over 255 characters remains even
-   then (the joins between units can lengthen a line), the whole file is
-   left as written. A unit left as written keeps the indentation of its
-   lines relative to each other, and a unit printed byte for byte that
+   then (the joins between units can lengthen a line), or if no unit owns
+   it (a file of comments only), the whole file is left as written. A unit
+   left as written keeps the indentation of its lines relative to each
+   other, and a unit printed byte for byte that
    starts a line keeps its indentation too, so a second run sees the same
    unit and makes the same choice (idempotency).
 3. If the check still fails, the result is X001: no output is written, exit 70.
