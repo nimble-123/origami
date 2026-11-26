@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
   <title>origami: a formatter for ABAP and CDS</title>
   <meta name="description" content="origami formats ABAP and CDS: line breaks, indentation, spaces and letter case, nothing else. It checks its own output token by token and says why it broke each line.">
   <meta name="color-scheme" content="light dark">
@@ -18,9 +19,6 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="keywords.js" defer></script>
   <script src="app.js" defer></script>
@@ -129,19 +127,21 @@
           <label class="pane-label" for="pg-input">Your code</label>
           <div class="editor">
             <pre id="pg-highlight" class="sheet code" aria-hidden="true"></pre>
-            <textarea id="pg-input" class="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+            <textarea id="pg-input" class="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-describedby="pg-input-hint"></textarea>
           </div>
+          <p id="pg-input-hint" class="sr-only">Tab inserts two spaces. Press Escape, then Tab, to move focus out of the editor.</p>
         </div>
         <div class="pg-pane">
           <div class="pane-label">
             <span id="pg-out-label">Formatted</span>
-            <button class="copy text" type="button" data-copy="#pg-output-text" aria-label="Copy formatted code">Copy</button>
+            <button id="pg-copy" class="copy text" type="button" data-copy="#pg-output-text" aria-label="Copy formatted code" disabled>Copy</button>
           </div>
-          <div id="pg-output" class="sheet code output" tabindex="0" aria-labelledby="pg-out-label" aria-describedby="pg-status"></div>
+          <div id="pg-output" class="sheet code output" role="region" tabindex="0" aria-labelledby="pg-out-label" aria-describedby="pg-status"></div>
           <pre id="pg-output-text" hidden></pre>
         </div>
       </div>
-      <p id="pg-status" class="status" role="status" aria-live="polite">Loading origami…</p>
+      <p id="pg-status" class="status">Loading origami…</p>
+      <p id="announce" class="sr-only" role="status" aria-live="polite"></p>
     </section>
 
     <section id="safety" class="band" aria-labelledby="safety-title">
