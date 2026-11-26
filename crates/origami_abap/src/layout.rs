@@ -261,7 +261,8 @@ pub fn layout(
                 statements::parse(&mut p)
             };
             // Keywords inside constructor bodies (`FOR … IN`, `BASE`,
-            // `MAPPING`, …), whichever layout the statement gets.
+            // `MAPPING`, …), whichever layout the body got; a statement
+            // without grammar keeps its case (GEN-CASE-001).
             let mark_ctor = |ctx: &mut Ctx| {
                 let mut p = P::new(ctx, st.tokens.start, st.tokens.end - 1, blank);
                 let end = p.end;
@@ -276,7 +277,6 @@ pub fn layout(
                 }
                 None => {
                     ctx.reset(saved);
-                    mark_ctor(&mut ctx);
                     unknown += 1;
                     bodies.push(Body::Unknown);
                     let t = &stream.tokens[first.0 as usize];

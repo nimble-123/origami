@@ -826,3 +826,69 @@ ENDLOOP.
         ),
     ]);
 }
+
+/// A name in an operand position stays a name, even when it is spelled like
+/// a keyword of the statement elsewhere.
+#[test]
+fn operands_named_like_keywords() {
+    check(&[
+        (
+            "submit zrep with s_b in lt and return.\n",
+            "SUBMIT zrep WITH s_b IN lt AND RETURN.\n",
+        ),
+        (
+            "submit zrep with p_a = lt with s_d between le and ge and return.\n",
+            "SUBMIT zrep WITH p_a = lt WITH s_d BETWEEN le AND ge AND RETURN.\n",
+        ),
+        (
+            "submit zrep with number eq user with selection-table lt_sel via job lv_job number number and return.\n",
+            "SUBMIT zrep WITH number EQ user WITH SELECTION-TABLE lt_sel VIA JOB lv_job NUMBER number AND RETURN.\n",
+        ),
+        ("lv = conv #( key ).\n", "lv = CONV #( key ).\n"),
+        (
+            "lv = value #( lt[ key key components a = 1 ] ).\n",
+            "lv = VALUE #( lt[ KEY key COMPONENTS a = 1 ] ).\n",
+        ),
+    ]);
+}
+
+#[test]
+fn more_keywords() {
+    check(&[
+        (
+            "data lt type table of ty with header line.\n",
+            "DATA lt TYPE TABLE OF ty WITH HEADER LINE.\n",
+        ),
+        (
+            "data lt type standard table of ty with default key with header line initial size 0.\n",
+            "DATA lt TYPE STANDARD TABLE OF ty WITH DEFAULT KEY WITH HEADER LINE INITIAL SIZE 0.\n",
+        ),
+        (
+            "call function 'X' starting new task t destination in group default exporting a = 1.\n",
+            "CALL FUNCTION 'X' STARTING NEW TASK t DESTINATION IN GROUP DEFAULT EXPORTING a = 1.\n",
+        ),
+        (
+            "call function 'X' starting new task task destination in group group exporting a = 1.\n",
+            "CALL FUNCTION 'X' STARTING NEW TASK task DESTINATION IN GROUP group EXPORTING a = 1.\n",
+        ),
+        (
+            "call function 'X' destination default exporting a = 1.\n",
+            "CALL FUNCTION 'X' DESTINATION default EXPORTING a = 1.\n",
+        ),
+    ]);
+}
+
+/// GEN-CASE-001: a statement without grammar (W003) keeps the case of every
+/// word, also inside constructor expressions.
+#[test]
+fn unrecognized_statements_keep_their_case() {
+    let hint = LanguageHint::Path("t.prog.abap".into());
+    for src in [
+        "mymacro conv string( for ) 'x'.\n",
+        "zz value #( base lt ( 1 ) ).\n",
+    ] {
+        let r = format(src.as_bytes(), &hint, &Options::default());
+        assert!(r.has(Code::W003), "recognized: {src}");
+        assert_eq!(String::from_utf8(r.output.unwrap()).unwrap(), src);
+    }
+}

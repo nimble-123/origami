@@ -2684,6 +2684,31 @@ fn gap(p: &P, i: usize, skip: Option<usize>) -> Doc {
     if skip == Some(i) { b::empty() } else { p.sp(i) }
 }
 
+/// Keywords of `SUBMIT` that take an operand (the last word of a phrase).
+const SUBMIT_OPERAND_AFTER: &[&str] = &[
+    "WITH",
+    "SELECTION-SET",
+    "SIGN",
+    "IN",
+    "USER",
+    "JOB",
+    "NUMBER",
+    "PARAMETERS",
+    "LINE-SIZE",
+    "LINE-COUNT",
+    "SELECTION-TABLE",
+    "EQ",
+    "NE",
+    "CP",
+    "NP",
+    "GT",
+    "GE",
+    "LT",
+    "LE",
+    "BETWEEN",
+    "AND",
+];
+
 /// Operands and clauses of a keyword statement, from `p.pos` to `p.end`.
 fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
     let skip = (!first_gap).then_some(p.pos);
@@ -2727,7 +2752,15 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
         } else {
             phrase_at(p, i, spec.clauses)
         };
-        let mut n_word = if repeated {
+        // SUBMIT: the word after an operator or after a keyword that takes
+        // an operand is that operand (`WITH s_b IN lt`, `= number`).
+        let submit_operand = spec.lead == ["SUBMIT"]
+            && (prev_kw.as_deref().is_some_and(|w| {
+                SUBMIT_OPERAND_AFTER.contains(&w) && !(w == "WITH" && p.is(i, "SELECTION-TABLE"))
+            }) || (i > p.first
+                && p.kind(i - 1) == WORD
+                && matches!(p.text(i - 1), "=" | "<>" | "<" | ">" | "<=" | ">=")));
+        let mut n_word = if repeated || submit_operand {
             0
         } else {
             phrase_at(p, i, spec.words)
@@ -3744,7 +3777,9 @@ fn decl_tokens(p: &mut P, from: usize, to: usize) -> Vec<Doc> {
             "ANY" | "INDEX" => p.is(i + 1, "TABLE"),
             // `SORTED TABLE`, `WITH NON-UNIQUE SORTED KEY sk`
             "STANDARD" | "SORTED" | "HASHED" => p.is(i + 1, "TABLE") || p.is(i + 1, "KEY"),
-            "LINE" | "RANGE" => p.is(i + 1, "OF"),
+            // `WITH HEADER LINE`
+            "LINE" => p.is(i + 1, "OF") || prev_kw.as_deref() == Some("HEADER"),
+            "RANGE" => p.is(i + 1, "OF"),
             "REF" => p.is(i + 1, "TO"),
             _ => true,
         };
@@ -5049,6 +5084,9 @@ const CALL_HEADER_WORDS: &[&str] = &[
     "KEEPING",
     "LOGICAL",
     "WORK",
+    // `DESTINATION IN GROUP DEFAULT`
+    "GROUP",
+    "DEFAULT",
 ];
 
 fn is_group(p: &P, i: usize) -> bool {
@@ -5069,14 +5107,30 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
     head.push(p.sp(p.pos));
     head.push(p.expr()?);
     // Header words (DESTINATION, STARTING NEW TASK, IN UPDATE TASK, …).
+    // The word after a header word that takes an operand is that operand
+    // (`STARTING NEW TASK task`, `IN GROUP group`).
+    let mut operand_next = false;
     while !p.at_end() && !is_group(p, p.pos) {
         let i = p.pos;
         head.push(p.sp(i));
-        if p.kind(i) == WORD && !p.glued(i) && CALL_HEADER_WORDS.contains(&p.upper(i).as_str()) {
+        if !operand_next
+            && p.kind(i) == WORD
+            && !p.glued(i)
+            && CALL_HEADER_WORDS.contains(&p.upper(i).as_str())
+        {
             head.push(p.kw(i));
+            operand_next = match p.upper(i).as_str() {
+                "TASK" => p.is(i - 1, "NEW"),
+                "UNIT" => p.is(i - 1, "BACKGROUND"),
+                "DESTINATION" => !p.is(i + 1, "IN"),
+                "GROUP" => !p.is(i + 1, "DEFAULT"),
+                "PERFORMING" | "CALLING" => true,
+                _ => false,
+            };
             p.pos += 1;
         } else {
             head.push(p.expr()?);
+            operand_next = false;
         }
     }
     let aligned = p.c.style == Style::Aligned;

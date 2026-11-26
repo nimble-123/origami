@@ -1765,8 +1765,9 @@ impl<'c, 'a> P<'c, 'a> {
                         "=" | "<>" | "<" | ">" | "<=" | ">=" | "+" | "-" | "*" | "/" | "&&" | "?="
                     );
                 // `MAPPING FROM ENTITY`, `MAPPING TO ENTITY`, `USING CONTROL`,
-                // `GROUP SIZE`, `IS INSTANCE OF`
+                // `USING KEY`, `GROUP SIZE`, `IS INSTANCE OF`
                 let paired = match w.as_str() {
+                    "KEY" => prev.as_deref() == Some("USING"),
                     "GROUP" if self.is(i + 1, "SIZE") || self.is(i + 1, "INDEX") => true,
                     "SIZE" | "INDEX" if prev.as_deref() == Some("GROUP") => true,
                     "INSTANCE" => {
@@ -2107,7 +2108,6 @@ const CTOR_WORDS: &[&str] = &[
     "WHEN",
     "ELSE",
     "USING",
-    "KEY",
     "GROUPS",
     "GROUP",
     "OF",
