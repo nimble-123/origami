@@ -12,21 +12,77 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Decides whether a change touches code. The docs filter sits at job and step
+  # level, not in `on.paths-ignore`: the ruleset requires the checks `test (...)`,
+  # `quality`, `corpus` and `extension`, and a workflow that never starts leaves
+  # them pending. A skipped job counts as passed. The matrix jobs (`test`,
+  # `extension-os`) must stay, so that the expanded check names exist; they skip
+  # their steps instead.
+  # Docs-only: every changed file is under site/ (except site/build.sh, which
+  # the wasm job runs), docs/ (except docs/STYLE.md, which tests read), is a
+  # Markdown file outside the code folders (crates/, xtask/, fuzz/, editors/,
+  # corpus/), LICENSE*, scripts/abap-cleaner-compare/ or .github/ISSUE_TEMPLATE/.
+  # Everything else is code. If this job fails, the
+  # jobs below still run (`!= 'false'`), never a silent skip.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+      - id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          code=true
+          if [ "$EVENT" = pull_request ] \
+            && git diff -z --name-only --no-renames "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/files"; then
+            code=false
+            count=0
+            while IFS= read -r -d '' file; do
+              count=$((count + 1))
+              case "$file" in
+                docs/STYLE.md | site/build.sh | crates/* | xtask/* | fuzz/* | editors/* | corpus/*) code=true; break ;;
+                site/* | docs/* | *.md | LICENSE* | scripts/abap-cleaner-compare/* | .github/ISSUE_TEMPLATE/*) ;;
+                *) code=true; break ;;
+              esac
+            done < "$RUNNER_TEMP/files"
+            if [ "$count" -eq 0 ]; then code=true; fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   test:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    needs: changes
+    if: ${{ !cancelled() }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.changes.outputs.code != 'false'
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: needs.changes.outputs.code != 'false'
       - run: cargo fmt --all --check
+        if: needs.changes.outputs.code != 'false'
       - run: cargo clippy --workspace --all-targets -- -D warnings
+        if: needs.changes.outputs.code != 'false'
       - run: cargo test --workspace
+        if: needs.changes.outputs.code != 'false'
       - run: cargo test -p origami_core --features fault-injection
+        if: needs.changes.outputs.code != 'false'
 
   quality:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,6 +99,8 @@ jobs:
           --features origami_core/fault-injection --fail-under-lines 85
 
   corpus:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -74,6 +132,8 @@ jobs:
       matrix:
         toolchain: [stable, beta]
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     continue-on-error: ${{ matrix.toolchain == 'beta' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -84,6 +144,8 @@ jobs:
   # origami_wasm for the browser: the build site.yml deploys, and the C ABI
   # (alloc, review, dealloc) called from Node like the playground worker does.
   wasm:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -104,26 +166,34 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    needs: changes
+    if: ${{ !cancelled() }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.changes.outputs.code != 'false'
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: needs.changes.outputs.code != 'false'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: needs.changes.outputs.code != 'false'
         with:
           node-version: 22
       - run: cargo build --release -p abap-origami
+        if: needs.changes.outputs.code != 'false'
       - name: Install, unit tests, bundle
+        if: needs.changes.outputs.code != 'false'
         working-directory: editors/vscode
         run: |
           npm ci
           npm test
           npm run build
       - name: Lint and typecheck
-        if: runner.os == 'Linux'
+        if: needs.changes.outputs.code != 'false' && runner.os == 'Linux'
         working-directory: editors/vscode
         run: |
           npm run lint
           npx tsc --noEmit
       - name: Bundle the origami binary
+        if: needs.changes.outputs.code != 'false'
         shell: bash
         working-directory: editors/vscode
         run: |
@@ -131,15 +201,15 @@ jobs:
           if [ "$RUNNER_OS" = Windows ]; then exe=origami.exe; else exe=origami; fi
           cp "../../target/release/$exe" "bin/$exe"
       - name: End-to-end tests in VS Code (Linux, needs a display)
-        if: runner.os == 'Linux'
+        if: needs.changes.outputs.code != 'false' && runner.os == 'Linux'
         working-directory: editors/vscode
         run: xvfb-run -a npm run test:e2e
       - name: End-to-end tests in VS Code
-        if: runner.os != 'Linux'
+        if: needs.changes.outputs.code != 'false' && runner.os != 'Linux'
         working-directory: editors/vscode
         run: npm run test:e2e
       - name: Package VSIX (linux-x64)
-        if: runner.os == 'Linux'
+        if: needs.changes.outputs.code != 'false' && runner.os == 'Linux'
         working-directory: editors/vscode
         run: npx vsce package --target linux-x64 --no-dependencies --allow-missing-repository
 
