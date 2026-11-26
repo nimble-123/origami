@@ -90,6 +90,7 @@ fn format_with(
         blank_after_comments: Default::default(),
         forced_blanks: laid.forced_blanks.clone(),
         comment_overrides: Default::default(),
+        line_limit: None,
     };
     let limit = max_output_len(src.text().len());
     let (output, diagnostics) = match print_bounded(&laid.doc, src, &stream, &print_opts, limit) {
