@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/nimble-123/origami/compare/v0.4.4...v0.5.0) (2026-11-26)
+
+
+### Features
+
+* **site:** rebuild the website as a dark product page with live editor and terminal windows ([#121](https://github.com/nimble-123/origami/issues/121)) ([f43357e](https://github.com/nimble-123/origami/commit/f43357e9ba08028db8b6fe347d9264e4185d20c6))
+
 ## [0.4.4](https://github.com/nimble-123/origami/compare/v0.4.3...v0.4.4) (2026-11-26)
 
 
