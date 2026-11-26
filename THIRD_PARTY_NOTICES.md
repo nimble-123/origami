@@ -8,7 +8,7 @@ appended here by the release workflow.
 
 ## Fonts (website)
 
-The website under `site/` serves Schibsted Grotesk (Copyright 2022 The Schibsted Grotesk Project Authors, https://github.com/schibsted/schibsted-grotesk) and Martian Mono (Copyright 2022 The Martian Mono Project Authors, https://github.com/evilmartians/mono) as WOFF2 files, both under the SIL Open Font License 1.1 (https://openfontlicense.org).
+The website under `site/` serves Martian Mono (Copyright 2022 The Martian Mono Project Authors, https://github.com/evilmartians/mono; the variable font with width and weight axes) and Archivo (Copyright 2020 The Archivo Project Authors, https://github.com/Omnibus-Type/Archivo; the variable font with the weight axis) as WOFF2 files, Latin subsets as Google Fonts distributes them, both under the SIL Open Font License 1.1 (https://openfontlicense.org).
 
 ## three.js (website)
 
