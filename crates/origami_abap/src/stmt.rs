@@ -1343,6 +1343,68 @@ impl<'c, 'a> P<'c, 'a> {
         ]))
     }
 
+    /// End (exclusive) of the iteration `FOR …` at `from`: the first `(` at
+    /// bracket depth 0 that starts a row, not one that is an operand of the
+    /// iteration (`WHERE ( … )`, `GROUP BY ( … )`, `THEN ( … )`).
+    fn iteration_end(&self, from: usize) -> Option<usize> {
+        const OPERAND_BEFORE: &[&str] = &[
+            "WHERE", "BY", "THEN", "UNTIL", "WHILE", "=", "+", "-", "*", "/", "**", "&&", "AND",
+            "OR", "NOT", "EQUIV", "DIV", "MOD", "<", ">", "<=", ">=", "<>", "EQ", "NE", "LT", "GT",
+            "LE", "GE",
+        ];
+        let mut k = from + 1;
+        while k < self.end {
+            match self.kind(k) {
+                LPAREN | LBRACKET => {
+                    let prev = self.upper(k - 1);
+                    if self.kind(k) == LPAREN
+                        && !self.glued(k)
+                        && !OPERAND_BEFORE.contains(&prev.as_str())
+                    {
+                        return Some(k);
+                    }
+                    k = self.matching(k)? + 1;
+                }
+                RPAREN | RBRACKET => return None,
+                _ => k += 1,
+            }
+        }
+        None
+    }
+
+    /// Aligned style (ABAP-VALUE-002): a `REDUCE` body `INIT … FOR … NEXT …`
+    /// with each part on its own line, aligned under `INIT`.
+    fn reduce_body(&mut self, lp: usize, rp: usize) -> Option<Doc> {
+        let init = self.pos;
+        // Word `w` at bracket depth 0 from `from` on.
+        let find = |p: &Self, from: usize, w: &str| -> Option<usize> {
+            let mut k = from;
+            while k < p.end {
+                match p.kind(k) {
+                    LPAREN | LBRACKET => k = p.matching(k)? + 1,
+                    _ if p.is(k, w) && !p.glued(k) => return Some(k),
+                    _ => k += 1,
+                }
+            }
+            None
+        };
+        let for_at = find(self, init + 1, "FOR")?;
+        let next = find(self, for_at + 1, "NEXT")?;
+        if next + 1 >= self.end || self.has_comment(init, self.end - 1) {
+            return None;
+        }
+        let content = b::shared(b::concat(vec![
+            self.flat(init, for_at - 1),
+            self.hl(for_at),
+            self.flat(for_at, next - 1),
+            self.hl(next),
+            self.flat(next, self.end - 1),
+        ]));
+        self.pos = self.end;
+        self.c.span(lp, rp, "ABAP-VALUE-002");
+        Some(self.hanging(lp, rp, content.clone(), content))
+    }
+
     /// One table row `( … )` at `open`: its components flat if they fit.
     fn table_row(&mut self, open: usize) -> Option<(Doc, bool)> {
         let close = self.matching(open)?;
@@ -1403,8 +1465,20 @@ impl<'c, 'a> P<'c, 'a> {
             parts.push((start, self.let_expr()?));
             lead = true;
         }
+        // ABAP-VALUE-002: `FOR …` on its own line, the rows below it.
+        let mut iteration = false;
+        if self.is(self.pos, "FOR") && !self.glued(self.pos + 1) {
+            let from = self.pos;
+            let to = self.iteration_end(from)?;
+            if self.has_comment(from, to) {
+                return None;
+            }
+            parts.push((from, self.flat(from, to - 1)));
+            self.pos = to;
+            iteration = true;
+        }
         let mut comps = 0;
-        if !self.at_end() && self.is_named_row(self.pos) {
+        if !iteration && !self.at_end() && self.is_named_row(self.pos) {
             let at = self.pos;
             let mut rows = Vec::new();
             while !self.at_end() && self.kind(self.pos) != LPAREN {
@@ -1443,7 +1517,11 @@ impl<'c, 'a> P<'c, 'a> {
             parts.push((open, d));
         }
         let content = parts.len() - usize::from(lead);
-        let broken = comps > 1
+        if iteration && n_rows == 0 {
+            return None;
+        }
+        let broken = iteration
+            || comps > 1
             || (n_rows > 1 && named_row)
             || (lead && content > 0)
             || (comps > 0 && n_rows > 0);
@@ -1457,7 +1535,12 @@ impl<'c, 'a> P<'c, 'a> {
             }
             docs.push(d);
         }
-        self.c.span(lp, rp, "ABAP-VALUE-001");
+        let rule = if iteration {
+            "ABAP-VALUE-002"
+        } else {
+            "ABAP-VALUE-001"
+        };
+        self.c.span(lp, rp, rule);
         let content = b::shared(b::concat(docs));
         Some(self.hanging(lp, rp, content.clone(), content))
     }
@@ -1467,7 +1550,12 @@ impl<'c, 'a> P<'c, 'a> {
         let first = self.pos;
         if self.c.style == Style::Aligned {
             let mark = self.c.mark();
-            if let Some(d) = self.ctor_body_aligned(lp, rp) {
+            let aligned = if self.is(first, "INIT") {
+                self.reduce_body(lp, rp)
+            } else {
+                self.ctor_body_aligned(lp, rp)
+            };
+            if let Some(d) = aligned {
                 return Some(d);
             }
             self.c.reset(mark);

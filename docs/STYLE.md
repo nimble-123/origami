@@ -534,7 +534,7 @@ aligned under it. `BASE` and `LET` get no line of their own, and table
 expressions are not broken by this rule.
 
 ### ABAP-VALUE-002: Iterations in constructor expressions
-Milestone: M5
+Milestone: M4
 Explanation: iteration and rows on their own lines
 
 Approved by the maintainer, Nils Lutz, on 2026-11-26. In a `VALUE` or `NEW`
