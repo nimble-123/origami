@@ -519,7 +519,8 @@ main > .hero { border-top: 0; }
 .margin-grip::after { right: 2.5px; }
 .margin:hover .margin-grip, .margin.dragging .margin-grip { background: var(--valley-wash); }
 .margin.dragging .margin-grip { scale: 1.08; }
-.margin[aria-disabled="true"] { cursor: default; opacity: 0.45; }
+.margin[aria-disabled="true"], .margin.asleep { opacity: 0.45; }
+.margin[aria-disabled="true"] { cursor: default; }
 
 .stage-foot {
   margin: 0 var(--s-5); padding-top: var(--s-3); border-top: 1px dashed var(--crease);
@@ -773,3 +774,5 @@ textarea.code:focus-visible { outline-offset: 0; }
 .rules .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rules td a { color: var(--syn-rule); font-family: var(--mono); font-size: 0.72rem; }
 .table-note { margin: var(--s-3) 0 0; color: var(--ink-soft); font-size: var(--t-0); max-width: var(--measure); }
+.live-only { display: none; }
+.journey.live .live-only { display: inline; }

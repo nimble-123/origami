@@ -1,17 +1,19 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;800&display=swap" rel="stylesheet">
+<!-- The link preview (docs/assets/social-preview.png): render this page with a
+     headless browser at 1280x640, e.g. puppeteer's page.screenshot. -->
 <style>
-  html,body{margin:0;width:1280px;height:640px;color:#c0caf5;font-family:"Schibsted Grotesk",sans-serif;-webkit-font-smoothing:antialiased}
-  body{background:#0e121e url(../../docs/assets/photos/crane-dark.webp) no-repeat;background-size:auto 112%;background-position:right -40px center}
-  body::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#0e121e 0%,rgba(14,18,30,.85) 32%,rgba(14,18,30,0) 52%)}
-  .wrap{position:relative;padding:72px 80px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between}
-  .brand{display:flex;align-items:center;gap:18px;font-weight:800;font-size:44px;letter-spacing:-.02em}
-  h1{font-size:62px;line-height:1.04;letter-spacing:-.035em;margin:0;font-weight:800;max-width:460px}
-  .foot{font-weight:500;font-size:26px;color:#a9b1d6}
+  @font-face { font-family: "Martian Mono"; src: url(../fonts/martian-mono-latin.woff2) format("woff2"); font-weight: 100 800; font-stretch: 75% 112.5%; }
+  @font-face { font-family: "Archivo"; src: url(../fonts/archivo-latin.woff2) format("woff2"); font-weight: 400 800; }
+  html,body{margin:0;width:1280px;height:640px;color:#c0caf5;-webkit-font-smoothing:antialiased}
+  body{background:#0c0f15 url(../../docs/assets/photos/fold-dark.webp) no-repeat;background-size:cover;background-position:center;position:relative}
+  .wrap{position:relative;padding:68px 76px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:16px;font:700 40px/1 "Martian Mono";font-stretch:75%;letter-spacing:-.02em}
+  h1{font:780 44px/1.1 "Martian Mono";font-stretch:75%;letter-spacing:-.02em;margin:0;white-space:nowrap}
+  .foot{font:500 26px "Archivo";color:#a9b1d6}
 </style></head><body><div class="wrap">
-  <div class="brand"><img src="../../docs/assets/logo-small-dark.svg" width="56" height="56">origami</div>
-  <h1>A long line of ABAP, folded into shape.</h1>
-  <div class="foot">Layout-only formatter for ABAP and CDS</div>
+  <div class="brand"><img src="../../docs/assets/logo-small-dark.svg" width="52" height="52" alt="">origami</div>
+  <h1>A long line of ABAP,<br>folded into shape.</h1>
+  <div class="foot">The layout-only formatter for ABAP and CDS</div>
 </div>
 </body></html>

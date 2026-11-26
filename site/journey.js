@@ -250,8 +250,9 @@ export function journey() {
     section.dataset.step = String(step);
     steps.forEach((li, i) => li.classList.toggle("current", i === step));
     $("stage-step").innerHTML = `<b>${step + 1}</b>${STEPS[step]}`;
-    margin.setAttribute("aria-disabled", String(step < 1 || !st.data));
-    margin.tabIndex = step >= 1 && st.data ? 0 : -1;
+    margin.setAttribute("aria-disabled", String(!st.data));
+    margin.tabIndex = st.data ? 0 : -1;
+    margin.classList.toggle("asleep", step < 1);
     const P = s < 0 ? 0 : s + t;
     craneFold = stageFold(P);
     if (!st.data) return;
@@ -391,6 +392,11 @@ export function journey() {
   }
 
   // ---- the margin: drag and keys --------------------------------------------
+  // Reached by keyboard before the Fold step: bring that step into view, so
+  // the line folds as the width changes.
+  margin.addEventListener("focus", () => {
+    if (Number(section.dataset.step) < 1) $("step-fold").scrollIntoView({ block: "center", behavior: "instant" });
+  });
   margin.addEventListener("keydown", (e) => {
     if (margin.getAttribute("aria-disabled") === "true") return;
     const step = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: 10, PageDown: -10 }[e.key];
