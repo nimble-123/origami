@@ -63,3 +63,35 @@ fn invalid_utf8_is_e005() {
     );
     assert!(r.has(Code::E005));
 }
+
+/// CDS-KEY-001: the names of non-key elements and their annotations line up
+/// under the names after `key `, at every indent width and in both styles.
+#[test]
+fn non_key_elements_line_up_under_key_names() {
+    use origami_core::{Language, Style};
+    let src = "define view entity Z as select from t\n{\n  key t.id as Id,\n  @Semantics.text: true\n  t.name as Name,\n  _x\n}\n";
+    let col = |out: &str, needle: &str| {
+        let line = out.lines().find(|l| l.contains(needle)).expect(needle);
+        line.find(needle).unwrap()
+    };
+    for style in [Style::Aligned, Style::Compact] {
+        for indent in 1..=8 {
+            let mut o = with(120, indent);
+            o.lang.style = style;
+            let r = format(src.as_bytes(), &LanguageHint::Explicit(Language::Ddls), &o);
+            let out = String::from_utf8(r.output.unwrap()).unwrap();
+            let key = col(&out, "key t.id") + 4;
+            assert_eq!(
+                col(&out, "t.name"),
+                key,
+                "{style:?} indent {indent}:\n{out}"
+            );
+            assert_eq!(
+                col(&out, "@Semantics"),
+                key,
+                "{style:?} indent {indent}:\n{out}"
+            );
+            assert_eq!(col(&out, "_x"), key, "{style:?} indent {indent}:\n{out}");
+        }
+    }
+}

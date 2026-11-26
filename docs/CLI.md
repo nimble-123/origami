@@ -225,7 +225,8 @@ for the path `<internal>`.
 W004 limits (reported once per file):
 
 * **Nesting depth:** a unit (ABAP statement, CDS-family element) with a token
-  nested deeper than 100 levels of blocks and brackets combined is printed
+  nested deeper than 100 levels of blocks, brackets and CDS `case` expressions
+  combined is printed
   byte for byte. Real code stays far below 100.
 * **Input size:** a file larger than 8 MiB is not formatted: status
   `unchanged`, output equal to the input.

@@ -1397,6 +1397,8 @@ Milestone: M2
 
 Units are indented one level per enclosing `{ }` block. `{` and `}` are at the
 level of the header they belong to.
+A comment line in front of a closing `}` or `]` stays at the level of the
+content it follows, one level deeper than the bracket.
 
 ```cds
 define behavior for ZI_Travel alias Travel
@@ -1412,8 +1414,8 @@ define behavior for ZI_Travel alias Travel
 Milestone: M2
 
 In a block that contains `key` elements, the other elements and their
-annotations are indented two more levels, so that element names line up with
-the names after `key `.
+annotations are indented by the width of `key ` (four columns, whatever the
+indent width), so that element names line up with the names after `key `.
 
 ```cds
 {
