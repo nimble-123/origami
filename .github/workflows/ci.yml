@@ -22,7 +22,11 @@ jobs:
   # the wasm job runs), docs/ (except docs/STYLE.md, which tests read), is a
   # Markdown file outside the code folders (crates/, xtask/, fuzz/, editors/,
   # corpus/), LICENSE*, scripts/abap-cleaner-compare/ or .github/ISSUE_TEMPLATE/.
-  # Everything else is code. If this job fails, the
+  # Everything else is code. A second output, `wasm`, is also true when a
+  # changed file is under site/ or docs/assets/: site/build.sh copies
+  # site/{index.html,abap-cleaner.html,style.css,app.js,worker.js} and files
+  # from docs/assets/, so renaming or deleting one must run the `wasm` job,
+  # which builds the site. If this job fails, the
   # jobs below still run (`!= 'false'`), never a silent skip.
   changes:
     runs-on: ubuntu-latest
@@ -30,6 +34,7 @@ jobs:
       contents: read
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      wasm: ${{ steps.filter.outputs.wasm }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: github.event_name == 'pull_request'
@@ -42,21 +47,26 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           code=true
+          wasm=true
           if [ "$EVENT" = pull_request ] \
             && git diff -z --name-only --no-renames "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/files"; then
             code=false
+            wasm=false
             count=0
             while IFS= read -r -d '' file; do
               count=$((count + 1))
               case "$file" in
                 docs/STYLE.md | site/build.sh | crates/* | xtask/* | fuzz/* | editors/* | corpus/*) code=true; break ;;
-                site/* | docs/* | *.md | LICENSE* | scripts/abap-cleaner-compare/* | .github/ISSUE_TEMPLATE/*) ;;
+                site/* | docs/assets/*) wasm=true ;;
+                docs/* | *.md | LICENSE* | scripts/abap-cleaner-compare/* | .github/ISSUE_TEMPLATE/*) ;;
                 *) code=true; break ;;
               esac
             done < "$RUNNER_TEMP/files"
             if [ "$count" -eq 0 ]; then code=true; fi
+            if [ "$code" = true ]; then wasm=true; fi
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "wasm=$wasm" >> "$GITHUB_OUTPUT"
 
   test:
     strategy:
@@ -145,7 +155,7 @@ jobs:
   # (alloc, review, dealloc) called from Node like the playground worker does.
   wasm:
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
+    if: ${{ !cancelled() && needs.changes.outputs.wasm != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -158,6 +168,29 @@ jobs:
       - run: rustup target add wasm32-unknown-unknown
       - run: sh site/build.sh
       - run: node crates/origami_wasm/tests/smoke.mjs site/dist/origami.wasm
+
+  # The composite action (action.yml) against a released binary: download,
+  # checksum, attestation, run. Read-only and without secrets: the action only
+  # reads the public release with the workflow token, which a pull request
+  # from a fork has as well. The version is pinned on purpose, so that a new
+  # release cannot fail unrelated pull requests; raise it by hand when the
+  # action needs a newer binary.
+  action:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./
+        with:
+          version: v0.4.2
+          args: --check --no-config tests/action-fixture
+      - name: The pinned binary is the one that runs
+        run: origami --version | grep -q '^origami 0\.4\.2 '
 
   extension-os:
     name: extension (${{ matrix.os }})

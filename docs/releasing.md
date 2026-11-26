@@ -11,10 +11,11 @@ lists what to create to turn the other steps on.
 
 | Job | Result |
 |---|---|
+| `version` | The tag must equal the version in `Cargo.toml` and `editors/vscode/package.json`; otherwise nothing is built. |
 | `build` | Binaries for 7 targets (macOS x64/arm64, Windows x64/arm64, Linux gnu x64/arm64, Linux musl x64). Signed and notarized (macOS) or signed (Windows) when the credentials exist. |
 | `smoke` | Starts every binary on a runner of its own platform, prints `--version`, formats a fixture. A binary that does not run stops the release. |
 | `vsix` | One VS Code extension package per target, with the binary inside. |
-| `extras` | Third-party notices, the CycloneDX SBOM (`origami-X.Y.Z.sbom.cdx.json`), and `release-diff.patch` (what the new release formats differently from the previous one, on the test corpus). |
+| `extras` | Third-party notices, the CycloneDX SBOM (`origami-X.Y.Z.sbom.cdx.json`), and `release-diff.patch` (what the new release formats differently from the previous one, on the test corpus; the previous binary is checked against its `.sha256` and its attestation before it runs). |
 | `release` | Attests build provenance for the binaries, the SBOM and the extension packages, then attaches everything to the GitHub release. |
 | `homebrew`, `crates`, `vscode-publish` | Formula in the tap, crates.io, VS Code Marketplace and Open VSX. |
 
@@ -188,9 +189,11 @@ environment `vscode-marketplace`, and the job calls
      version, when those secrets are set.
 
 A failed job can be re-run with *Re-run failed jobs*; the release assets are
-uploaded with `--clobber`. crates.io and the Marketplace refuse a version that
-exists already, so after a partial publish continue by hand with the missing
-registry rather than re-running the publishing job.
+uploaded with `--clobber`. The `crates` job skips crates that are in the index
+already, and `vscode-publish` passes `--skip-duplicate` to `vsce` and `ovsx`,
+so both can be re-run after a partial publish. In `vscode-publish` the Open
+VSX step runs even when the Marketplace step failed (and the job is red
+then), so one registry being down does not hold back the other.
 
 ## Verifying a download
 
@@ -209,8 +212,9 @@ attestations existed it prints a warning and checks the checksum only; set
 
 Actions are pinned to full commit SHAs with the version in a comment, and the
 build tools to exact versions (`cargo-zigbuild`, `ziglang`, `cargo-about`,
-`cargo-cyclonedx`, `vsce`, `ovsx`). Dependabot (`.github/dependabot.yml`) opens
-a grouped weekly pull request per ecosystem, including the SHAs of the actions.
-The `ziglang`, `cargo-zigbuild`, `ovsx` and `vsce` versions in `release.yml`
-are not covered by Dependabot; update them by hand when a release build asks
-for it.
+`cargo-cyclonedx`). `vsce` and `ovsx` are installed from the lockfile in
+`tools/publish` (`npm ci --ignore-scripts`), so their dependencies are fixed too.
+Dependabot (`.github/dependabot.yml`) opens a grouped weekly pull request per
+ecosystem, including the SHAs of the actions and the npm lockfiles. The
+`ziglang` and `cargo-zigbuild` versions in `release.yml` are not covered by
+Dependabot; update them by hand when a release build asks for it.

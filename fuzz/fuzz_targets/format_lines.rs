@@ -1,6 +1,10 @@
 #![no_main]
 //! Invariants of `format_lines`, at the default setting and at `variant`:
-//! no X001 or X002, and a result for every source that is not an error.
+//! no X001 or X002, a result for every source that is not an error, and
+//! formatting the whole source (no ranges) is idempotent. A result for a
+//! range is not idempotent over the same range, because whole hunks are
+//! applied and the line numbers move, so only the diagnostics of a second
+//! run are checked there.
 //! The first byte selects the language (ABAP or a CDS-family language); the
 //! line range is derived from the input length.
 
@@ -44,12 +48,31 @@ fuzz_target!(|data: &[u8]| {
     };
     let hint = LanguageHint::Explicit(LANGS[first as usize % LANGS.len()]);
     for opts in [Options::default(), variant(rest.len())] {
-        let r = format_lines(rest, &hint, &opts, &[lines(rest.len())]);
+        let range = [lines(rest.len())];
+        let r = format_lines(rest, &hint, &opts, &range);
         assert!(
             !r.has(Code::X001) && !r.has(Code::X002),
             "{:?}",
             r.diagnostics
         );
         assert_eq!(r.output.is_some(), r.status != Status::Error);
+        if let Some(out) = r.output {
+            let again = format_lines(&out, &hint, &opts, &range);
+            assert!(
+                !again.has(Code::X001) && !again.has(Code::X002),
+                "{:?}",
+                again.diagnostics
+            );
+        }
+        let whole = format_lines(rest, &hint, &opts, &[]);
+        assert!(
+            !whole.has(Code::X001) && !whole.has(Code::X002),
+            "{:?}",
+            whole.diagnostics
+        );
+        if let Some(out) = whole.output {
+            let again = format_lines(&out, &hint, &opts, &[]);
+            assert_eq!(again.output.as_deref(), Some(&out[..]), "not idempotent");
+        }
     }
 });
