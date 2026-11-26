@@ -2355,6 +2355,14 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
             .bare
             .then(|| b::concat(vec![b::concat(head), p.period()]));
     }
+    if p.c.style == Style::Aligned && matches!(spec.lead, ["SORT"] | ["CATCH"]) {
+        let saved = p.c.mark();
+        if let Some(body) = one_per_line(p, start, spec) {
+            return Some(b::concat(vec![b::concat(head), body, p.period()]));
+        }
+        p.c.reset(saved);
+        p.pos = start + spec.lead.len();
+    }
     if p.kind(p.pos) == COLON && !spec.commas {
         return spec_chain(p, spec, b::concat(head));
     }
@@ -2389,6 +2397,121 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
         mark_sql_keywords(p, start, p.end);
     }
     Some(b::group(vec![b::concat(head), body, p.period()]))
+}
+
+/// `SORT itab BY a b` and `CATCH cx_a cx_b`, aligned style (ABAP-ALIGN-009):
+/// two or more sort fields or exception classes go one per line, aligned
+/// under the first. `None` for other forms: one item, a dynamic sort field,
+/// a comment inside, `CATCH SYSTEM-EXCEPTIONS`.
+fn one_per_line(p: &mut P, start: usize, spec: &Spec) -> Option<Doc> {
+    const SORT_WORDS: &[&str] = &["STABLE", "ASCENDING", "DESCENDING"];
+    let sort = p.is(start, "SORT");
+    if (start + 1..p.end).any(|k| p.c.commented[k]) || p.is(start + 1, "SYSTEM-EXCEPTIONS") {
+        return None;
+    }
+    // A token and the tokens glued to it.
+    let unit_end = |p: &P, k: usize| {
+        let mut e = k + 1;
+        while e < p.end && p.glued(e) {
+            e += 1;
+        }
+        e
+    };
+    let mut docs = Vec::new();
+    let mut k = start + 1;
+    // Before the list: `itab [STABLE] [ASCENDING|DESCENDING] [AS TEXT] BY`,
+    // `[BEFORE UNWIND]`.
+    if sort {
+        if !p.is(k, "BY") {
+            let e = unit_end(p, k);
+            for i in k..e {
+                docs.push(p.sp(i));
+                docs.push(p.t(i));
+            }
+            k = e;
+        }
+        loop {
+            let n = if p.is(k, "AS") && p.is(k + 1, "TEXT") {
+                2
+            } else if SORT_WORDS.iter().any(|w| p.is(k, w)) {
+                1
+            } else {
+                break;
+            };
+            for i in k..k + n {
+                docs.push(p.sp(i));
+                docs.push(p.kw(i));
+            }
+            k += n;
+        }
+        if !p.is(k, "BY") || p.glued(k + 1) {
+            return None;
+        }
+        docs.push(p.sp(k));
+        docs.push(p.kw(k));
+        k += 1;
+    } else if p.is(k, "BEFORE") && p.is(k + 1, "UNWIND") {
+        for i in k..k + 2 {
+            docs.push(p.sp(i));
+            docs.push(p.kw(i));
+        }
+        k += 2;
+    }
+    // The list: one item is a token with its glued tokens, for `SORT` with
+    // its `ASCENDING`, `DESCENDING` and `AS TEXT`.
+    let mut items: Vec<(usize, Vec<Doc>)> = Vec::new();
+    while k < p.end && (sort || !p.is(k, "INTO")) {
+        if p.glued(k) || matches!(p.kind(k), LPAREN | RPAREN | LBRACKET | RBRACKET | COMMA) {
+            return None;
+        }
+        let first = k;
+        let e = unit_end(p, k);
+        let mut d = Vec::new();
+        for i in k..e {
+            if i > k {
+                d.push(p.sp(i));
+            }
+            d.push(p.t(i));
+        }
+        k = e;
+        loop {
+            let n = if !sort {
+                break;
+            } else if p.is(k, "AS") && p.is(k + 1, "TEXT") {
+                2
+            } else if p.is(k, "ASCENDING") || p.is(k, "DESCENDING") {
+                1
+            } else {
+                break;
+            };
+            for i in k..k + n {
+                d.push(p.sp(i));
+                d.push(p.kw(i));
+            }
+            k += n;
+        }
+        items.push((first, d));
+    }
+    if items.len() < 2 {
+        return None;
+    }
+    let first0 = items[0].0;
+    let mut lines = Vec::new();
+    for (n, (first, d)) in items.into_iter().enumerate() {
+        let mut line = vec![if n == 0 { b::empty() } else { p.hl(first) }];
+        line.extend(d);
+        lines.push(b::concat(line));
+    }
+    docs.push(p.sp(first0));
+    docs.push(b::hang(lines));
+    // `CATCH … INTO oref`
+    if k < p.end {
+        p.pos = k;
+        docs.push(spec_body(p, spec, true)?);
+    }
+    p.pos = p.end;
+    p.c.span(start, p.end, "ABAP-ALIGN-009");
+    Some(b::concat(docs))
 }
 
 /// The space before token `i`, except before the first token of a chain item
@@ -2630,6 +2753,10 @@ fn spec_chain(p: &mut P, spec: &Spec, head: Doc) -> Option<Doc> {
         return None;
     }
     let end = p.end;
+    // ABAP-ALIGN-009, aligned style: `CLEAR:` and `FREE:` always one item
+    // per line.
+    let forced =
+        p.c.style == Style::Aligned && matches!(spec.lead, ["CLEAR"] | ["FREE"]) && items.len() > 1;
     let mut docs = Vec::new();
     for (n, &(x, e)) in items.iter().enumerate() {
         p.pos = x;
@@ -2640,7 +2767,7 @@ fn spec_chain(p: &mut P, spec: &Spec, head: Doc) -> Option<Doc> {
         let mut d = Vec::new();
         // An item glued to its comma stays glued (no line break possible).
         if n > 0 && !p.glued(x) {
-            d.push(p.ln(x));
+            d.push(if forced { p.hl(x) } else { p.ln(x) });
         }
         d.push(b::group(vec![item]));
         if e < end && p.kind(e) == COMMA {
@@ -2650,7 +2777,12 @@ fn spec_chain(p: &mut P, spec: &Spec, head: Doc) -> Option<Doc> {
         docs.push(b::concat(d));
     }
     p.pos = end;
-    p.c.span(p.first, end, "ABAP-CHAIN-001");
+    let rule = if forced {
+        "ABAP-ALIGN-009"
+    } else {
+        "ABAP-CHAIN-001"
+    };
+    p.c.span(p.first, end, rule);
     Some(b::group(vec![
         head,
         p.sp(colon),
