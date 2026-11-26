@@ -435,6 +435,30 @@ fn sarif_output_is_json() {
     assert_eq!(doc["runs"][0]["results"][0]["ruleId"], "E004");
 }
 
+#[cfg(unix)]
+#[test]
+fn writing_through_a_symlink_keeps_the_link_and_formats_the_target() {
+    let d = dir();
+    write(d.path(), "real/a.prog.abap", "lv_a   =   1.\n");
+    let link = d.path().join("link.prog.abap");
+    std::os::unix::fs::symlink("real/a.prog.abap", &link).unwrap();
+    origami()
+        .current_dir(d.path())
+        .arg("link.prog.abap")
+        .assert()
+        .code(0);
+    assert!(
+        fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(
+        fs::read_to_string(d.path().join("real/a.prog.abap")).unwrap(),
+        "lv_a = 1.\n"
+    );
+}
+
 #[test]
 fn check_diff_prints_a_unified_diff_to_stdout() {
     let d = dir();

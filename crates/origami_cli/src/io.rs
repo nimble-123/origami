@@ -8,7 +8,10 @@
 use std::io::Write;
 use std::path::Path;
 
+/// Replaces the file `path` names. A symbolic link is followed, so the link
+/// stays a link and its target gets the new content.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let path = &path.canonicalize()?;
     let dir = path
         .parent()
         .filter(|d| !d.as_os_str().is_empty())
