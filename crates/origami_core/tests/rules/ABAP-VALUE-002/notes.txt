@@ -1,0 +1,6 @@
+1: ABAP-VALUE-002: iteration and rows on their own lines
+3: ABAP-VALUE-002: iteration and rows on their own lines
+5: ABAP-VALUE-002: iteration and rows on their own lines
+7: ABAP-VALUE-002: iteration and rows on their own lines
+9: ABAP-VALUE-002: iteration and rows on their own lines
+12: ABAP-VALUE-002: iteration and rows on their own lines
