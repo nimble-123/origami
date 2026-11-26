@@ -250,6 +250,28 @@ fn config_discovery_and_flag_precedence() {
 }
 
 #[test]
+fn discovery_walks_above_a_relative_working_directory() {
+    let d = dir();
+    write(d.path(), "origami.toml", "line_width = 300\n");
+    write(d.path(), "src/a.clas.abap", CLASS);
+    // From the project root and from below it, the same file is found.
+    for (cwd, file) in [(".", "src/a.clas.abap"), ("src", "a.clas.abap")] {
+        origami()
+            .current_dir(d.path().join(cwd))
+            .arg(file)
+            .assert()
+            .code(3);
+    }
+    // Also through `..`.
+    write(d.path(), "other/b.clas.abap", CLASS);
+    origami()
+        .current_dir(d.path().join("src"))
+        .arg("../other/b.clas.abap")
+        .assert()
+        .code(3);
+}
+
+#[test]
 fn discovery_stops_at_git_root() {
     let outer = tempfile::tempdir().unwrap();
     write(outer.path(), "origami.toml", "line_width = 300\n");

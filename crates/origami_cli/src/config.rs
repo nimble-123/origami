@@ -190,6 +190,20 @@ pub fn apply_flags(o: &mut Options, args: &Args) {
     }
 }
 
+/// `dir` as an absolute path without `..` where possible (a path that does
+/// not exist keeps them: its parents are then walked as written).
+fn absolute(dir: &Path) -> PathBuf {
+    let abs = std::path::absolute(dir).unwrap_or_else(|_| dir.to_path_buf());
+    if abs
+        .components()
+        .any(|c| c == std::path::Component::ParentDir)
+    {
+        abs.canonicalize().unwrap_or(abs)
+    } else {
+        abs
+    }
+}
+
 /// Finds and caches `origami.toml` files.
 #[derive(Default)]
 pub struct Resolver {
@@ -198,18 +212,20 @@ pub struct Resolver {
 
 impl Resolver {
     /// Walks up from `dir`, checking each directory including the one that
-    /// contains `.git`, and stops after it.
+    /// contains `.git`, and stops after it. A relative `dir` is made absolute
+    /// first, so the walk continues above the working directory.
     pub fn discover(&self, dir: &Path) -> Option<PathBuf> {
+        let dir = absolute(dir);
         if let Some(hit) = self
             .by_dir
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .get(dir)
+            .get(&dir)
         {
             return hit.clone();
         }
         let mut found = None;
-        let mut cur = Some(dir);
+        let mut cur = Some(dir.as_path());
         while let Some(d) = cur {
             let candidate = d.join(FILE_NAME);
             if candidate.is_file() {
@@ -224,7 +240,7 @@ impl Resolver {
         self.by_dir
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .insert(dir.to_path_buf(), found.clone());
+            .insert(dir, found.clone());
         found
     }
 }
