@@ -5,4 +5,5 @@ define view entity ZI_X
       @Semantics.text: true
       descr as Description,
       _Booking
+  // after the last element
 }

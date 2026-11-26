@@ -16,6 +16,9 @@ use origami_syntax::{
 };
 use std::collections::BTreeSet;
 
+/// Columns of `key ` (CDS-KEY-001).
+const KEY_COLS: u32 = 4;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Kind {
     Annotation,
@@ -30,8 +33,8 @@ pub struct CdsUnit {
     pub last: usize,
     kind: Kind,
     depth: u32,
-    /// Extra indent (in indent steps) for non-key elements in a block with
-    /// key elements.
+    /// Extra indent (in columns, whatever the indent width) for non-key
+    /// elements in a block with key elements: the width of `key `.
     extra: u32,
 }
 
@@ -82,13 +85,24 @@ fn clause_doc(text: &str, stream: &TokenStream, u: &CdsUnit, blank: bool) -> Doc
     ])
 }
 
+/// A comment lies between the byte offsets `from` and `to`. The trivia are in
+/// source order, so only those in the range are looked at (a scan of all of
+/// them for every unit is quadratic in the file).
+pub(crate) fn comment_between(stream: &TokenStream, from: u32, to: u32) -> bool {
+    let first = stream.trivia.partition_point(|t| t.start < from);
+    stream.trivia[first..]
+        .iter()
+        .take_while(|t| t.start < to)
+        .any(|t| t.is_comment() && t.end <= to)
+}
+
 /// The unit has no comment after its first token.
 fn no_comments(stream: &TokenStream, u: &CdsUnit) -> bool {
-    let (a, b) = (stream.tokens[u.first].start, stream.tokens[u.last].end);
-    !stream
-        .trivia
-        .iter()
-        .any(|t| t.is_comment() && t.start > a && t.end <= b)
+    !comment_between(
+        stream,
+        stream.tokens[u.first].start,
+        stream.tokens[u.last].end,
+    )
 }
 
 /// `from..to` printed on one line with single spaces (glued tokens stay
@@ -219,21 +233,30 @@ fn matching_braces(toks: &[origami_syntax::Token]) -> Vec<Option<usize>> {
     close
 }
 
-/// Nesting of every token in brackets of any kind: tokens inside one pair
-/// are at 1; a bracket is at the level of the tokens around it.
-fn nesting(toks: &[origami_syntax::Token]) -> Vec<u32> {
-    let mut depth = 0u32;
+/// Nesting of every token in brackets of any kind and in `case … end`: tokens
+/// inside one pair are at 1; a bracket, `case` or `end` is at the level of the
+/// tokens around it.
+fn nesting(text: &str, toks: &[origami_syntax::Token]) -> Vec<u32> {
+    let (mut depth, mut cases) = (0u32, 0u32);
     toks.iter()
         .map(|t| match t.kind {
             LBRACE | LPAREN | LBRACKET => {
                 depth += 1;
-                depth - 1
+                depth + cases - 1
             }
             RBRACE | RPAREN | RBRACKET => {
                 depth = depth.saturating_sub(1);
-                depth
+                depth + cases
             }
-            _ => depth,
+            IDENT if t.text(text).eq_ignore_ascii_case("case") => {
+                cases += 1;
+                depth + cases - 1
+            }
+            IDENT if t.text(text).eq_ignore_ascii_case("end") => {
+                cases = cases.saturating_sub(1);
+                depth + cases
+            }
+            _ => depth + cases,
         })
         .collect()
 }
@@ -429,10 +452,10 @@ fn mark_key_blocks(text: &str, stream: &TokenStream, units: &mut [CdsUnit]) {
                     Kind::Element => {
                         next_is_key = is_key(&units[m]);
                         if !next_is_key {
-                            units[m].extra = 2;
+                            units[m].extra = KEY_COLS;
                         }
                     }
-                    Kind::Annotation if !next_is_key => units[m].extra = 2,
+                    Kind::Annotation if !next_is_key => units[m].extra = KEY_COLS,
                     _ => {}
                 }
             }
@@ -465,7 +488,7 @@ pub fn layout(
     let aligned = opts.style == origami_syntax::Style::Aligned;
     let view = aligned && lang == Language::Ddls && is_view(text, stream, units);
     let alias_pads = if view {
-        alias_pads(text, stream, units, opts.indent_width)
+        alias_pads(text, stream, units)
     } else {
         Default::default()
     };
@@ -473,7 +496,7 @@ pub fn layout(
     let mut spans = Vec::new();
     let mut diagnostics = Vec::new();
     let mut depth_limited = 0;
-    let nest = nesting(&stream.tokens);
+    let nest = nesting(text, &stream.tokens);
     for (id, u) in units.iter().enumerate() {
         let first = TokenIndex(u.first as u32);
         let last = TokenIndex(u.last as u32);
@@ -587,12 +610,21 @@ pub fn layout(
         } else {
             b::hard(stream, first)
         };
-        let level = if too_deep {
-            (u.depth + u.extra).min(MAX_NESTING)
+        let (level, extra) = if too_deep {
+            (u.depth.min(MAX_NESTING), 0)
         } else {
-            u.depth + u.extra
+            (u.depth, u.extra)
         };
-        docs.push((0..level).fold(b::concat(vec![start, body]), |d, _| b::indent(vec![d])));
+        // Comment lines before a closing brace belong to the block's content.
+        let body = if u.kind == Kind::Close {
+            b::lead_indent(vec![body])
+        } else {
+            body
+        };
+        docs.push(b::indent_by(
+            level,
+            vec![b::indent_cols(extra, vec![start, body])],
+        ));
     }
     let forced_blanks = if view {
         view_blanks(text, stream, units)
@@ -656,11 +688,7 @@ fn case_breaks(text: &str, stream: &TokenStream, u: &CdsUnit) -> bool {
 fn one_line(text: &str, stream: &TokenStream, u: &CdsUnit) -> bool {
     let toks = &stream.tokens;
     let (a, b) = (toks[u.first].start, toks[u.last].end);
-    !text[a as usize..b as usize].contains('\n')
-        && !stream
-            .trivia
-            .iter()
-            .any(|t| t.is_comment() && t.start > a && t.end <= b)
+    !text[a as usize..b as usize].contains('\n') && !comment_between(stream, a, b)
 }
 
 /// Width of tokens `from..to` printed with single spaces.
@@ -680,7 +708,6 @@ fn alias_pads(
     text: &str,
     stream: &TokenStream,
     units: &[CdsUnit],
-    indent_width: u8,
 ) -> std::collections::HashMap<usize, (usize, usize)> {
     let mut out = std::collections::HashMap::new();
     let Some(open) = units
@@ -713,7 +740,7 @@ fn alias_pads(
         {
             continue;
         }
-        let offset = u.extra as usize * indent_width as usize;
+        let offset = u.extra as usize;
         let mut last = u.last;
         if stream.tokens[last].kind == COMMA {
             last -= 1;
