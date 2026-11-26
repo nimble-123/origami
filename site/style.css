@@ -105,6 +105,8 @@ p, li, dd { text-wrap: pretty; }
 .skip { position: absolute; left: -999px; top: 8px; z-index: 50; }
 .skip:focus { left: var(--gutter); background: var(--surface-2); padding: 8px 12px; border-radius: 8px; color: var(--head); }
 @media (scripting: enabled) { .noscript-note { display: none; } }
+/* Without scripting the playground cannot run; its note stands in for it. */
+@media (scripting: none) { .pg-window { display: none; } }
 .noscript-note { color: var(--text-2); font-size: var(--t-s); text-align: center; margin: var(--s-4) 0 0; }
 
 .top-in, main > section, .foot-in { width: min(100% - 2 * var(--gutter), var(--page)); margin-inline: auto; }
@@ -189,10 +191,10 @@ p, li, dd { text-wrap: pretty; }
   .top nav {
     display: none; position: absolute; left: 0; right: 0; top: 100%;
     flex-direction: column; align-items: stretch; gap: 0; padding: var(--s-2) var(--gutter) var(--s-5);
-    background: rgba(13, 14, 20, 0.96); border-bottom: 1px solid var(--line);
+    background: var(--bg); border-bottom: 1px solid var(--line); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
   }
   .top nav.open { display: flex; }
-  .top.menu-open { background: rgba(13, 14, 20, 0.96); border-bottom-color: var(--line); }
+  .top.menu-open { background: var(--bg); border-bottom-color: var(--line); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .top nav a { min-height: 52px; padding: 0 4px; font-size: var(--t-base); color: var(--text); border-radius: 0; }
   .top nav a + a { border-top: 1px solid var(--line); }
   .top nav a.nav-cta { margin: var(--s-4) 0 0; justify-content: center; border-radius: 10px; border-top: 0; }

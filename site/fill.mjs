@@ -39,17 +39,21 @@ for (const [name, r] of [["sample", hero], ["check", check], ["layout", layout]]
   if (r.output == null) throw new Error(`fill.mjs: origami did not format the ${name} sample`);
 }
 
-// The check: the output's tokens, each underlined, and the count.
+// The check: the line as written and the output, each token underlined,
+// and the count.
 const lexIn = call("lex", `${CHECK_SOURCE}\n`, 0);
 const lexOut = call("lex", check.output, 0);
-const outText = check.output.replace(/\n$/, "");
-let checkHtml = "";
-let pos = 0;
-for (const t of lexOut.tokens) {
-  checkHtml += esc(outText.slice(pos, t.start)) + `<u>${esc(outText.slice(t.start, t.end))}</u>`;
-  pos = t.end;
+function underline(text, tokens) {
+  let html = "";
+  let pos = 0;
+  for (const t of tokens) {
+    html += esc(text.slice(pos, t.start)) + `<u>${esc(text.slice(t.start, t.end))}</u>`;
+    pos = t.end;
+  }
+  return html + esc(text.slice(pos));
 }
-checkHtml += esc(outText.slice(pos));
+const checkHtml = underline(check.output.replace(/\n$/, ""), lexOut.tokens);
+const checkInHtml = `<div class="check-in-track">${underline(CHECK_SOURCE, lexIn.tokens)}</div>`;
 const same = lexIn.tokens.length === lexOut.tokens.length;
 
 const review_ = await readFile(new URL("samples/review.ansi", here), "utf8");
@@ -57,6 +61,7 @@ const fills = {
   "hero-in": inputRows(sample, hero.output, keywords),
   "hero-out": codeRows(hero.output, keywords, { notes: hero.notes }),
   "check-out": checkHtml,
+  "check-in": checkInHtml,
   "check-count": same ? String(lexOut.tokens.length) : "?",
   "layout-out": layoutMarks(`${LAYOUT_SOURCE}\n`, layout.output, keywords),
   "layout-in": LAYOUT_SOURCE.split("\n").map((l) => paintHtml(l, keywords)).join("\n"),
