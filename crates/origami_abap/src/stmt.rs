@@ -1150,9 +1150,6 @@ impl<'c, 'a> P<'c, 'a> {
             if !self.is_named_row(name) || self.glued(name) {
                 return None;
             }
-            if !items.is_empty() && self.c.commented[name] {
-                items.push(AlignItem::Break);
-            }
             let eq = name + 1;
             self.pos = eq + 1;
             let value = self.expr()?;
@@ -1230,9 +1227,6 @@ impl<'c, 'a> P<'c, 'a> {
                                 first = false;
                                 AlignItem::Row(r)
                             }
-                            // A comment line ends the `=` alignment
-                            // (ABAP-ALIGN-001), not the keyword column.
-                            AlignItem::Break => AlignItem::Split,
                             other => other,
                         });
                     }
@@ -1523,9 +1517,6 @@ impl<'c, 'a> P<'c, 'a> {
                 let name = self.pos;
                 if !self.is_named_row(name) || self.glued(name) {
                     return None;
-                }
-                if !rows.is_empty() && self.c.commented[name] {
-                    rows.push(AlignItem::Break);
                 }
                 self.pos = name + 2;
                 let value = self.expr()?;

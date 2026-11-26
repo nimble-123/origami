@@ -463,9 +463,23 @@ lo_service->read( EXPORTING iv_identifier = lv_id
 Milestone: M1
 
 In a broken parameter list, the `=` signs of consecutive parameters are
-aligned. A blank line or comment line ends the aligned group. If aligning
-would push a line past the width, or a `=` touches the name before it, the
-group uses single spaces.
+aligned. A blank line ends the aligned group; a comment line does not. If
+aligning would push a line past the width, or a `=` touches the name before
+it, the group uses single spaces.
+
+Approved by the maintainer, Nils Lutz, on 2026-11-26: a comment line between
+parameters, such as a commented-out optional parameter, does not end the
+group.
+
+```abap
+CALL FUNCTION 'POPUP_TO_CONFIRM'
+  EXPORTING
+*     TITLEBAR              = ' '
+            text_question         = lv_question
+*     ICON_BUTTON_1         = ' '
+            display_cancel_button = abap_false
+  IMPORTING answer                = lv_answer.
+```
 
 ### ABAP-ALIGN-002: Align `=` in broken constructor expressions (A2)
 Milestone: M1

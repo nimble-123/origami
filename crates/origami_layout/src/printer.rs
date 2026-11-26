@@ -340,7 +340,7 @@ impl<'a> Ctx<'a> {
             Inner::AlignGroup(items, _, broken) => {
                 let rows = items
                     .iter()
-                    .filter(|i| !matches!(i, AlignItem::Break | AlignItem::Split))
+                    .filter(|i| !matches!(i, AlignItem::Break))
                     .count();
                 (*broken && rows > 1)
                     | items
@@ -1289,13 +1289,12 @@ impl<'c, 'a> Printer<'c, 'a> {
 
     fn align_group(&mut self, items: &[AlignItem], fit: AlignFit, indent: usize, width: usize) {
         let col = self.column().max(indent);
-        // Split into segments at `Break` and `Split`; segments joined by
-        // `Split` form one block for the lead columns.
+        // Split into segments at `Break`; each segment is one block for the
+        // lead columns.
         let mut segments: Vec<(usize, Vec<&AlignItem>)> = vec![(0, Vec::new())];
         for it in items {
             match it {
                 AlignItem::Break => segments.push((segments.len(), Vec::new())),
-                AlignItem::Split => segments.push((segments.last().unwrap().0, Vec::new())),
                 _ => segments.last_mut().unwrap().1.push(it),
             }
         }
@@ -1412,7 +1411,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                         );
                         continue;
                     }
-                    AlignItem::Break | AlignItem::Split => continue,
+                    AlignItem::Break => continue,
                 };
                 for (c, cell) in r.lead.iter().enumerate() {
                     let at = self.cell_indent(cell, col);
@@ -1524,7 +1523,10 @@ fn first_token(doc: &Doc) -> Option<TokenIndex> {
         | Inner::Indent(ds)
         | Inner::Cont(ds)
         | Inner::Hang(ds)
-        | Inner::Concat(ds) => ds.iter().find_map(first_token),
+        | Inner::Concat(ds)
+        | Inner::LeadIndent(ds)
+        | Inner::IndentBy(_, ds)
+        | Inner::IndentCols(_, ds) => ds.iter().find_map(first_token),
         Inner::Choice(a, _) => first_token(a),
         Inner::Shared(d) => first_token(d),
         Inner::Fill(items) => items

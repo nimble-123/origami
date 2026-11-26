@@ -8,8 +8,8 @@ CALL FUNCTION 'Z_FLIGHT_TRAVEL_CREATE'
 CALL FUNCTION 'POPUP_TO_CONFIRM'
   EXPORTING
 *     TITLEBAR              = ' '
-            text_question = lv_q
-            text_button_1 = 'Ja'
+            text_question         = lv_q
+            text_button_1         = 'Ja'
 *     ICON_BUTTON_1         = ' '
             display_cancel_button = abap_false
   IMPORTING answer                = lv_answer.
@@ -18,7 +18,7 @@ CALL FUNCTION 'POPUP_TO_CONFIRM'
 CALL METHOD lo_service->read
   EXPORTING
             " the key
-            iv_id = lv_id
+            iv_id   = lv_id
             " the language
             iv_lang = sy-langu
   IMPORTING es_data = ls_data.

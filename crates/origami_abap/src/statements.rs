@@ -5179,9 +5179,6 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
                 {
                     return None;
                 }
-                if !rows.is_empty() && p.c.commented[name] {
-                    rows.push(AlignItem::Break);
-                }
                 let eq = name + 1;
                 p.pos = eq + 1;
                 let value = p.expr()?;
@@ -5224,9 +5221,6 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
                             first = false;
                             AlignItem::Row(r)
                         }
-                        // A comment line ends the `=` alignment
-                        // (ABAP-ALIGN-001), not the keyword column.
-                        AlignItem::Break => AlignItem::Split,
                         other => other.clone(),
                     });
                 }
