@@ -13,15 +13,28 @@ dir=$2
 repo=${ORIGAMI_REPO:-nimble-123/origami}
 base="https://github.com/${repo}/releases/download/v${version}"
 
+# The checksum of one target, validated. Called as `x=$(sum TRIPLE) || exit 1`
+# before anything is printed: an `exit` inside a command substitution inside
+# the heredoc would only end that substitution.
 sum() {
   f="$dir/origami-${version}-$1.sha256"
-  [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }
-  cut -d' ' -f1 < "$f"
+  [ -f "$f" ] || { echo "missing $f" >&2; return 1; }
+  s=$(cut -d' ' -f1 < "$f")
+  case $s in
+    *[!0-9a-f]*) s= ;;
+  esac
+  [ ${#s} -eq 64 ] || { echo "invalid sha256 in $f" >&2; return 1; }
+  printf '%s\n' "$s"
 }
+
+sum_arm_mac=$(sum aarch64-apple-darwin) || exit 1
+sum_intel_mac=$(sum x86_64-apple-darwin) || exit 1
+sum_arm_linux=$(sum aarch64-unknown-linux-gnu) || exit 1
+sum_intel_linux=$(sum x86_64-unknown-linux-gnu) || exit 1
 
 block() {
   printf '    url "%s/origami-%s-%s"\n' "$base" "$version" "$1"
-  printf '    sha256 "%s"\n' "$(sum "$1")"
+  printf '    sha256 "%s"\n' "$2"
 }
 
 cat <<RUBY
@@ -34,19 +47,19 @@ class Origami < Formula
 
   on_macos do
     on_arm do
-$(block aarch64-apple-darwin | sed 's/^/  /')
+$(block aarch64-apple-darwin "$sum_arm_mac" | sed 's/^/  /')
     end
     on_intel do
-$(block x86_64-apple-darwin | sed 's/^/  /')
+$(block x86_64-apple-darwin "$sum_intel_mac" | sed 's/^/  /')
     end
   end
 
   on_linux do
     on_arm do
-$(block aarch64-unknown-linux-gnu | sed 's/^/  /')
+$(block aarch64-unknown-linux-gnu "$sum_arm_linux" | sed 's/^/  /')
     end
     on_intel do
-$(block x86_64-unknown-linux-gnu | sed 's/^/  /')
+$(block x86_64-unknown-linux-gnu "$sum_intel_linux" | sed 's/^/  /')
     end
   end
 

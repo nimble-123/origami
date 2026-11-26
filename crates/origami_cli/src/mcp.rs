@@ -11,8 +11,10 @@
 //!
 //! Tool calls run one at a time on a worker thread, each with a deadline
 //! (30 s, `ORIGAMI_MCP_TIMEOUT` seconds); other requests are answered while
-//! a call runs, and `notifications/cancelled` cancels a call. A message may
-//! be at most 16 MiB long.
+//! a call runs, and `notifications/cancelled` cancels a call. A cancelled
+//! worker may keep running for a while: a call that writes does not start
+//! while one is running, nor a call after one that wrote. At most
+//! `MAX_QUEUE` calls wait. A message may be at most 16 MiB long.
 
 use crate::args::Args;
 use crate::report::diff::unified;
@@ -40,8 +42,15 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 /// carries; the rest is summarised.
 const RESPONSE_BUDGET: usize = 100 * 1024;
 
+/// How many tool calls may wait for the running one.
+const MAX_QUEUE: usize = 16;
+
 /// JSON-RPC error code for a tool call that missed its deadline.
 const TIMED_OUT: i64 = -32001;
+
+/// JSON-RPC error code for a tool call that is refused because the server
+/// is busy (queue full, or a cancelled call still running).
+const BUSY: i64 = -32002;
 
 enum Event {
     /// One message from stdin, without the line break.
@@ -63,6 +72,29 @@ struct Running {
     writes: bool,
 }
 
+/// A call that was cancelled or timed out whose worker has not stopped yet.
+struct Lingering {
+    seq: u64,
+    /// When it was cancelled.
+    since: Instant,
+    writes: bool,
+}
+
+fn writes_in(msg: &Value) -> bool {
+    msg["params"]["arguments"]["write"] == true
+}
+
+/// If `msg` must wait for a lingering worker (either of them writes): when
+/// the longest it waits for it ends.
+fn held_until(lingering: &[Lingering], msg: &Value, timeout: Duration) -> Option<Instant> {
+    let writes = writes_in(msg);
+    lingering
+        .iter()
+        .filter(|l| l.writes || writes)
+        .map(|l| l.since + timeout)
+        .min()
+}
+
 pub fn serve() -> i32 {
     let timeout = timeout();
     let (tx, rx) = mpsc::channel();
@@ -82,33 +114,49 @@ pub fn serve() -> i32 {
             .is_ok()
     };
     let mut running: Option<Running> = None;
+    let mut lingering: Vec<Lingering> = Vec::new();
     let mut queue: VecDeque<Value> = VecDeque::new();
     let mut seq = 0;
     let mut end = None;
     loop {
+        // The next call waits for a lingering worker, up to one deadline.
+        let mut held = None;
         if running.is_none() {
-            if let Some(msg) = queue.pop_front() {
-                seq += 1;
-                match start(msg, seq, timeout, &tx) {
-                    Ok(r) => running = Some(r),
-                    Err(reply) if !send(&reply) => return 4,
-                    Err(_) => {}
+            if let Some(msg) = queue.front() {
+                held = held_until(&lingering, msg, timeout);
+                if held.is_some_and(|until| until <= Instant::now()) {
+                    let id = queue.pop_front().map_or(Value::Null, |m| m["id"].clone());
+                    if !send(&still_running(id)) {
+                        return 4;
+                    }
+                    continue;
                 }
-                continue;
-            }
-            if let Some(code) = end {
+                if held.is_none()
+                    && let Some(msg) = queue.pop_front()
+                {
+                    seq += 1;
+                    match start(msg, seq, timeout, &tx) {
+                        Ok(r) => running = Some(r),
+                        Err(reply) if !send(&reply) => return 4,
+                        Err(_) => {}
+                    }
+                    continue;
+                }
+            } else if let Some(code) = end {
                 return code;
             }
         }
-        let event = match &running {
-            Some(r) => {
-                let left = r.deadline.saturating_duration_since(Instant::now());
+        let wake = running.as_ref().map(|r| r.deadline).or(held);
+        let event = match wake {
+            Some(at) => {
+                let left = at.saturating_duration_since(Instant::now());
                 match (!left.is_zero()).then(|| rx.recv_timeout(left)) {
                     Some(Ok(e)) => e,
                     Some(Err(RecvTimeoutError::Disconnected)) => return 70,
                     None | Some(Err(RecvTimeoutError::Timeout)) => {
                         if let Some(r) = running.take() {
                             r.cancel.store(true, Ordering::Relaxed);
+                            lingering.push(r.lingering());
                             if !send(&timed_out(&r, timeout)) {
                                 return 4;
                             }
@@ -133,7 +181,10 @@ pub fn serve() -> i32 {
                     Some(reply)
                 }
                 // A call that timed out or was cancelled: no reply.
-                _ => None,
+                _ => {
+                    lingering.retain(|l| l.seq != seq);
+                    None
+                }
             },
             Event::TooLong(start) => Some(error(
                 id_in(&start),
@@ -152,13 +203,24 @@ pub fn serve() -> i32 {
                         && let Some(r) = running.take()
                     {
                         r.cancel.store(true, Ordering::Relaxed);
+                        lingering.push(r.lingering());
                     }
                     queue.retain(|m| &m["id"] != id);
                     None
                 }
                 Ok(msg) if msg["method"] == "tools/call" && msg.get("id").is_some() => {
-                    queue.push_back(msg);
-                    None
+                    if queue.len() >= MAX_QUEUE {
+                        Some(error(
+                            msg["id"].clone(),
+                            BUSY,
+                            &format!(
+                                "Server busy: {MAX_QUEUE} calls are already waiting; nothing was done. Call again when earlier calls have finished."
+                            ),
+                        ))
+                    } else {
+                        queue.push_back(msg);
+                        None
+                    }
                 }
                 Ok(msg) => handle(&msg, &AtomicBool::new(false)),
             },
@@ -204,7 +266,7 @@ fn start(
         id: id.clone(),
         cancel: Arc::clone(&cancel),
         deadline: Instant::now() + timeout,
-        writes: msg["params"]["arguments"]["write"] == true,
+        writes: writes_in(&msg),
     };
     let tx = tx.clone();
     let worker = move || {
@@ -224,6 +286,24 @@ fn start(
             &format!("Internal error: cannot start a worker thread: {e}"),
         )),
     }
+}
+
+impl Running {
+    fn lingering(&self) -> Lingering {
+        Lingering {
+            seq: self.seq,
+            since: Instant::now(),
+            writes: self.writes,
+        }
+    }
+}
+
+fn still_running(id: Value) -> Value {
+    error(
+        id,
+        BUSY,
+        "Server busy: an earlier call that was cancelled or timed out is still running and cannot be stopped yet; this call was not started, so nothing was written. Call again later.",
+    )
 }
 
 fn timed_out(r: &Running, timeout: Duration) -> Value {
@@ -354,7 +434,7 @@ fn handle(msg: &Value, cancel: &AtomicBool) -> Option<Value> {
             let a = &params["arguments"];
             let result = match name {
                 "format" => format_tool(a),
-                "format_files" => Ok(files_tool(a, cancel)),
+                "format_files" => files_tool(a, cancel),
                 _ => Err(format!("Unknown tool: {name}")),
             };
             match result {
@@ -396,7 +476,7 @@ fn tools() -> Value {
                     "changed": {"type": "string", "description": "Git revision, e.g. HEAD or main: only format lines changed against it."}
                 }
             },
-            "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+            "annotations": {"readOnlyHint": false, "destructiveHint": true, "idempotentHint": true, "openWorldHint": false}
         }
     ])
 }
@@ -423,6 +503,32 @@ fn summary(diags: &[origami_core::Reported]) -> String {
 
 fn tool_error(text: String, structured: Value) -> Value {
     json!({"content": [{"type": "text", "text": text}], "structuredContent": structured, "isError": true})
+}
+
+/// The optional argument `key` of the tool call `a`, as a value of the type
+/// the tool schema declares. A wrong type is an error: silently using the
+/// default would, for `paths` with `write`, rewrite the whole working directory.
+fn optional<'a, T>(
+    a: &'a Value,
+    key: &str,
+    expected: &str,
+    get: impl Fn(&'a Value) -> Option<T>,
+) -> Result<Option<T>, String> {
+    match &a[key] {
+        Value::Null => Ok(None),
+        v => get(v)
+            .map(Some)
+            .ok_or_else(|| format!("`{key}` must be {expected}; got {v}")),
+    }
+}
+
+/// The tool arguments must be an object (or absent).
+fn check_object(a: &Value) -> Result<(), String> {
+    if a.is_null() || a.is_object() {
+        Ok(())
+    } else {
+        Err(format!("`arguments` must be an object; got {a}"))
+    }
 }
 
 /// The `lines` argument: `[[start, end], …]`, 1 <= start <= end < 2^32.
@@ -455,11 +561,15 @@ fn line_ranges(v: &Value) -> Result<Vec<(u32, u32)>, String> {
 }
 
 fn format_tool(a: &Value) -> Result<Value, String> {
-    let Some(source) = a["source"].as_str() else {
+    check_object(a)?;
+    let source = optional(a, "source", "a string", Value::as_str)?;
+    let filename = optional(a, "filename", "a string", Value::as_str)?;
+    let language = optional(a, "language", "a string", Value::as_str)?;
+    let lines = line_ranges(&a["lines"])?;
+    let Some(source) = source else {
         return Ok(tool_error("`source` is required".into(), json!({})));
     };
-    let filename = a["filename"].as_str();
-    let hint = match a["language"].as_str() {
+    let hint = match language {
         Some("cds") => LanguageHint::CdsFamily,
         Some(l) => match Language::parse(l) {
             Some(lang) => LanguageHint::Explicit(lang),
@@ -470,7 +580,6 @@ fn format_tool(a: &Value) -> Result<Value, String> {
             None => LanguageHint::None,
         },
     };
-    let lines = line_ranges(&a["lines"])?;
     let dir = filename
         .and_then(|n| Path::new(n).parent().map(Path::to_path_buf))
         .filter(|d| !d.as_os_str().is_empty() && d.is_dir())
@@ -545,16 +654,21 @@ fn outside_cwd<'a>(paths: impl Iterator<Item = &'a PathBuf>) -> Vec<String> {
         .collect()
 }
 
-fn files_tool(a: &Value, cancel: &AtomicBool) -> Value {
-    let paths: Vec<PathBuf> = a["paths"]
-        .as_array()
-        .map(|v| {
-            v.iter()
-                .filter_map(|p| p.as_str().map(PathBuf::from))
-                .collect()
-        })
-        .unwrap_or_default();
-    let write = a["write"].as_bool().unwrap_or(false);
+fn files_tool(a: &Value, cancel: &AtomicBool) -> Result<Value, String> {
+    check_object(a)?;
+    let paths: Vec<PathBuf> = optional(a, "paths", "an array of strings", |v| {
+        v.as_array()?
+            .iter()
+            .map(|p| p.as_str().map(PathBuf::from))
+            .collect()
+    })?
+    .unwrap_or_default();
+    let write = optional(a, "write", "a boolean", Value::as_bool)?.unwrap_or(false);
+    let changed = optional(a, "changed", "a string", Value::as_str)?;
+    Ok(files_run(&paths, write, changed, cancel))
+}
+
+fn files_run(paths: &[PathBuf], write: bool, changed: Option<&str>, cancel: &AtomicBool) -> Value {
     // The tool works only below the server's working directory.
     let outside = outside_cwd(paths.iter());
     if !outside.is_empty() {
@@ -566,8 +680,8 @@ fn files_tool(a: &Value, cancel: &AtomicBool) -> Value {
             json!({"outside": outside}),
         );
     }
-    let selected: Vec<(PathBuf, crate::changed::Ranges)> = match a["changed"].as_str() {
-        Some(rev) => match crate::changed::files(rev, &paths) {
+    let selected: Vec<(PathBuf, crate::changed::Ranges)> = match changed {
+        Some(rev) => match crate::changed::files(rev, paths) {
             Ok(f) => f,
             Err(m) => return tool_error(m, json!({})),
         },
@@ -575,7 +689,7 @@ fn files_tool(a: &Value, cancel: &AtomicBool) -> Value {
             let roots = if paths.is_empty() {
                 vec![PathBuf::from(".")]
             } else {
-                paths
+                paths.to_vec()
             };
             crate::walk::files(&roots)
                 .into_iter()
@@ -752,6 +866,25 @@ fn within_budget(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn format_files_is_announced_as_destructive() {
+        let tools = tools();
+        let annotations = |name: &str| {
+            tools
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|t| t["name"] == name)
+                .map(|t| t["annotations"].clone())
+                .unwrap()
+        };
+        // It rewrites files with `write: true`.
+        let files = annotations("format_files");
+        assert_eq!(files["readOnlyHint"], false);
+        assert_eq!(files["destructiveHint"], true);
+        assert_eq!(annotations("format")["readOnlyHint"], true);
+    }
 
     #[test]
     fn read_line_caps_long_lines_and_keeps_reading() {

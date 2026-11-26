@@ -165,6 +165,25 @@ fn nested_calls_are_not_exponential() {
     run(Language::Abap, &src, &Options::default());
 }
 
+/// Explaining the breaks looks up comments and rule spans once per break,
+/// not by scanning all of them for each.
+#[test]
+fn explaining_many_breaks_is_not_quadratic() {
+    let src = (0..40_000)
+        .map(|k| format!("lv_a = {k}."))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let start = Instant::now();
+    let e = origami_core::explain(
+        src.as_bytes(),
+        &LanguageHint::Explicit(Language::Abap),
+        &Options::default(),
+        &[],
+    );
+    assert!(start.elapsed() < BOUND, "took {:?}", start.elapsed());
+    assert_eq!(e.notes.len(), 39_999, "{:?}", e.result.diagnostics);
+}
+
 #[test]
 fn input_over_the_size_limit_is_left_as_written() {
     let src = "WRITE 'x'.\n".repeat(MAX_INPUT_LEN / 11 + 1);
@@ -173,6 +192,39 @@ fn input_over_the_size_limit_is_left_as_written() {
     assert_eq!(r.status, Status::Unchanged);
     assert!(r.has(Code::W004));
     assert_eq!(r.output.as_deref(), Some(src.as_bytes()));
+}
+
+/// The size limit comes before content sniffing, which lexes the input: a
+/// language detected from content gives the same W004 as a named one.
+#[test]
+fn input_over_the_size_limit_is_not_sniffed() {
+    let src = "a ".repeat(MAX_INPUT_LEN / 2 + 1);
+    for hint in [
+        LanguageHint::None,
+        LanguageHint::CdsFamily,
+        LanguageHint::Path("z.acds".into()),
+        LanguageHint::StdinPath("z.acds".into()),
+        LanguageHint::LanguageId("acds".into()),
+    ] {
+        let start = Instant::now();
+        let r = format(src.as_bytes(), &hint, &Options::default());
+        assert!(
+            start.elapsed() < BOUND,
+            "{hint:?}: took {:?}",
+            start.elapsed()
+        );
+        assert_eq!(r.status, Status::Unchanged, "{hint:?}: {:?}", r.diagnostics);
+        assert!(r.has(Code::W004), "{hint:?}: {:?}", r.diagnostics);
+        assert_eq!(r.language, None, "{hint:?}");
+        assert_eq!(r.output.as_deref(), Some(src.as_bytes()), "{hint:?}");
+    }
+    let r = format(
+        src.as_bytes(),
+        &LanguageHint::Path("z.ddls.asddls".into()),
+        &Options::default(),
+    );
+    assert!(r.has(Code::W004), "{:?}", r.diagnostics);
+    assert_eq!(r.language, Some(Language::Ddls));
 }
 
 #[test]

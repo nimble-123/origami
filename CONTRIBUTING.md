@@ -107,7 +107,8 @@ that: 0.4.1 and 0.4.2 each lost a changelog entry this way.
 A pull request that changes only documentation skips the jobs that build and
 test the code (`changes` in `.github/workflows/ci.yml` decides). Documentation
 is `site/`, `docs/` except `docs/STYLE.md` (tests read it), Markdown files
-outside the code folders, and `scripts/abap-cleaner-compare/`.
+outside the code folders, and `scripts/abap-cleaner-compare/`. A change under
+`site/` or `docs/assets/` still runs the `wasm` job, which builds the website.
 
 ```text
 <type>(<optional scope>): <what changes, in the imperative>

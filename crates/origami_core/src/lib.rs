@@ -90,7 +90,9 @@ fn format_inner(
         Ok(s) => s,
         Err(d) => return plain(error_result(None, &d, "")),
     };
-    let lang = match detect::detect(&src, hint) {
+    // The size limit comes before detecting the language from the content,
+    // which lexes the whole input.
+    let named = match detect::by_hint(hint) {
         Ok(l) => l,
         Err(d) => return plain(error_result(None, &d, src.text())),
     };
@@ -105,12 +107,16 @@ fn format_inner(
         return plain(FormatResult {
             output: Some(input.to_vec()),
             changed: false,
-            language: Some(lang),
+            language: named,
             status: Status::Unchanged,
             diagnostics: vec![d],
             stats: Stats::default(),
         });
     }
+    let lang = match named.map_or_else(|| detect::detect(&src, hint), Ok) {
+        Ok(l) => l,
+        Err(d) => return plain(error_result(None, &d, src.text())),
+    };
     let identity = identity_mode(lang);
     let checked = check::run(&src, lang, opts, identity, explain);
     // The final pass before line selection, for the explain pass.

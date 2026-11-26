@@ -314,6 +314,7 @@ def page(examples, rows, cleaner, origami, profile_count):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
   <title>origami and ABAP Cleaner</title>
   <meta name="description" content="The same ABAP and CDS code formatted by ABAP Cleaner's layout rules and by origami, and every ABAP Cleaner rule next to origami's rules.">
   <meta name="color-scheme" content="light dark">
@@ -321,9 +322,6 @@ def page(examples, rows, cleaner, origami, profile_count):
   <meta name="theme-color" content="#16161e" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
