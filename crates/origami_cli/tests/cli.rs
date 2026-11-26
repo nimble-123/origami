@@ -1244,6 +1244,62 @@ fn changed_rejects_a_revision_that_looks_like_an_option() {
     assert!(err.lines().count() < 10, "{err}");
 }
 
+/// Names git quotes, writes with a trailing tab, or leaves alone.
+#[cfg(unix)]
+const AWKWARD_NAMES: &[&str] = &[
+    "plain.prog.abap",
+    "with space.prog.abap",
+    "quo\"te.prog.abap",
+    "back\\slash.prog.abap",
+    "tab\tname.prog.abap",
+    "umlaut_ä.prog.abap",
+    "sub dir/inner.prog.abap",
+];
+
+/// `--changed` finds every changed and untracked file whatever git's diff
+/// settings and the file names are.
+#[cfg(unix)]
+fn changed_formats_awkward_files(config: &[&str]) {
+    let files: Vec<(&str, &str)> = AWKWARD_NAMES.iter().map(|n| (*n, "lv_a = 1.\n")).collect();
+    let d = git_repo(&files);
+    for kv in config.chunks(2) {
+        git(d.path(), &["config", kv[0], kv[1]]);
+    }
+    for n in AWKWARD_NAMES {
+        write(d.path(), n, "lv_a   =   2.\n");
+    }
+    write(d.path(), "new file \"x\".prog.abap", "lv_b   =   3.\n");
+    origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--changed"])
+        .assert()
+        .code(0);
+    for n in AWKWARD_NAMES {
+        assert_eq!(
+            fs::read_to_string(d.path().join(n)).unwrap(),
+            "lv_a = 2.\n",
+            "{n:?}"
+        );
+    }
+    assert_eq!(
+        fs::read_to_string(d.path().join("new file \"x\".prog.abap")).unwrap(),
+        "lv_b = 3.\n"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn changed_handles_awkward_file_names() {
+    changed_formats_awkward_files(&[]);
+}
+
+#[cfg(unix)]
+#[test]
+fn changed_ignores_the_diff_prefix_settings() {
+    changed_formats_awkward_files(&["diff.noprefix", "true"]);
+    changed_formats_awkward_files(&["diff.mnemonicPrefix", "true"]);
+}
+
 #[test]
 fn changed_outside_git_says_so_in_one_line() {
     let d = tempfile::tempdir().unwrap();
