@@ -12,7 +12,7 @@
 //! statement falls back to the generic layout.
 
 use crate::kinds::*;
-use crate::stmt::{AlignKey, DeclCols, P, Row, Stmt, decl_columns};
+use crate::stmt::{AlignKey, CondAt, DeclCols, P, Row, Stmt, decl_columns};
 use origami_layout::{AlignItem, Doc, builder as b};
 use origami_syntax::Style;
 
@@ -2725,6 +2725,14 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
     let mut list_next = select && p.pos > 0 && p.is(p.pos - 1, "SELECT");
     let mut order_by = false;
     let mut into_next = false;
+    // ABAP-COND-001, aligned style: conditions outside ABAP SQL in ABAP
+    // Cleaner's layout. `LOOP AT … WHERE` with the condition on several
+    // lines starts `WHERE` on its own line, under `AT`: the WHERE clause's
+    // keyword token and number of conditions.
+    let cond_at = (p.c.style == Style::Aligned && !spec.all_clauses).then_some(CondAt::Keyword);
+    let loop_at = cond_at.is_some() && spec.lead.starts_with(&["LOOP", "AT"]);
+    let mut loop_where: Option<(usize, usize, usize)> = None;
+    let mut clause_at = None;
     while !p.at_end() {
         let i = p.pos;
         // `EXCEPTIONS … OTHERS = n`; `EVENTS e EXPORTING VALUE(p) …`
@@ -2806,6 +2814,7 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
             };
             p.pos = i + n_clause;
             prev_kw = Some(p.upper(i + n_clause - 1));
+            clause_at = Some(i);
             continue;
         }
         if n_word > 0 {
@@ -2882,11 +2891,30 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
         }
         let saved_kw = p.c.mark();
         let operand = match mode {
-            Operands::Expr => p.expr(),
-            Operands::Logical => p.logical(),
+            Operands::Expr => p.expr().map(|d| (d, None)),
+            Operands::Logical => p
+                .condition(cond_at)
+                .map(|c| (c.doc, Some((c.count, c.split)))),
         };
+        // The clause keyword in front of a condition (`WHERE`, `UNTIL`).
+        let clause = clause_at.filter(|&w| w + 1 == i);
         match operand {
-            Some(d) => current.push(d),
+            Some((d, Some((n, _)))) if loop_at && clause.is_some_and(|w| p.is(w, "WHERE")) => {
+                loop_where = Some((parts.len(), clause.unwrap_or(i), n));
+                current.push(d);
+            }
+            Some((_, Some((_, Some((aligned, plain)))))) if !loop_at && clause.is_some() => {
+                // One condition per line by rule: the clause stays on its
+                // line if the aligned layout fits there; otherwise the
+                // clause and condition break as without the rule.
+                let w = clause.unwrap_or(i);
+                let words = b::shared(b::concat(current.drain(1..).collect()));
+                let sep = current.pop().unwrap_or_else(b::empty);
+                let inline = b::concat(vec![p.sp(w), words.clone(), aligned]);
+                current.push(b::empty());
+                current.push(b::choice(inline, b::group(vec![sep, words, plain])));
+            }
+            Some((d, _)) => current.push(d),
             None => {
                 // Bracket groups the expression parser does not know
                 // (`( c1, c2 )`, `div( a, b )`, path filters `[ … ]`) stay
@@ -2916,6 +2944,30 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
     let mut docs = vec![b::cont(vec![first])];
     if spec.all_clauses {
         docs.push(b::cont(parts));
+    } else if let Some((k, w, n)) = loop_where.filter(|&(k, ..)| k > 0) {
+        // `LOOP AT … WHERE`: `WHERE` under `AT` when it does not fit, and
+        // always from three conditions on (ABAP-COND-001); the other clauses
+        // at the continuation indent.
+        if n >= 3 {
+            p.c.span(w - 1, p.end - 1, "ABAP-COND-001");
+        }
+        let clauses = parts
+            .into_iter()
+            .map(split_sep)
+            .enumerate()
+            .map(|(c, (sep, content))| {
+                if c + 1 == k {
+                    let sep = if n >= 3 { p.hl(w) } else { sep };
+                    (
+                        b::indent_cols(5, vec![sep]),
+                        b::indent_cols(5, vec![content]),
+                    )
+                } else {
+                    (b::cont(vec![sep]), b::cont(vec![content]))
+                }
+            })
+            .collect();
+        docs.push(b::fill(clauses));
     } else {
         // Each clause: (separator, content). The separator is the first element.
         let clauses: Vec<(Doc, Doc)> = parts.into_iter().map(split_sep).collect();
@@ -4614,7 +4666,10 @@ fn method_item_inner(p: &mut P, name: usize, sections_kw: &[&str]) -> Option<Met
     // ABAP-METHODS-001, aligned style: the signature is a table (FORM keeps
     // the compact form in both styles).
     if p.c.style == Style::Aligned && sections_kw == SECTIONS && i < p.end {
-        let sections = method_table(p, i)?;
+        // ABAP-ALIGN-005: a test method (`FOR TESTING RAISING …`) stays on
+        // one line if it fits.
+        let below = key != Some(AlignKey::ForTesting);
+        let sections = method_table(p, i, below)?;
         return Some(MethodParts {
             name: name_docs,
             header,
@@ -4736,8 +4791,9 @@ fn param_name(p: &mut P, a: usize, ne: usize) -> Vec<Doc> {
 /// The sections of a method signature from `i` to `p.end` as an aligned
 /// table below the method name at the continuation indent: the keywords
 /// padded to the longest, the names, `TYPE`, and `OPTIONAL` / `DEFAULT` in
-/// columns. A one-line table stays behind the name if it fits.
-fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
+/// columns. With `below` false (a test method), a one-line table stays
+/// behind the name if it fits.
+fn method_table(p: &mut P, mut i: usize, below: bool) -> Option<Doc> {
     let first_kw = i;
     let mut rows: Vec<SigRow> = Vec::new();
     while i < p.end {
@@ -4763,27 +4819,59 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
             }
             // RAP handler parameters: `keys FOR ACTION Travel~accept RESULT
             // result`, `REQUEST requested FOR Travel RESULT result`.
+            let mut marked = Vec::new();
             if p.is(i, "IMPORTING") && j < section_end {
                 let from = if p.is(j, "REQUEST") && p.is(j + 2, "FOR") {
                     j
                 } else {
                     name_end(p, j, section_end)
                 };
+                let before = p.c.keywords.len();
                 mark_phrase_keywords(p, from, section_end, RAP_PARAM_WORDS, RAP_PARAM_OPERAND);
+                marked = p.c.keywords[before..].to_vec();
             }
-            let mut name = Vec::new();
-            for k in j..section_end {
-                if k > j {
-                    name.push(p.sp(k));
+            // A RAP handler signature has a row for each `name FOR …` part,
+            // and `RESULT` and `LINK` start rows as section keywords.
+            let rap = marked.iter().any(|&k| p.is(k, "FOR"));
+            let mut starts: Vec<(usize, bool)> = vec![(j, true)];
+            if rap {
+                for k in j + 1..section_end {
+                    let is_kw = marked.contains(&k);
+                    if is_kw && (p.is(k, "RESULT") || p.is(k, "LINK")) {
+                        starts.push((k, false));
+                    } else if !is_kw
+                        && p.kind(k) == WORD
+                        && !p.glued(k)
+                        && p.is(k + 1, "FOR")
+                        && marked.contains(&(k + 1))
+                        && !p.is(k - 1, "REQUEST")
+                    {
+                        starts.push((k, true));
+                    }
                 }
-                name.push(p.t(k));
             }
-            rows.push(SigRow {
-                kw: Some(kw),
-                name,
-                ty: Vec::new(),
-                opt: None,
-            });
+            let mut kw = Some(kw);
+            for (n, &(a, in_section)) in starts.iter().enumerate() {
+                let e = starts.get(n + 1).map_or(section_end, |s| s.0);
+                let (row_kw, from) = if in_section {
+                    (kw.take(), a)
+                } else {
+                    (Some(p.t(a)), a + 1)
+                };
+                let mut name = Vec::new();
+                for k in from..e {
+                    if k > from {
+                        name.push(p.sp(k));
+                    }
+                    name.push(p.t(k));
+                }
+                rows.push(SigRow {
+                    kw: row_kw,
+                    name,
+                    ty: Vec::new(),
+                    opt: None,
+                });
+            }
             i = section_end;
             continue;
         }
@@ -4861,8 +4949,8 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
         };
         items.push(b::row_cols(vec![kw_cell, r.name], head, tail));
     }
-    if items.len() > 1 {
-        // A table of two or more lines always starts below the method name.
+    if items.len() > 1 || below {
+        // The table always starts below the method name.
         p.c.multi_line = true;
         return Some(b::cont(vec![p.hl(first_kw), b::align_broken(items)]));
     }

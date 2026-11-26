@@ -296,6 +296,7 @@ impl<'a> Ctx<'a> {
                     }
                 }
                 Inner::Space => w += 1,
+                Inner::BreakPad(_) | Inner::Reserve(_) => {}
                 Inner::SoftLine | Inner::SoftBreak | Inner::HardLine => return w,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
@@ -380,7 +381,11 @@ impl<'a> Ctx<'a> {
             Inner::Choice(a, _) => self.forced(a, first, end),
             Inner::Shared(d) => self.forced(d, first, end),
             Inner::Fill(items) => items.iter().any(|(_, c)| self.forced(c, first, end)),
-            Inner::Space | Inner::SoftLine | Inner::SoftBreak => false,
+            Inner::Space
+            | Inner::SoftLine
+            | Inner::SoftBreak
+            | Inner::BreakPad(_)
+            | Inner::Reserve(_) => false,
         }
     }
 
@@ -401,7 +406,7 @@ impl<'a> Ctx<'a> {
             match &d.0 {
                 Inner::Token { index, .. } => w += self.token_text(*index).chars().count(),
                 Inner::Space | Inner::SoftLine => w += 1,
-                Inner::SoftBreak => {}
+                Inner::SoftBreak | Inner::BreakPad(_) | Inner::Reserve(_) => {}
                 Inner::HardLine => return None,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
@@ -966,6 +971,14 @@ impl<'c, 'a> Printer<'c, 'a> {
             self.line_empty = true;
             if n == last {
                 self.pending_indent = Some(target);
+                // One-line block comments in front of the token on its line
+                // (`/* a */ b`) are part of the gap too; the blanks after
+                // them stay as they are.
+                let comments = trimmed.trim_end_matches(BLANKS);
+                if !comments.is_empty() {
+                    self.write(comments, indent);
+                    self.write(&trimmed[comments.len()..], indent);
+                }
             } else if trimmed.trim_end_matches(BLANKS).is_empty() {
                 self.pending_indent = None;
             } else {
@@ -1007,6 +1020,8 @@ impl<'c, 'a> Printer<'c, 'a> {
                 Inner::SoftLine | Inner::SoftBreak if mode == Mode::Break => return true,
                 Inner::SoftLine => remaining -= 1,
                 Inner::SoftBreak => {}
+                Inner::BreakPad(n) if mode == Mode::Break => remaining -= *n as isize,
+                Inner::BreakPad(_) | Inner::Reserve(_) => {}
                 Inner::HardLine => return true,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
@@ -1084,6 +1099,12 @@ impl<'c, 'a> Printer<'c, 'a> {
                 }
                 Inner::SoftLine => self.write(" ", indent),
                 Inner::SoftBreak => {}
+                Inner::BreakPad(n) if mode == Mode::Break => self.pad(*n as usize, indent),
+                Inner::BreakPad(_) => {}
+                Inner::Reserve(n) if self.trial.is_some() => {
+                    self.write(&" ".repeat(*n as usize), indent)
+                }
+                Inner::Reserve(_) => {}
                 Inner::HardLine => self.newline(indent),
                 Inner::Concat(ds) => {
                     stack.extend(ds.iter().rev().map(|d| Cmd {
@@ -1586,7 +1607,12 @@ fn first_token(doc: &Doc) -> Option<TokenIndex> {
             .iter()
             .filter_map(AlignItem::docs)
             .find_map(|mut docs| docs.find_map(first_token)),
-        Inner::Space | Inner::SoftLine | Inner::SoftBreak | Inner::HardLine => None,
+        Inner::Space
+        | Inner::SoftLine
+        | Inner::SoftBreak
+        | Inner::BreakPad(_)
+        | Inner::Reserve(_)
+        | Inner::HardLine => None,
     }
 }
 
@@ -1613,6 +1639,11 @@ fn last_token(doc: &Doc) -> Option<TokenIndex> {
             .rev()
             .filter_map(AlignItem::docs)
             .find_map(|docs| docs.rev().find_map(last_token)),
-        Inner::Space | Inner::SoftLine | Inner::SoftBreak | Inner::HardLine => None,
+        Inner::Space
+        | Inner::SoftLine
+        | Inner::SoftBreak
+        | Inner::BreakPad(_)
+        | Inner::Reserve(_)
+        | Inner::HardLine => None,
     }
 }

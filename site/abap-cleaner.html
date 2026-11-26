@@ -48,7 +48,7 @@
         <dt>ABAP Cleaner</dt>
         <dd>1.29.2, default profile reduced to its 47 layout rules with their default options (<a href="https://github.com/nimble-123/origami/tree/main/scripts/abap-cleaner-compare">how</a>). Checked on 2026-11-23 on the 1,964 ABAP and 144 CDS files of the test corpus: these rules change no code and delete no comment; the only reordering is a closing bracket moved in front of a comment or pragma.</dd>
         <dt>origami</dt>
-        <dd>origami 0.4.1 (style edition 2026), default settings (style <code>aligned</code>).</dd>
+        <dd>origami 0.4.3 (style edition 2026), default settings (style <code>aligned</code>).</dd>
         <dt>Both</dt>
         <dd>Line width 120, keywords in upper case, indent 2.</dd>
       </dl>
@@ -97,11 +97,11 @@ select carrid, connid, fldate from sflight where carrid = @lv_carrier and fldate
 <span class="kw">SELECT</span> carrid, connid, fldate <span class="kw">FROM</span> sflight
   <span class="kw">WHERE</span> carrid = @lv_carrier <span class="kw">AND</span> fldate &gt;= @sy-datum
   <span class="kw">INTO</span> <span class="kw">TABLE</span> @<span class="kw">DATA</span>(lt_flights).</code></pre></div>
-          <div class="cmp-pane ours"><div class="pane-label">origami</div><pre class="sheet code-block" tabindex="0"><code><span class="kw">IF</span> lv_amount &gt; <span class="num-lit">0</span>
-  <span class="kw">AND</span> lv_currency <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">INITIAL</span>
-  <span class="kw">AND</span> ls_data-status = <span class="str">&#x27;A&#x27;</span>
-  <span class="kw">AND</span> ls_data-created_by = sy-uname
-  <span class="kw">AND</span> lv_flag = abap_true.
+          <div class="cmp-pane ours"><div class="pane-label">origami</div><pre class="sheet code-block" tabindex="0"><code><span class="kw">IF</span>     lv_amount           &gt; <span class="num-lit">0</span>
+   <span class="kw">AND</span> lv_currency        <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">INITIAL</span>
+   <span class="kw">AND</span> ls_data-status      = <span class="str">&#x27;A&#x27;</span>
+   <span class="kw">AND</span> ls_data-created_by  = sy-uname
+   <span class="kw">AND</span> lv_flag             = abap_true.
   book( ).
 <span class="kw">ENDIF</span>.
 <span class="kw">SELECT</span> carrid, connid, fldate
@@ -489,9 +489,9 @@ lo_log = <span class="kw">NEW</span> zcl_log( iv_object    = <span class="str">&
     <section id="rules" class="band" aria-labelledby="rules-title">
       <div class="section-head">
         <h2 id="rules-title">Every ABAP Cleaner rule</h2>
-        <p>ABAP Cleaner 1.29.2 has 100 rules. 53 of them change code, comments or names; origami never does that, it checks its own output token by token. Of the other 47, origami does 32 the same way and covers 14 with its own layout; 1 have no counterpart.</p>
+        <p>ABAP Cleaner 1.29.2 has 100 rules. 53 of them change code, comments or names; origami never does that, it checks its own output token by token. Of the other 47, origami does 33 the same way and covers 13 with its own layout; 1 have no counterpart.</p>
       </div>
-      <ul class="legend"><li><span class="badge yes">Same</span> origami does the same: <strong>32</strong></li><li><span class="badge own">Own layout</span> origami covers this with its own layout: <strong>14</strong></li><li><span class="badge no">No</span> layout rule origami does not have: <strong>1</strong></li><li><span class="badge goal">Not a goal</span> changes code, comments or names, which origami never does: <strong>53</strong></li></ul>
+      <ul class="legend"><li><span class="badge yes">Same</span> origami does the same: <strong>33</strong></li><li><span class="badge own">Own layout</span> origami covers this with its own layout: <strong>13</strong></li><li><span class="badge no">No</span> layout rule origami does not have: <strong>1</strong></li><li><span class="badge goal">Not a goal</span> changes code, comments or names, which origami never does: <strong>53</strong></li></ul>
       <div class="table-wrap" tabindex="0">
         <table class="rules">
           <caption class="sr-only">ABAP Cleaner rules and origami</caption>
@@ -572,7 +572,7 @@ lo_log = <span class="kw">NEW</span> zcl_log( iv_object    = <span class="str">&
 </tbody>
 <tbody><tr class="group"><th colspan="4" scope="rowgroup">Alignment</th></tr>
 <tr><td><span class="rule-name">Align ABAP Doc</span><code class="rule-id">ALIGN_ABAP_DOC</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-doc-001">ABAP-DOC-001</a> Only the blanks after the tag and before | change; not aligned if a line would exceed the width.</td></tr>
-<tr><td><span class="rule-name">Align METHODS declarations</span><code class="rule-id">ALIGN_METHODS_DECLARATION</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-methods-001">ABAP-METHODS-001</a> The table always starts below the method name, as ABAP Cleaner keeps it when the input breaks there.</td></tr>
+<tr><td><span class="rule-name">Align METHODS declarations</span><code class="rule-id">ALIGN_METHODS_DECLARATION</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-methods-001">ABAP-METHODS-001</a> Every signature with a section is a table below the method name, whatever the input; RAP handler parts and RESULT / LINK get a row each.</td></tr>
 <tr><td><span class="rule-name">Align METHODS ... FOR TESTING</span><code class="rule-id">ALIGN_METHODS_FOR_TESTING</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-005">ABAP-ALIGN-005</a> Not aligned if a line would exceed the width.</td></tr>
 <tr><td><span class="rule-name">Align METHODS ... REDEFINITION</span><code class="rule-id">ALIGN_METHODS_REDEFINITION</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-006">ABAP-ALIGN-006</a> Not aligned if a line would exceed the width.</td></tr>
 <tr><td><span class="rule-name">Align ALIASES ... FOR ...</span><code class="rule-id">ALIGN_ALIASES_FOR</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-007">ABAP-ALIGN-007</a> Not aligned if a line would exceed the width.</td></tr>
@@ -584,8 +584,8 @@ lo_log = <span class="kw">NEW</span> zcl_log( iv_object    = <span class="str">&
 <tr><td><span class="rule-name">Align SELECT ... FROM ... JOIN</span><code class="rule-id">ALIGN_SELECT_FROM</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-sql-001">ABAP-SQL-001</a> A JOIN starts its own clause line; ON conditions are not aligned.</td></tr>
 <tr><td><span class="rule-name">Align SELECT lists</span><code class="rule-id">ALIGN_SELECT_LISTS</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-sql-003">ABAP-SQL-003</a> Lists with complex fields one field per line, AS aligned; simple lists on one line if they fit (not derived from the rest of the file).</td></tr>
 <tr><td><span class="rule-name">Align parameters and components</span><code class="rule-id">ALIGN_PARAMETERS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-call-001">ABAP-CALL-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-call-002">ABAP-CALL-002</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-001">ABAP-ALIGN-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-002">ABAP-ALIGN-002</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-value-001">ABAP-VALUE-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-value-002">ABAP-VALUE-002</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-010">ABAP-ALIGN-010</a> A table row too wide for its column breaks into its components instead of moving left.</td></tr>
-<tr><td><span class="rule-name">Align logical expressions</span><code class="rule-id">ALIGN_LOGICAL_EXPRESSIONS</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-cond-001">ABAP-COND-001</a> Breaks before AND and OR at a fixed indent; operands are not aligned in columns.</td></tr>
-<tr><td><span class="rule-name">Align conditional expressions</span><code class="rule-id">ALIGN_COND_EXPRESSIONS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-cond-002">ABAP-COND-002</a> A COND with one WHEN is joined onto one line when it fits.</td></tr>
+<tr><td><span class="rule-name">Align logical expressions</span><code class="rule-id">ALIGN_LOGICAL_EXPRESSIONS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-cond-001">ABAP-COND-001</a> One condition per line from three conditions on or when it does not fit, whatever the input; ABAP SQL conditions are not aligned.</td></tr>
+<tr><td><span class="rule-name">Align conditional expressions</span><code class="rule-id">ALIGN_COND_EXPRESSIONS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-cond-002">ABAP-COND-002</a> A COND with one WHEN and an ELSE is always broken; one without ELSE is joined onto one line when it fits.</td></tr>
 <tr><td><span class="rule-name">Align FORM declarations</span><code class="rule-id">ALIGN_FORM_DECLARATION</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-form-001">ABAP-FORM-001</a> Each section on its own line, parameters one level deeper.</td></tr>
 <tr><td><span class="rule-name">Align PERFORM parameters</span><code class="rule-id">ALIGN_PERFORM</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td>A long PERFORM breaks before a section keyword that does not fit.</td></tr>
 </tbody>
