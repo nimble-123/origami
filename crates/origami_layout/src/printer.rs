@@ -836,7 +836,7 @@ impl<'c, 'a> Printer<'c, 'a> {
             if k > first.0 as usize && !(kind == RawKind::Unknown && glued_gap(ctx, k)) {
                 let gap = &src[toks[k - 1].end as usize..toks[k].start as usize];
                 if gap.contains('\n') {
-                    self.raw_gap(gap, shift, min_indent, indent);
+                    self.raw_gap(toks[k - 1].end as usize, gap, shift, min_indent, indent);
                 } else if !gap.is_empty() {
                     // Same line: shrink blanks (unknown) or keep (verbatim).
                     if kind == RawKind::Unknown {
@@ -855,10 +855,27 @@ impl<'c, 'a> Printer<'c, 'a> {
     /// A gap with line breaks inside a raw unit: comments and line breaks are
     /// kept, every new line is shifted (`*` comments stay in column 1), and
     /// code continuation lines never land below `min_indent`.
-    fn raw_gap(&mut self, gap: &str, shift: isize, min_indent: usize, indent: usize) {
+    fn raw_gap(&mut self, from: usize, gap: &str, shift: isize, min_indent: usize, indent: usize) {
         // A block comment spanning lines keeps every byte: write the gap as
         // it is (INVARIANTS 3: only the first line of a block comment moves).
-        if gap.contains("/*") {
+        // A one-line block comment, or `/*` in the text of a line comment, is
+        // no reason to keep the gap.
+        let trivia = &self.ctx.tokens.trivia;
+        let at = trivia.partition_point(|t| (t.start as usize) < from);
+        let to = from + gap.len();
+        if trivia[at..]
+            .iter()
+            .take_while(|t| (t.start as usize) < to)
+            .any(|t| {
+                matches!(
+                    t.kind,
+                    TriviaKind::Comment {
+                        syntax: CommentSyntax::CdsBlock,
+                        ..
+                    }
+                ) && t.text(self.ctx.src).contains('\n')
+            })
+        {
             self.pending_eol = false;
             self.write(gap, indent);
             return;

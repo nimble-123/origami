@@ -6,5 +6,13 @@ define view entity ZI_X
 {
   key a,
 
+      cast( b /* c */
+          as abap.char(1) )
+        as B,
+
+      cast( b // x /* y
+          as abap.char(1) )
+        as C,
+
       _Y
 }
