@@ -39,9 +39,9 @@ import {
 // body, wings, neck and tail, head.
 export const FACETS = [
   { id: "bodyL", role: "valley", pts: [[80.96, 175.49], [127.58, 148.58], [127.58, 202.41]],
-    hinge: [[127.58, 202.41], [127.58, 148.58]], angle: -0.7, from: 0, to: 0.5 },
+    hinge: [[127.58, 202.41], [127.58, 148.58]], angle: -0.7, from: 0.08, to: 0.5 },
   { id: "bodyR", role: "ink", pts: [[132.58, 148.58], [179.2, 175.49], [132.58, 202.41]],
-    hinge: [[132.58, 202.41], [132.58, 148.58]], angle: 0.7, from: 0, to: 0.5 },
+    hinge: [[132.58, 202.41], [132.58, 148.58]], angle: 0.7, from: 0.08, to: 0.5 },
   { id: "wingF", role: "crease", parent: "bodyL", pts: [[90.46, 164.24], [149.58, 61.84], [127.94, 142.6]],
     hinge: [[90.46, 164.24], [127.94, 142.6]], angle: 0.8, from: 0.1, to: 0.85 },
   { id: "wingB", role: "valley", parent: "bodyR", pts: [[133.0, 143.04], [156.91, 53.8], [156.91, 156.85]],
@@ -100,7 +100,7 @@ function creaseGeometry(p, q) {
   const d = b.clone().sub(a);
   const len = d.length();
   d.normalize();
-  const n = new Vector3(-d.y, d.x, 0).multiplyScalar(0.0045);
+  const n = new Vector3(-d.y, d.x, 0).multiplyScalar(0.0085);
   const pos = [];
   const z = THICK;
   for (let s = 0.02; s < len - 0.02; s += 0.06) {
@@ -226,6 +226,24 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
   // The crane turns as one; the facets fold inside it.
   const crane = new Group();
   scene.add(crane);
+  // Flat, the facets are one sheet of paper: a sheet behind them closes the
+  // gaps, and the facets take the paper's color; folding, the sheet goes
+  // and the facets take their own colors.
+  const backing = new Mesh(
+    new PlaneGeometry(2.39, 1.73),
+    new MeshStandardMaterial({ roughness: 0.9, metalness: 0, transparent: true, opacity: 0, depthWrite: false }),
+  );
+  backing.position.set(-0.021, 0.743, -THICK * 0.8);
+  crane.add(backing);
+  const base = { ink: new Color(), valley: new Color(), crease: new Color(), paper: new Color() };
+  function tint(fold) {
+    const flat = 1 - smooth(0, 0.22, fold);
+    for (const role of ["ink", "valley", "crease"]) materials[role].color.copy(base[role]).lerp(base.paper, flat * 0.5);
+    // Gone before the first facet turns, so none can pass behind it.
+    const sheet = 1 - smooth(0.01, 0.08, fold);
+    backing.material.opacity = sheet;
+    backing.visible = sheet > 0.01;
+  }
   const byId = new Map(FACETS.map((f) => [f.id, f]));
   const parts = FACETS.map((f) => {
     const mesh = new Mesh(facetGeometry(f.pts), materials[f.role]);
@@ -278,9 +296,14 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
   function colors() {
     const css = getComputedStyle(document.documentElement);
     const get = (n) => new Color(css.getPropertyValue(n).trim());
-    materials.ink.color.copy(get("--ink"));
-    materials.valley.color.copy(get("--valley"));
-    materials.crease.color.copy(get("--crease"));
+    base.ink.copy(get("--ink"));
+    base.valley.copy(get("--valley"));
+    base.crease.copy(get("--crease"));
+    // The paper of the flat sheet: the sheet color by day, a lighter slate
+    // by night, so it stands off the dark ground.
+    base.paper.copy(dark.matches ? get("--crease").lerp(get("--ink-dim"), 0.35) : get("--sheet").lerp(new Color(0xffffff), 0.45));
+    backing.material.color.copy(base.paper);
+    tint(fold);
     dash.color.copy(get("--valley"));
     ground.material.color.copy(dark.matches ? new Color(0x000000) : get("--ink"));
     ground.material.opacity = dark.matches ? 0.55 : 0.2;
@@ -313,7 +336,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
    * folding, it stands up. */
   const lieOf = (f) => 1 - smooth(0, 0.35, f);
   function aim(lie) {
-    const pitch = VIEW.pitch + lie * 0.32;
+    const pitch = VIEW.pitch + lie * 0.5;
     const look = new Vector3(0, 0.7 * (1 - lie) + 0.05 * lie, -0.72 * lie);
     camera.position.set(0, look.y + Math.sin(pitch) * camDist, look.z + Math.cos(pitch) * camDist);
     camera.lookAt(look);
@@ -355,6 +378,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
       fold = busy ? f : goal;
     }
     pose(fold);
+    tint(fold);
     // The creases show while the sheet is (nearly) flat.
     dash.opacity = creaseShown * (1 - smooth(0.04, 0.3, fold)) * 0.95;
 
@@ -479,6 +503,8 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
       p.mesh.geometry.dispose();
       p.crease?.geometry.dispose();
     }
+    backing.geometry.dispose();
+    backing.material.dispose();
     ground.geometry.dispose();
     ground.material.dispose();
     for (const m of Object.values(materials)) m.dispose();

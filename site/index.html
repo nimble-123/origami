@@ -20,6 +20,7 @@
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="preload" href="fonts/martian-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
   <script src="nav.js" defer></script>
   <script src="keywords.js" defer></script>
@@ -92,9 +93,15 @@
              scripting or with reduced motion it stays hidden and every step
              shows its own figure instead. -->
         <div class="stage" id="stage" hidden>
-          <div class="stage-sheet sheet fold">
-            <div class="stage-input" id="stage-input" aria-hidden="true"></div>
-            <svg class="stage-links" id="stage-links" aria-hidden="true"></svg>
+          <nav class="rail" id="rail" aria-label="Steps">
+            <a href="#step-read"><b>1</b><span>Read</span></a>
+            <a href="#step-fold"><b>2</b><span>Fold</span></a>
+            <a href="#step-check"><b>3</b><span>Check</span></a>
+            <a href="#step-explain"><b>4</b><span>Explain</span></a>
+            <a href="#step-write"><b>5</b><span>Write</span></a>
+          </nav>
+          <div class="stage-sheet sheet fold" id="stage-sheet">
+            <div class="row-in" id="row-in" aria-hidden="true"><div class="row-in-track" id="row-in-track"></div></div>
             <div class="code-scroll" id="code-scroll">
               <div class="code-canvas" id="code-canvas">
                 <div class="tokens" id="tokens" aria-hidden="true"></div>
@@ -104,12 +111,12 @@
                 </div>
               </div>
             </div>
+            <span class="edge edge-l" id="edge-l" aria-hidden="true"></span>
+            <span class="edge edge-r" id="edge-r" aria-hidden="true"></span>
+            <svg class="stage-links" id="stage-links" aria-hidden="true"></svg>
             <p class="stage-foot" id="stage-foot" aria-live="off"></p>
           </div>
-          <div class="stage-under">
-            <p class="stage-step" id="stage-step" aria-hidden="true"></p>
-            <div class="crane-slot crane-stage" id="crane-stage" aria-hidden="true"></div>
-          </div>
+          <div class="crane-slot crane-stage" id="crane-stage" aria-hidden="true"></div>
         </div>
 
         <ol class="steps" id="steps">
@@ -147,8 +154,10 @@
               <p class="tamper-note">A simulation of a formatter bug, in this page only: it removes the space in front of <code>sy-datum</code> in the output. If the check finds a difference, origami prints the statement again as it was written and reports W001, as on the sheet. If it still differs, the file stays unchanged (X001).</p>
             </div>
             <figure class="step-figure">
-              <pre class="sheet">20 of 20 tokens identical</pre>
-              <figcaption>The output has the same 20 tokens as the input.</figcaption>
+              <pre class="sheet checked"><u class="kw">DATA</u><u>(</u><u>ls_rule</u><u>)</u> <u>=</u> <u>zcl_flight_rules</u><u>=&gt;</u><u>get</u><u>(</u> <u>iv_carrier</u> <u>=</u> <u>is_flight-carrid</u>
+                                       <u>iv_date</u>    <u>=</u> <u>sy-datum</u>
+                                       <u>iv_mode</u>    <u>=</u> <u class="str">'A'</u> <u>)</u><u>.</u></pre>
+              <figcaption>20 of 20 tokens identical: the output has the same tokens as the input.</figcaption>
             </figure>
           </li>
           <li class="step" id="step-explain" data-step="3">

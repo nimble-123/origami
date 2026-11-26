@@ -241,8 +241,10 @@ The website draws the logo as a crane of real paper in WebGL
   Every facet hangs from a neighbour and turns about the edge they share: the
   halves of the body about the middle, the wings, the neck and the tail about
   the body, the head about the neck. Facets never bend.
-* **Fold:** one number from 0 to 1. At 0 the sheet lies flat on the table,
-  seen from above at an angle, with dashed `--valley` creases on its hinges;
+* **Fold:** one number from 0 to 1. At 0 it is a flat sheet of paper on the
+  table, seen from above at an angle: a sheet behind the facets closes the
+  gaps, the facets take the paper's color, and dashed `--valley` creases
+  mark the hinges;
   as it folds, it stands up and the facets turn in stages: body, wings, neck
   and tail, head. At 1 the crane stands.
 * **Materials and light:** matte paper in `--ink`, `--valley` and `--crease`,
@@ -267,9 +269,15 @@ The website draws the logo as a crane of real paper in WebGL
 
 The heart of the website: one overlong statement (104 characters) through
 what origami does with it, in five numbered steps (the only numbered markers
-on the page, because it is a sequence). A stage with the sheet stays pinned
-(beside the steps on wide screens, at the top on phones) while the steps
-scroll past. Every state on the sheet is computed by origami in the page's
+on the page, because it is a sequence). A stage stays pinned while the
+steps scroll past: on wide screens beside the steps, its centre on the line
+where the active step's text sits, with the sheet (code at 15px, as tall as
+its tallest state), the crane on the paper ground at its lower right, and a
+rail of the five steps (links, the current one marked); on phones at the top
+(half the screen), with a band of paper beneath it and the rail as numbers.
+A step takes about 85% of the screen height on wide screens and 62% on
+phones. Where the sheet cuts the long line, a tab says how many columns are
+out of view. Every state on the sheet is computed by origami in the page's
 worker; nothing is drawn from a script of the result.
 
 1. **Read:** the tokens from origami's lexer (`lex` in `origami_wasm`) get
@@ -277,11 +285,14 @@ worker; nothing is drawn from a script of the result.
 2. **Fold:** the line folds into the layout `review` returns for the width;
    the margin can be dragged or moved with the keys (40 to 120); the sheet
    uses the style `compact`, and says so.
-3. **Check:** the output is lexed again; lines connect each input token to
-   its output token and a counter says how many are identical. "What if a
-   token changed?" removes one space in the output, in the page only, labelled
-   as a simulation; the check finds the difference (in `--mountain`), the
-   statement is shown as written, and W001 is quoted as `check.rs` reports it.
+3. **Check:** the output is lexed again. Above the code, the line as
+   written; a cursor walks the tokens with the scroll, marks each token in
+   both rows at once with one line between the pair, leaves a quiet
+   `--valley` underline behind, and the counter counts up to "20 of 20 tokens
+   identical". "What if a token changed?" removes one space in the output, in
+   the page only, labelled as a simulation: the cursor stops at the token
+   that differs, the pair turns `--mountain`, the statement goes back to how
+   it was written, and W001 is quoted as `check.rs` reports it.
 4. **Explain:** the `--review` note under the construct, with its rule linked
    to STYLE.md.
 5. **Write:** how long the run took in this browser.

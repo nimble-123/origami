@@ -387,79 +387,141 @@ main > .hero { border-top: 0; }
 
 /* ---- the journey ---------------------------------------------------------------- */
 
+main { overflow-x: clip; }
 .journey-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); }
-.steps { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; counter-reset: none; }
+.steps { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; }
 .step { max-width: var(--measure); padding-block: var(--s-6); border-top: 1px dashed var(--crease); }
 .step:first-child { border-top: 0; }
 .step h3 { display: flex; align-items: baseline; gap: var(--s-3); font-size: var(--t-3); margin-bottom: var(--s-3); }
 .step-n { font-weight: 300; color: var(--valley); font-size: 1.25em; font-variant-numeric: tabular-nums; }
 .step p { margin: 0 0 var(--s-3); color: var(--ink-soft); }
 .step .step-aside { font-size: 0.94rem; }
-.step-live { font: 600 var(--t-0) / 1.5 var(--mono); color: var(--ink); min-height: 0; }
+.step-live { font: 600 var(--t-0) / 1.5 var(--mono); color: var(--ink); }
 .step-live:empty { display: none; }
 .step-figure { margin: var(--s-4) 0 0; }
-.step-figure pre {
-  margin: 0; padding: var(--s-4); overflow-x: auto;
-  font: 400 12px / 1.75 var(--mono); color: var(--ink);
-}
+.step-figure pre { margin: 0; padding: var(--s-4); overflow-x: auto; font: 400 12px / 1.75 var(--mono); color: var(--ink); }
+.step-figure pre.checked u { text-decoration: none; box-shadow: inset 0 -2px 0 var(--valley); }
 .step-figure figcaption { margin-top: var(--s-2); color: var(--ink-soft); font-size: var(--t-0); }
 .tamper { margin-top: var(--s-4); }
-.tamper-note { font-size: 0.94rem; margin-top: var(--s-3) !important; }
+.tamper-note { font-size: 0.94rem !important; margin-top: var(--s-3) !important; }
 
-/* Enhanced (app.js adds .live when origami is ready and motion is welcome):
-   the stage is pinned, the steps scroll past it, figures give way. */
+/* Enhanced (journey.js adds .live when motion is welcome): the stage is
+   pinned, the steps scroll past it, the figures give way. */
 .journey.live .step-figure { display: none; }
-.journey.live .stage { display: flex; }
-.stage { display: none; flex-direction: column; gap: var(--s-4); min-width: 0; }
+.journey.live .step-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.stage { display: none; min-width: 0; }
+.journey.live .stage {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 36%);
+  grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "sheet sheet" "rail crane";
+  column-gap: var(--gap);
+}
+.stage-sheet { grid-area: sheet; }
+.rail { grid-area: rail; align-self: end; }
+.crane-stage { grid-area: crane; }
+
+/* The story is the text: a size up, active in ink, the rest quieter. */
+.journey.live .step h3 { transition-property: color; transition-duration: 200ms; transition-timing-function: var(--ease); }
+.journey.live .step p { transition-property: color; transition-duration: 200ms; transition-timing-function: var(--ease); }
+.journey.live .step:not(.current) h3, .journey.live .step:not(.current) .step-n { color: var(--ink-dim); }
+.journey.live .step.current > p:not(.step-aside):not(.tamper-note) { color: var(--ink); }
 
 @media (min-width: 64rem) {
+  /* The journey uses more of a wide screen than the text sections. */
+  .journey-grid { margin-inline: calc(-1 * clamp(0px, (100vw - 100%) / 2 - var(--gutter), 6rem)); }
   .journey.live .stage {
-    grid-column: 1 / 8; grid-row: 1;
-    position: sticky; top: calc(var(--header) + var(--s-5));
-    height: calc(100vh - var(--header) - 2 * var(--s-5)); justify-content: center;
+    --stage-h: min(42rem, 100vh - var(--header) - 3rem);
+    grid-column: 1 / 9; grid-row: 1;
+    position: sticky; top: calc(50vh - var(--stage-h) / 2 + var(--header) / 2); height: var(--stage-h);
+    row-gap: var(--s-4);
   }
   .journey.live .steps { grid-column: 9 / 13; grid-row: 1; }
   .journey.live .step {
-    min-height: 82vh; display: flex; flex-direction: column; justify-content: center;
-    border-top: 0; padding-block: var(--s-8);
+    min-height: 85vh; max-width: 46ch; display: flex; flex-direction: column; justify-content: center;
+    border-top: 0; padding-block: var(--s-6);
   }
-  .journey.live .step:first-child { margin-top: 8vh; }
-  .journey.live .step:last-child { min-height: 70vh; }
+  .journey.live .step:first-child { min-height: 70vh; }
+  .journey.live .step:last-child { min-height: 80vh; }
+  .journey.live .step p { font-size: var(--t-2); line-height: 1.45; }
+  .journey.live .step .step-aside, .journey.live .step .tamper-note { font-size: var(--t-1) !important; line-height: 1.55; }
 }
 @media (max-width: 63.99rem) {
   .journey.live .stage {
     grid-column: 1 / -1; position: sticky; top: var(--header); z-index: 2;
-    height: 46svh; padding-block: var(--s-3);
+    height: 50svh; padding-block: var(--s-3) var(--s-2);
     margin-inline: calc(-1 * var(--gutter)); padding-inline: var(--gutter);
-    background: var(--paper); border-bottom: 1px dashed var(--crease); gap: var(--s-2);
+    background: var(--paper); border-bottom: 1px dashed var(--crease); row-gap: var(--s-2);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 30%);
   }
-  .journey.live .step { min-height: 62svh; padding-top: var(--s-7); }
-  .journey.live .step:last-child { min-height: 50svh; }
+  /* A band of paper under the stage: text scrolls into a clean window. */
+  .journey.live .stage::after {
+    content: ""; position: absolute; left: 0; right: 0; top: calc(100% + 1px); height: var(--s-5);
+    background: var(--paper); pointer-events: none;
+  }
+  .journey.live .step { min-height: 62svh; padding-top: var(--s-7); padding-bottom: var(--s-4); border-top: 0; }
+  .journey.live .step:last-child { min-height: 52svh; }
+  .journey.live .step p { font-size: 1.125rem; }
 }
-.journey.live .step { transition-property: color; transition-duration: 200ms; transition-timing-function: var(--ease); }
-.journey.live .step:not(.current) h3 { color: var(--ink-soft); }
-.journey.live .step:not(.current) .step-n { color: var(--ink-dim); }
 
-/* The sheet on the stage: the input as one small line (step 3), links from
-   each input token to its output token, the code, and a foot line. */
-.stage-sheet { position: relative; display: flex; flex-direction: column; min-height: 0; padding-bottom: var(--s-3); }
-.stage-input {
-  position: relative; height: 0; overflow: hidden; margin: 0 var(--s-5);
-  font: 400 7.5px / 1 var(--mono);
-  transition-property: height, margin; transition-duration: 300ms; transition-timing-function: var(--ease);
+/* The progress rail: five links, the current one marked. */
+.rail { display: flex; flex-wrap: nowrap; gap: 0 var(--s-1); margin: 0; }
+.rail a {
+  position: relative; display: inline-flex; align-items: baseline; gap: 0.35em; min-height: 40px; align-items: center;
+  padding: 0 var(--s-2); color: var(--ink-soft); text-decoration: none; border-radius: 4px;
+  font: 600 var(--t-0) var(--sans);
+  transition-property: color, background-color; transition-duration: 150ms; transition-timing-function: var(--ease);
 }
-.stage-input .tok { position: absolute; top: 0; left: 0; translate: calc(var(--x) * 1ch) 0; line-height: 18px; color: var(--ink-soft); white-space: pre; }
-.stage-links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
-.stage-links line { stroke: var(--valley); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.55; }
-.stage-links line.bad { stroke: var(--mountain); stroke-width: 1.5; stroke-dasharray: none; opacity: 1; }
-.journey[data-step="2"] .stage-input { height: 18px; margin-top: var(--s-4); }
+.rail a b { font: 300 var(--t-1) var(--mono); color: var(--ink-dim); }
+.rail a:hover { color: var(--ink); background: var(--valley-wash); }
+.rail a[aria-current] { color: var(--ink); }
+.rail a[aria-current] b { color: var(--valley); font-weight: 600; }
+.rail a[aria-current]::after { content: ""; position: absolute; left: var(--s-2); right: var(--s-2); bottom: 6px; border-bottom: 1.5px dashed var(--valley); }
+@media (max-width: 63.99rem) {
+  .rail { gap: 0; }
+  .rail a { min-width: 44px; min-height: 44px; justify-content: center; padding: 0; }
+  .rail a span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .rail a[aria-current]::after { left: 14px; right: 14px; }
+}
+
+/* The sheet: the input as written (from Fold on), the code with its margin,
+   and a foot line. Its height never changes between the steps. */
+.stage-sheet { position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.stage-sheet.fold { overflow: visible; }
+.row-in {
+  position: relative; height: 2.5rem; margin: var(--s-3) var(--s-5) 0; overflow: hidden;
+  border-bottom: 1px dashed var(--crease);
+  font: 400 clamp(12px, 0.9vw, 13px) / 2.5rem var(--mono); color: var(--ink-soft);
+  opacity: 0; transition-property: opacity; transition-duration: 220ms; transition-timing-function: var(--ease);
+}
+.journey[data-step="1"] .row-in, .journey[data-step="2"] .row-in, .journey[data-step="3"] .row-in, .journey[data-step="4"] .row-in { opacity: 1; }
+.row-in-track { position: absolute; left: 0; top: 0; height: 100%; translate: var(--shift, 0) 0; transition-property: translate; transition-duration: 220ms; transition-timing-function: var(--ease); }
+.row-in .tok { position: absolute; top: 0; left: 0; translate: calc(var(--x) * 1ch) 0; white-space: pre; border-radius: 2px; }
+.row-in .tok.ok { box-shadow: inset 0 -2px 0 var(--valley); color: var(--ink); }
+.row-in .tok.cur { box-shadow: inset 0 0 0 1.5px var(--valley); color: var(--ink); background: var(--valley-wash); }
+.row-in .tok.bad { box-shadow: inset 0 0 0 1.5px var(--mountain); background: var(--mountain-wash); color: var(--mountain); }
+.row-in.more-l::before, .row-in.more-r::after {
+  content: "…"; position: absolute; top: 0; z-index: 1; padding: 0 0.4em; background: var(--sheet); color: var(--valley);
+}
+.row-in.more-l::before { left: 0; border-right: 1px dashed var(--valley); }
+.row-in.more-r::after { right: 0; border-left: 1px dashed var(--valley); }
+.stage-links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+.stage-links line { stroke: var(--valley); stroke-width: 1.5; }
+.stage-links line.bad { stroke: var(--mountain); stroke-width: 2; }
 
 .code-scroll {
-  overflow-x: auto; overscroll-behavior-x: contain;
+  position: relative; overflow-x: auto; overscroll-behavior-x: contain;
   padding: 2.4rem var(--s-5) var(--s-3);
   scrollbar-width: thin; scrollbar-color: var(--crease) transparent;
 }
-.code-canvas { --w: 72; position: relative; width: max-content; min-width: 100%; font: 400 12px / 1 var(--mono); }
+.code-canvas { --w: 72; position: relative; width: max-content; min-width: 100%; font: 400 clamp(12px, 1.1vw, 15px) / 1 var(--mono); }
+/* Where the sheet cuts the long line: a tab says how many columns are out
+   of view on that side. */
+.edge {
+  position: absolute; z-index: 2; display: none; align-items: center; padding: 0 0.45rem;
+  background: var(--sheet); color: var(--valley); font: 600 11px var(--mono); font-variant-numeric: tabular-nums;
+}
+.edge.on { display: flex; }
+.edge-l { left: 0; border-right: 1px dashed var(--valley); }
+.edge-r { right: 0; border-left: 1px dashed var(--valley); }
 
 /* Token grid: every token is placed by (line, column) in ch units, so a
    new layout moves each token from its old place to its new one. */
@@ -475,13 +537,14 @@ main > .hero { border-top: 0; }
   border-radius: 2px;
 }
 .tokens.instant .tok { transition: none; }
-/* Step 1: token boundaries; literals, comments and pragmas are kept. */
+/* Read: token boundaries; literals, comments and pragmas are kept. */
 .tokens .tok.boxed { box-shadow: inset 0 0 0 1px var(--crease); }
 .tokens .tok.kept { box-shadow: inset 0 0 0 1px var(--syn-string); background: color-mix(in srgb, var(--syn-string) 10%, transparent); }
-/* Step 3: checked tokens, and the one that differs. */
+/* Check: checked tokens, the one under the cursor, the one that differs. */
 .tokens .tok.ok { box-shadow: inset 0 -2px 0 var(--valley); }
+.tokens .tok.cur { box-shadow: inset 0 0 0 1.5px var(--valley); background: var(--valley-wash); }
 .tokens .tok.bad { box-shadow: inset 0 0 0 1.5px var(--mountain); background: var(--mountain-wash); color: var(--mountain); }
-/* Step 4: the lines of the construct origami broke. */
+/* Explain: the lines of the construct origami broke. */
 .tokens .bracket {
   position: absolute; left: -0.9rem; width: 2px; top: 0; background: var(--valley);
   height: calc(var(--n, 0) * var(--lh)); translate: 0 calc(var(--y, 0) * var(--lh));
@@ -523,34 +586,25 @@ main > .hero { border-top: 0; }
 .margin[aria-disabled="true"] { cursor: default; }
 
 .stage-foot {
-  margin: 0 var(--s-5); padding-top: var(--s-3); border-top: 1px dashed var(--crease);
-  min-height: calc(3 * 1.5em + var(--s-3));
-  font: 600 0.78rem / 1.5 var(--mono); color: var(--ink); font-variant-numeric: tabular-nums;
+  margin: 0 var(--s-5); padding: var(--s-3) 0 var(--s-4); border-top: 1px dashed var(--crease);
+  min-height: calc(3 * 1.55em + var(--s-3) + var(--s-4));
+  font: 600 clamp(0.75rem, 0.95vw, 0.875rem) / 1.55 var(--mono); color: var(--ink); font-variant-numeric: tabular-nums;
 }
 .stage-foot .note-mark { color: var(--valley); }
 .stage-foot .bad { color: var(--mountain); }
 .stage-foot a { color: var(--syn-rule); }
 
-.stage-under { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-4); min-height: 0; flex: 1; max-height: 17rem; }
-.stage-step { margin: 0; font: 700 var(--t-2) / 1 var(--mono); font-stretch: 75%; color: var(--ink-soft); white-space: nowrap; }
-.stage-step b { color: var(--valley); font-weight: 300; margin-right: 0.4em; }
-.crane-stage { flex: 1; align-self: stretch; max-width: 22rem; }
-@media (min-width: 64rem) { .stage-step { display: none; } .stage-under { justify-content: center; } }
+.crane-stage { min-height: 0; }
 
 @media (max-width: 63.99rem) {
-  .stage-sheet { flex: 0 0 auto; }
+  .row-in { height: 2rem; line-height: 2rem; margin-inline: var(--s-4); font-size: 11px; }
   .code-scroll { padding: 2.2rem var(--s-4) var(--s-2); }
   .code-canvas { font-size: 10.5px; }
-  .stage-foot { margin-inline: var(--s-4); font-size: 0.7rem; min-height: calc(3 * 1.5em + var(--s-3)); }
-  .stage-under { flex: 1 1 0; min-height: 3rem; max-height: none; align-items: stretch; }
-  .stage-step { font-size: var(--t-1); }
-  .crane-stage { max-width: 14rem; }
-  .stage-step { align-self: center; }
-  .journey[data-step="2"] .stage-input { display: none; }
+  .stage-foot { margin-inline: var(--s-4); font-size: 0.7rem; padding-bottom: var(--s-3); min-height: calc(3 * 1.55em + 2 * var(--s-3)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tokens .tok, .margin, .stage-input, .tokens .bracket { transition: none; }
+  .tokens .tok, .margin, .row-in, .row-in-track, .tokens .bracket { transition: none; }
 }
 
 /* ---- safety ---------------------------------------------------------------------- */
@@ -775,6 +829,5 @@ textarea.code:focus-visible { outline-offset: 0; }
 .rules td a { color: var(--syn-rule); font-family: var(--mono); font-size: 0.72rem; }
 .table-note { margin: var(--s-3) 0 0; color: var(--ink-soft); font-size: var(--t-0); max-width: var(--measure); }
 .live-only { display: none; }
-.journey.live .live-only { display: inline; }
-/* With the stage, its foot line shows the live values; the steps keep them for screen readers. */
-.journey.live .step-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Shown from the first paint when the journey will be live, so the text does not move. */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) { .live-only { display: inline; } }

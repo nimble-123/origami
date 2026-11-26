@@ -15,7 +15,6 @@ const SOURCE =
 const OPTS = { cds: false, lower: false, compact: true };
 const MIN = 40;
 const MAX = 120;
-const STEPS = ["Read", "Fold", "Check", "Explain", "Write"];
 // The headline's load moment (style.css), which the crane follows.
 const MOMENT = { crease: 250, fold: 950, foldFor: 760 };
 // What check.rs reports for a unit the self-check left as written.
@@ -103,9 +102,15 @@ export function journey() {
   const scroll = $("code-scroll");
   const margin = $("margin");
   const foot = $("stage-foot");
-  const inputRow = $("stage-input");
+  const rowIn = $("row-in");
+  const rowTrack = $("row-in-track");
   const links = $("stage-links");
+  const sheetEl = $("stage-sheet");
+  const edgeL = $("edge-l");
+  const edgeR = $("edge-r");
   const steps = [...section.querySelectorAll(".step")];
+  const railLinks = [...$("rail").querySelectorAll("a")];
+  scroll.addEventListener("scroll", () => edges(), { passive: true });
   foot.textContent = "Loading origami…";
 
   // ---- width -------------------------------------------------------------
@@ -194,7 +199,7 @@ export function journey() {
     const bracket = document.createElement("span");
     bracket.className = "bracket";
     tokensBox.append(bracket);
-    inputRow.replaceChildren(
+    rowTrack.replaceChildren(
       ...toks.map((t) => {
         const s = document.createElement("span");
         s.className = "tok";
@@ -211,7 +216,9 @@ export function journey() {
   function progress() {
     // The reading line: the middle of the screen beside the stage, or the
     // middle of what the pinned stage leaves free on a phone.
-    const line = wide.matches ? innerHeight * 0.5 : innerHeight * 0.74;
+    // On a phone a step starts as it enters the window under the stage, so
+    // its sweep plays while its text is in view.
+    const line = wide.matches ? innerHeight * 0.5 : innerHeight * 0.92;
     let s = -1;
     let t = 0;
     for (let i = 0; i < steps.length; i++) {
@@ -249,7 +256,7 @@ export function journey() {
     const step = Math.max(0, s);
     section.dataset.step = String(step);
     steps.forEach((li, i) => li.classList.toggle("current", i === step));
-    $("stage-step").innerHTML = `<b>${step + 1}</b>${STEPS[step]}`;
+    railLinks.forEach((a, i) => (i === step ? a.setAttribute("aria-current", "step") : a.removeAttribute("aria-current")));
     margin.setAttribute("aria-disabled", String(!st.data));
     margin.tabIndex = st.data ? 0 : -1;
     margin.classList.toggle("asleep", step < 1);
@@ -259,33 +266,63 @@ export function journey() {
     const d = st.data;
     const N = d.inTokens.length;
     const tam = st.tamper;
+    const kept = !!tam?.kept;
 
-    // Positions: on the long line (Read), folding (Fold), folded after.
-    const k = s < 1 ? 0 : s === 1 ? ease(clamp(t * 1.8, 0, 1)) : 1;
-    const keptAsWritten = tam?.kept;
+    // Positions: on the long line (Read), folding (Fold), folded after; the
+    // statement as written when the check has left it so.
+    // How much of a step the sweeps take: on a phone, the part where the
+    // text is still in view.
+    const pace = wide.matches ? 0.6 : 0.45;
+    const k = kept ? 0 : s < 1 ? 0 : s === 1 ? ease(clamp(t / pace, 0, 1)) : 1;
+    // Check: a cursor walks the tokens with the scroll; it stops at a
+    // difference.
+    let cur = s === 2 ? Math.floor(clamp((t - 0.05) / pace, 0, 1) * N) : s > 2 ? N : -1;
+    if (tam && cur >= tam.mismatch) {
+      cur = tam.mismatch;
+      if (!tam.caught) {
+        tam.caught = true;
+        setTimeout(() => {
+          if (st.tamper === tam) {
+            tam.kept = true;
+            schedule();
+          }
+        }, 900);
+      }
+    }
+    const inCheck = s === 2;
+    const done = cur >= N;
+    const inSpans = [...rowTrack.children];
     st.spans.forEach((span, i) => {
       const a = d.inTokens[i];
-      const b = keptAsWritten ? a : (tam?.outTokens[i] ?? d.outTokens[i]) ?? a;
+      const b = kept ? a : (tam?.outTokens[i] ?? d.outTokens[i]) ?? a;
       span.style.setProperty("--x", lerp(a.x, b.x, k).toFixed(3));
       span.style.setProperty("--y", lerp(a.y, b.y, k).toFixed(3));
       // Read: boxes sweep in; literals, comments and pragmas are kept.
-      const read = s === 0 && i < Math.ceil(t * 1.4 * N);
-      span.classList.toggle("boxed", read && a.cls !== "literal" && a.cls !== "pragma");
-      span.classList.toggle("kept", (s === 0 && read) && (a.cls === "literal" || a.cls === "pragma" || a.cls === "verbatim"));
-      // Check: matched tokens get a valley line; a difference turns red.
-      const swept = s === 2 ? Math.ceil(clamp(t * 1.6, 0, 1) * N) : s > 2 ? N : 0;
-      const bad = tam && s >= 2 && i === tam.mismatch;
-      span.classList.toggle("ok", s === 2 && i < swept && !(tam && i >= tam.mismatch));
+      const read = s === 0 && i < Math.ceil(clamp(t / pace, 0, 1) * N);
+      const keptCls = a.cls === "literal" || a.cls === "pragma" || a.cls === "verbatim";
+      span.classList.toggle("boxed", read && !keptCls);
+      span.classList.toggle("kept", read && keptCls);
+      const ok = inCheck && (i < cur || (done && !tam));
+      const isCur = inCheck && i === cur && !done && !tam;
+      const bad = inCheck && tam && i === tam.mismatch && cur >= tam.mismatch;
+      span.classList.toggle("ok", ok);
+      span.classList.toggle("cur", isCur);
       span.classList.toggle("bad", !!bad);
+      const r = inSpans[i];
+      if (r) {
+        r.classList.toggle("ok", ok);
+        r.classList.toggle("cur", isCur);
+        r.classList.toggle("bad", !!bad);
+      }
     });
-    const lines = keptAsWritten ? 1 : k < 1 ? 1 + Math.round((d.lines - 1) * k) : d.lines;
-    tokensBox.style.setProperty("--lines", Math.max(3, lines));
-    tokensBox.style.setProperty("--cols", k < 0.5 || keptAsWritten ? SOURCE.length : Math.max(...d.output.split("\n").map((l) => l.length)));
+    const lines = kept ? 1 : k < 1 ? 1 + Math.round((d.lines - 1) * k) : d.lines;
+    tokensBox.style.setProperty("--lines", 4);
+    tokensBox.style.setProperty("--cols", k < 0.5 ? SOURCE.length : Math.max(...d.output.split("\n").map((l) => l.length)));
 
     // The note's lines get a bracket (Explain).
     const note = d.review.notes.find((n) => n.text.includes("because")) ?? d.review.notes[0];
     const bracket = tokensBox.querySelector(".bracket");
-    if (note && !keptAsWritten) {
+    if (note && !kept && lines > 1) {
       bracket.style.setProperty("--y", note.first - 1);
       bracket.style.setProperty("--n", note.last - note.first + 1);
     } else bracket.style.setProperty("--n", 0);
@@ -300,40 +337,64 @@ export function journey() {
       const longest = Math.max(...d.output.split("\n").map((l) => l.length));
       foot.textContent =
         d.lines === 1
-          ? `Line width ${st.w}: it fits on one line (${longest} characters).`
-          : `Line width ${st.w}: ${d.lines} lines, the longest ${longest} characters.`;
+          ? `Line width ${st.w}: it fits on one line (${longest} characters). Above: the line as written.`
+          : `Line width ${st.w}: ${d.lines} lines, the longest ${longest} characters. Above: the line as written.`;
     } else if (s === 2) {
-      checkFoot(N, t);
+      checkFoot(N, cur);
     } else if (s === 3) {
       noteFoot(note);
     } else {
-      foot.textContent = tam?.kept
+      foot.textContent = kept
         ? `Written as it was, with W001. Took ${formatMs(d.ms)} ms in your browser.`
         : `Formatted and checked in ${formatMs(d.ms)} ms in your browser, then written.`;
     }
     say("write-live", `This run took ${formatMs(d.ms)} ms in your browser.`);
-    links.classList.toggle("on", s === 2);
-    if (s === 2) drawLinks(N, t);
-    else links.replaceChildren();
+
+    // The input row follows the cursor; the code shows the token that differs.
+    const chIn = st.chIn || (st.chIn = chOf(rowTrack));
+    const rowW = rowIn.clientWidth;
+    const total = SOURCE.length * chIn;
+    let shift = 0;
+    if (inCheck && cur >= 0 && cur < N) {
+      const a = d.inTokens[Math.min(cur, N - 1)];
+      shift = clamp((a.x + a.text.length / 2) * chIn - rowW / 2, 0, Math.max(0, total - rowW));
+      // Start at a token, so none is cut at the left edge, with room for
+      // the mark that says more is to the left.
+      const first = d.inTokens.filter((x) => x.x * chIn <= shift).pop();
+      shift = first && first.x > 0 ? first.x * chIn - 2 * chIn : 0;
+    }
+    rowTrack.style.setProperty("--shift", `${-shift}px`);
+    rowIn.classList.toggle("more-l", shift > 0);
+    rowIn.classList.toggle("more-r", total - shift > rowW + 1);
+    if (kept && !st.scrolledTo) {
+      st.scrolledTo = true;
+      const m = d.inTokens[tam.mismatch];
+      const ch = chOf(canvas);
+      const before = d.inTokens.filter((x) => x.x <= m.x - 24).pop();
+      // The first token in view starts right after the tab at the left edge.
+      scroll.scrollLeft = before ? Math.max(0, before.x * ch - 20) : 0;
+    }
+    if (!kept) st.scrolledTo = false;
+    edges();
+    drawLink(inCheck && cur >= 0 && (cur < N || tam) && !kept ? cur : -1, shift);
   }
 
-  function checkFoot(N, t) {
+  function checkFoot(N, cur) {
     const tam = st.tamper;
-    if (tam) {
+    if (tam && cur >= tam.mismatch) {
       const i = tam.mismatch;
       foot.replaceChildren();
       const a = document.createElement("span");
       a.textContent = `${i} of ${N} tokens identical; token ${i + 1} differs. `;
       const b = document.createElement("span");
       b.className = "bad";
-      b.textContent = tam.kept ? `W001 ${W001}.` : "Checking…";
+      b.textContent = tam.kept ? `W001 ${W001}.` : "The statement goes back to how it was written…";
       foot.append(a, b);
       return;
     }
-    const swept = Math.min(N, Math.ceil(clamp(t * 1.6, 0, 1) * N));
-    const same = st.data.mismatch < 0 ? swept : Math.min(swept, st.data.mismatch);
-    foot.textContent = `${same} of ${N} tokens identical.`;
-    if (swept === N) say("check-live", `${same} of ${N} tokens identical.`);
+    const same = Math.min(N, Math.max(0, cur));
+    foot.textContent = same >= N ? `${N} of ${N} tokens identical.` : `${same} of ${N} tokens identical. Token ${same + 1}: ${st.data.inTokens[same].text}`;
+    if (same >= N) say("check-live", `${N} of ${N} tokens identical.`);
   }
 
   function noteFoot(note) {
@@ -351,35 +412,51 @@ export function journey() {
     foot.append(mark, a, note.text.slice(note.rule.length));
   }
 
-  /** Lines from each input token (the small line above) to its output
-   * token, drawn as far as the sweep has come. The ends are computed from
-   * the tokens' columns, not from their moving boxes. */
-  function drawLinks(N, t) {
-    if (!wide.matches) return links.replaceChildren();
-    const sheet = links.getBoundingClientRect();
-    const rowBox = inputRow.getBoundingClientRect();
-    const codeBox = tokensBox.getBoundingClientRect();
-    const chIn = chOf(inputRow);
-    const ch = chOf(tokensBox);
-    const lh = parseFloat(getComputedStyle(st.spans[0]).lineHeight) || 21;
-    const swept = Math.ceil(clamp(t * 1.6, 0, 1) * N);
-    const tam = st.tamper;
-    const outs = tam?.kept ? st.data.inTokens : (tam?.outTokens ?? st.data.outTokens);
-    const cut = tam ? tam.mismatch : st.data.mismatch < 0 ? N : st.data.mismatch;
-    const ns = "http://www.w3.org/2000/svg";
-    const lines = [];
-    for (let i = 0; i < Math.min(swept, N, cut + 1); i++) {
-      const a = st.data.inTokens[i];
-      const b = outs[i] ?? a;
-      const l = document.createElementNS(ns, "line");
-      l.setAttribute("x1", (rowBox.left + (a.x + a.text.length / 2) * chIn - sheet.left).toFixed(1));
-      l.setAttribute("y1", (rowBox.bottom - sheet.top).toFixed(1));
-      l.setAttribute("x2", (codeBox.left + (b.x + b.text.length / 2) * ch - sheet.left).toFixed(1));
-      l.setAttribute("y2", (codeBox.top + b.y * lh + 4 - sheet.top).toFixed(1));
-      if (i === cut && tam) l.classList.add("bad");
-      lines.push(l);
+  /** Tabs at the edges of the code where the sheet cuts the line: how many
+   * columns are out of view on that side. */
+  function edges() {
+    const ch = chOf(canvas);
+    const pad = parseFloat(getComputedStyle(scroll).paddingLeft) || 0;
+    const left = Math.round((scroll.scrollLeft - pad) / ch);
+    // From the laid-out width, not scrollWidth, which counts tokens still
+    // moving to their places.
+    const right = Math.round((pad + tokensBox.offsetWidth - scroll.scrollLeft - scroll.clientWidth + pad) / ch);
+    const top = `${scroll.offsetTop + parseFloat(getComputedStyle(scroll).paddingTop) - 2}px`;
+    const height = `${tokensBox.offsetHeight + 4}px`;
+    for (const [el, n, sign] of [[edgeL, left, "+"], [edgeR, right, "+"]]) {
+      el.style.top = top;
+      el.style.height = height;
+      el.textContent = `${sign}${n}`;
+      el.classList.toggle("on", n > 1);
     }
-    links.replaceChildren(...lines);
+  }
+
+  /** One line between the input token and the output token under the
+   * cursor, clipped to the sheet. The ends come from where the tokens are
+   * placed (their columns), not from boxes that may still be moving. */
+  function drawLink(i, shift) {
+    const d = st.data;
+    if (i < 0 || !d || i >= d.inTokens.length) return links.replaceChildren();
+    const a = d.inTokens[i];
+    const b = (st.tamper?.outTokens ?? d.outTokens)[i] ?? a;
+    const sheet = sheetEl.getBoundingClientRect();
+    const rowBox = rowIn.getBoundingClientRect();
+    const canvasBox = canvas.getBoundingClientRect();
+    const codeBox = scroll.getBoundingClientRect();
+    const chIn = st.chIn;
+    const ch = chOf(canvas);
+    const lh = parseFloat(getComputedStyle(tokensBox).getPropertyValue("--lh")) * parseFloat(getComputedStyle(canvas).fontSize) || 26;
+    const x1 = rowBox.left + (a.x + a.text.length / 2) * chIn - shift;
+    const x2 = canvasBox.left + (b.x + b.text.length / 2) * ch;
+    const y2 = canvasBox.top + b.y * lh;
+    if (x1 < rowBox.left || x1 > rowBox.right || x2 < codeBox.left || x2 > codeBox.right) return links.replaceChildren();
+    const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    l.setAttribute("x1", (x1 - sheet.left).toFixed(1));
+    l.setAttribute("y1", (rowBox.bottom - sheet.top).toFixed(1));
+    l.setAttribute("x2", (x2 - sheet.left).toFixed(1));
+    l.setAttribute("y2", (y2 - sheet.top).toFixed(1));
+    if (st.tamper && i === st.tamper.mismatch) l.classList.add("bad");
+    links.replaceChildren(l);
   }
 
   // ---- the crane's fold along the steps -----------------------------------
@@ -473,7 +550,7 @@ export function journey() {
       const lexed = await request("lex", { op: "lex", source: tampered, opts: OPTS });
       const outTokens = placed(tampered, lexed);
       const mismatch = firstMismatch(st.data.inTokens, outTokens);
-      st.tamper = { mismatch, outTokens, kept: false };
+      st.tamper = { mismatch, outTokens, kept: false, caught: false };
       tamperButton.setAttribute("aria-pressed", "true");
       tamperButton.textContent = "Undo the change";
       schedule();
@@ -482,20 +559,6 @@ export function journey() {
         "check-live",
         `The check found a difference: ${mismatch} of ${N} tokens identical, token ${mismatch + 1} differs. origami leaves the statement as written and reports W001.`,
       );
-      // A moment later, the statement is printed as it was written.
-      setTimeout(() => {
-        if (st.tamper) {
-          st.tamper.kept = true;
-          schedule();
-          // On a narrow sheet the long line runs out of view: show the token.
-          const x = st.data.inTokens[mismatch]?.x ?? 0;
-          requestAnimationFrame(() =>
-            requestAnimationFrame(() => {
-              scroll.scrollLeft = Math.max(0, x * chOf(canvas) - scroll.clientWidth / 2);
-            }),
-          );
-        }
-      }, 900);
     } catch {
       say("check-live", "The simulation could not run here.");
     }
