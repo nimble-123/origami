@@ -4,6 +4,7 @@
 //! structural layout (the author's line breaks, re-indented).
 
 use crate::kinds::*;
+use crate::layout::comment_between;
 use origami_layout::{Doc, builder as b};
 use origami_syntax::{Language, RuleId, RuleSpan, TokenIndex, TokenStream};
 use std::cell::RefCell;
@@ -525,12 +526,7 @@ impl G<'_> {
                 continue;
             };
             let (from, to) = (toks[lp].start, toks[rp].end);
-            if self
-                .stream
-                .trivia
-                .iter()
-                .any(|t| t.is_comment() && t.start > from && t.end < to)
-            {
+            if comment_between(self.stream, from, to) {
                 continue;
             }
             out.insert(k, (lp, rp, params));
@@ -574,12 +570,7 @@ impl G<'_> {
             return None;
         }
         let (from, to) = (toks[lp].start, toks[rp].end);
-        if self
-            .stream
-            .trivia
-            .iter()
-            .any(|t| t.is_comment() && t.start > from && t.end < to)
-        {
+        if comment_between(self.stream, from, to) {
             return None;
         }
         Some((lp, rp, items))
@@ -635,12 +626,7 @@ impl G<'_> {
     /// breaks): the positions of `as` and `on` and the widths around them.
     fn association_row(&self, s: usize, end: usize) -> Option<(usize, usize, usize, usize, usize)> {
         let toks = &self.stream.tokens;
-        if self
-            .stream
-            .trivia
-            .iter()
-            .any(|t| t.is_comment() && t.start >= toks[s].start && t.end <= toks[end].end)
-        {
+        if comment_between(self.stream, toks[s].start, toks[end].end) {
             return None;
         }
         let mut depth = 0i32;

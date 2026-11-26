@@ -85,13 +85,24 @@ fn clause_doc(text: &str, stream: &TokenStream, u: &CdsUnit, blank: bool) -> Doc
     ])
 }
 
+/// A comment lies between the byte offsets `from` and `to`. The trivia are in
+/// source order, so only those in the range are looked at (a scan of all of
+/// them for every unit is quadratic in the file).
+pub(crate) fn comment_between(stream: &TokenStream, from: u32, to: u32) -> bool {
+    let first = stream.trivia.partition_point(|t| t.start < from);
+    stream.trivia[first..]
+        .iter()
+        .take_while(|t| t.start < to)
+        .any(|t| t.is_comment() && t.end <= to)
+}
+
 /// The unit has no comment after its first token.
 fn no_comments(stream: &TokenStream, u: &CdsUnit) -> bool {
-    let (a, b) = (stream.tokens[u.first].start, stream.tokens[u.last].end);
-    !stream
-        .trivia
-        .iter()
-        .any(|t| t.is_comment() && t.start > a && t.end <= b)
+    !comment_between(
+        stream,
+        stream.tokens[u.first].start,
+        stream.tokens[u.last].end,
+    )
 }
 
 /// `from..to` printed on one line with single spaces (glued tokens stay
@@ -677,11 +688,7 @@ fn case_breaks(text: &str, stream: &TokenStream, u: &CdsUnit) -> bool {
 fn one_line(text: &str, stream: &TokenStream, u: &CdsUnit) -> bool {
     let toks = &stream.tokens;
     let (a, b) = (toks[u.first].start, toks[u.last].end);
-    !text[a as usize..b as usize].contains('\n')
-        && !stream
-            .trivia
-            .iter()
-            .any(|t| t.is_comment() && t.start > a && t.end <= b)
+    !text[a as usize..b as usize].contains('\n') && !comment_between(stream, a, b)
 }
 
 /// Width of tokens `from..to` printed with single spaces.
