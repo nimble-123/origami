@@ -557,6 +557,8 @@ fn sarif_uris_are_percent_encoded_and_pseudo_paths_have_no_location() {
     assert!(result.get("locations").is_none(), "{result}");
 }
 
+// Unix quoting; on Windows the paths have backslashes and double quotes.
+#[cfg(unix)]
 #[test]
 fn agent_next_command_quotes_paths() {
     let d = dir();
