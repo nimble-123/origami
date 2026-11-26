@@ -222,6 +222,7 @@ function ruleLink(text, rule) {
 
 function render(r) {
   output.replaceChildren();
+  output.classList.remove("plain");
   if (r.status === "error" || r.output == null) {
     const d = r.diagnostics.find((x) => x.severity !== "warning") ?? r.diagnostics[0];
     const p = document.createElement("p");
@@ -237,6 +238,20 @@ function render(r) {
   }
   status.classList.remove("error");
   outputText.textContent = r.output;
+  const warnings = r.diagnostics.filter((d) => d.code !== "W003").length;
+  const num = (n) => `<span class="num">${n}</span>`;
+  const parts = [];
+  parts.push(r.changed ? "Formatted" : "Already formatted");
+  parts.push(`${num(r.notes.length)} ${r.notes.length === 1 ? "note" : "notes"} on line breaks`);
+  if (warnings) parts.push(`${num(warnings)} ${warnings === 1 ? "warning" : "warnings"}`);
+  const tail = `Took ${num(r.ms)} ms in your browser.`;
+  // A row and highlight spans per line would freeze the tab on a huge paste.
+  if (r.output.length > HIGHLIGHT_MAX) {
+    output.classList.add("plain");
+    output.textContent = r.output;
+    status.innerHTML = `${parts.join(", ")}. ${tail} Shown as plain text because the output is large.`;
+    return;
+  }
   const lines = r.output.replace(/\n$/, "").split("\n");
   const broken = new Set();
   const after = new Map();
@@ -267,16 +282,11 @@ function render(r) {
     }
   });
   output.append(frag);
-  const warnings = r.diagnostics.filter((d) => d.code !== "W003").length;
-  const num = (n) => `<span class="num">${n}</span>`;
-  const parts = [];
-  parts.push(r.changed ? "Formatted" : "Already formatted");
-  parts.push(`${num(r.notes.length)} ${r.notes.length === 1 ? "note" : "notes"} on line breaks`);
-  if (warnings) parts.push(`${num(warnings)} ${warnings === 1 ? "warning" : "warnings"}`);
-  status.innerHTML = `${parts.join(", ")}. Took ${num(r.ms)} ms in your browser.`;
+  status.innerHTML = `${parts.join(", ")}. ${tail}`;
 }
 
-// Inputs larger than this are shown without colors, so typing stays fast.
+// Inputs and outputs larger than this are shown without colors, so typing
+// stays fast and a huge paste cannot freeze the tab.
 const HIGHLIGHT_MAX = 200_000;
 
 /** Colors the copy of the input behind the textarea. */

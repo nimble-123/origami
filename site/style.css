@@ -325,6 +325,7 @@ textarea.code:focus-visible { outline-offset: 0; }
   white-space: normal; min-width: 0;
 }
 .output .ln-note a { color: var(--syn-rule); text-decoration-color: currentColor; }
+.output.plain { padding-inline: 1rem; white-space: pre; }
 .output .empty { padding: 0 1rem; color: var(--ink-soft); font-family: var(--sans); font-size: var(--t-sm); }
 
 .status { min-height: 1.6em; margin: 0.9rem 0 0; color: var(--ink-soft); font-size: var(--t-sm); }
