@@ -119,3 +119,27 @@ fn fixed_fuzz_findings_stay_fixed() {
     }
     assert!(n >= 4, "expected the fixed findings in fuzz/found");
 }
+
+/// A one-line block comment in front of a token of a unit the grammar does not
+/// know (an element without its comma) is part of the gap before the token:
+/// the unit is formatted, not left as written, and the comment stays
+/// (fuzz/found/cds-block-comment-line-before-token.bin).
+#[test]
+fn block_comment_in_front_of_a_token_in_an_unknown_unit_is_kept() {
+    let hint = LanguageHint::Explicit(Language::Ddls);
+    for src in [
+        "define view entity X as select from t { a\n    /* x */ b }\n",
+        "a\n /* x */ b\n",
+    ] {
+        for opts in [Options::default(), variant(src.len())] {
+            let r = format(src.as_bytes(), &hint, &opts);
+            assert!(
+                !r.has(Code::X001) && !r.has(Code::W001),
+                "{:?}",
+                r.diagnostics
+            );
+            let out = String::from_utf8(r.output.unwrap()).unwrap();
+            assert!(out.contains("/* x */ b"), "{out:?}");
+        }
+    }
+}
