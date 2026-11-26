@@ -19,7 +19,8 @@ fn git(args: &[&str]) -> Result<String, String> {
         .map_err(|e| format!("--changed needs git: {e}"))?;
     if !out.status.success() {
         let msg = String::from_utf8_lossy(&out.stderr);
-        return Err(format!("--changed: git {}: {}", args[0], msg.trim()));
+        let first = msg.lines().next().unwrap_or("").trim();
+        return Err(format!("--changed: git {}: {first}", args[0]));
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
@@ -81,7 +82,21 @@ fn resolve(rev: &str) -> Result<String, String> {
     }
 }
 
+/// Fails with one line unless the current directory is inside a git work tree.
+fn in_work_tree() -> Result<(), String> {
+    let out = Command::new("git")
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .output()
+        .map_err(|e| format!("--changed needs git: {e}"))?;
+    if out.status.success() && out.stdout.trim_ascii() == b"true" {
+        Ok(())
+    } else {
+        Err("--changed: the current directory is not inside a git work tree".into())
+    }
+}
+
 pub fn files(rev: &str, paths: &[PathBuf]) -> Result<Vec<(PathBuf, Ranges)>, String> {
+    in_work_tree()?;
     let rev = resolve(rev)?;
     let specs: Vec<String> = paths.iter().map(|p| p.display().to_string()).collect();
     let mut diff_args = vec![

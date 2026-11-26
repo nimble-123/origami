@@ -1245,6 +1245,20 @@ fn changed_rejects_a_revision_that_looks_like_an_option() {
 }
 
 #[test]
+fn changed_outside_git_says_so_in_one_line() {
+    let d = tempfile::tempdir().unwrap();
+    let out = origami()
+        .current_dir(d.path())
+        .env("GIT_CEILING_DIRECTORIES", d.path().parent().unwrap())
+        .args(["--no-config", "--changed"])
+        .assert()
+        .code(3);
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert!(err.contains("not inside a git work tree"), "{err}");
+    assert!(err.lines().count() < 10, "{err}");
+}
+
+#[test]
 fn mcp_changed_rejects_a_revision_that_looks_like_an_option() {
     let d = git_repo(&[("z.prog.abap", "lv_a = 1.\n")]);
     let outside = tempfile::tempdir().unwrap();
