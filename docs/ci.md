@@ -32,7 +32,10 @@ jobs:
 ```
 
 Without `version`, the action downloads the release that matches the tag it
-is used at (`@v0.4.2`), else the latest release.
+is used at (`@v0.4.2`), else the latest release. When the action is pinned by
+commit SHA or used at a branch or another floating ref, the binary version is
+not pinned with it: the action prints a warning (it does not fail) and
+installs the newest release. Set `version: v0.4.2` to pin the binary as well.
 
 ## GitLab CI
 

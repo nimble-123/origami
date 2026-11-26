@@ -6,7 +6,11 @@ branding:
 
 inputs:
   version:
-    description: Release tag (e.g. v1.0.0) or "latest". Default - the tag this action is used at, else latest.
+    description: >
+      Release tag (e.g. v1.0.0) or "latest". Default - the tag this action is
+      used at; when the action is used at a commit SHA, a branch or a floating
+      ref, the newest release is installed and a warning says so. Set this
+      input to pin the binary version.
     default: ""
   args:
     description: Arguments for origami.
@@ -51,7 +55,12 @@ runs:
         esac
         tag="$VERSION"
         if [ -z "$tag" ]; then
-          if [[ "$ACTION_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then tag="$ACTION_REF"; else tag=latest; fi
+          if [[ "$ACTION_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tag="$ACTION_REF"
+          else
+            tag=latest
+            echo "::warning title=origami::The action is used at '${ACTION_REF:-a local path}', which is not a version tag like v1.2.3, so the newest release binary is installed and the version changes with every release. Pin it with the version input (for example version: v1.2.3), or use the action at a version tag."
+          fi
         fi
         if [ "$tag" = latest ]; then
           tag=$(gh release view --repo "$REPO" --json tagName -q .tagName)
