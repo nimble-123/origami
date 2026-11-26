@@ -215,7 +215,7 @@ for the path `<internal>`.
 | E030 | error | file cannot be read | 4 | file | yes |
 | E031 | error | file cannot be written (a read-only file is not replaced) | 4 | file | yes |
 | W001 | warning | unit quarantined by the self-check | 0 / 5 | file | yes |
-| W002 | warning | unit left as written because of the 255-character limit | 0 / 5 | file | yes |
+| W002 | warning | unit, comment line or file left as written because of the 255-character limit (a comment line may be indented less) | 0 / 5 | file | yes |
 | W003 | warning | unknown statement formatted generically | 0 / 5 | file | yes |
 | W004 | warning | nesting-depth or size limit reached; the affected units, or the whole file, are left as written | 0 / 5 | file | yes |
 | W101 | warning | unknown config key | 0 / 5 | run | yes |
