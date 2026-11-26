@@ -1,1 +1,7 @@
-1: ABAP-VALUE-001: one row per line, because the constructor expression would end at column 124 (limit 120)
+1: ABAP-VALUE-001: one row per line
+5: ABAP-VALUE-001: one row per line
+8: ABAP-VALUE-001: one row per line
+12: ABAP-VALUE-001: one row per line
+16: ABAP-VALUE-001: one row per line
+18: ABAP-VALUE-001: one row per line
+20: ABAP-VALUE-001: one row per line

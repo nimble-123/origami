@@ -748,7 +748,12 @@ impl<'c, 'a> P<'c, 'a> {
                 LBRACKET => {
                     let close = self.matching(j)?;
                     self.mark_table_expr(j, close);
-                    docs.push(self.flat(j, close));
+                    let keys = if self.c.style == Style::Aligned {
+                        self.table_keys(j, close)
+                    } else {
+                        None
+                    };
+                    docs.push(keys.unwrap_or_else(|| self.flat(j, close)));
                     self.pos = close + 1;
                     self.last_call = false;
                 }
@@ -1124,6 +1129,20 @@ impl<'c, 'a> P<'c, 'a> {
         if items.is_empty() { None } else { Some(items) }
     }
 
+    /// Aligned `name = value` rows; in the aligned style two or more rows
+    /// always go one per line (ABAP-CALL-001, ABAP-VALUE-001).
+    fn rows_doc(&self, rows: Vec<AlignItem>) -> Doc {
+        let n = rows
+            .iter()
+            .filter(|i| matches!(i, AlignItem::Row(_)))
+            .count();
+        if self.c.style == Style::Aligned && n > 1 {
+            b::align_broken(rows)
+        } else {
+            b::align(rows)
+        }
+    }
+
     /// Call arguments between `lp` and `rp` (exclusive). `self.end == rp`.
     /// `call`: a method call (not a constructor); only calls record the
     /// ABAP-CALL-001 / ABAP-CALL-002 spans.
@@ -1180,8 +1199,13 @@ impl<'c, 'a> P<'c, 'a> {
                         });
                     }
                 }
-                // ABAP-CALL-002: two or more keywords always break.
-                let a = b::shared(if several {
+                // ABAP-CALL-002: two or more keywords always break;
+                // ABAP-CALL-001: so do two or more parameters.
+                let params = items
+                    .iter()
+                    .filter(|i| matches!(i, AlignItem::Row(_)))
+                    .count();
+                let a = b::shared(if several || params > 1 {
                     b::align_broken(items)
                 } else {
                     b::align(items)
@@ -1219,7 +1243,7 @@ impl<'c, 'a> P<'c, 'a> {
             if call {
                 self.c.span(lp, rp, "ABAP-CALL-001");
             }
-            let a = b::shared(b::align(rows));
+            let a = b::shared(self.rows_doc(rows));
             return Some(self.hanging(lp, rp, a.clone(), a));
         }
         // Single positional argument: an expression, or a logical
@@ -1246,9 +1270,209 @@ impl<'c, 'a> P<'c, 'a> {
         ]))
     }
 
+    /// Aligned style (ABAP-VALUE-001): a table expression `[ … ]` from
+    /// `open` to `close` with two or more key components, optionally after
+    /// `KEY name [COMPONENTS]`, one component per line. `None` otherwise.
+    fn table_keys(&mut self, open: usize, close: usize) -> Option<Doc> {
+        if self.has_comment(open, close) || self.glued(open + 1) {
+            return None;
+        }
+        let mark = self.c.mark();
+        let mut k = open + 1;
+        let mut head = Vec::new();
+        let mut components = false;
+        if self.is(k, "KEY") && self.kind(k + 1) == WORD && !self.glued(k + 1) {
+            let mut e = k + 2;
+            while e < close && self.glued(e) {
+                e += 1;
+            }
+            for i in k..e {
+                if i > k {
+                    head.push(self.sp(i));
+                }
+                head.push(self.t(i));
+            }
+            k = e;
+            if self.is(k, "COMPONENTS") {
+                head.push(self.sp(k));
+                head.push(self.t(k));
+                k += 1;
+                components = true;
+            }
+        }
+        let parsed = {
+            let mut inner = P {
+                c: &mut *self.c,
+                pos: k,
+                end: close,
+                first: self.first,
+                blank: false,
+                last_call: false,
+                period_at: close,
+            };
+            if inner.is_named_row(k) {
+                inner.rows().filter(|_| inner.at_end())
+            } else {
+                None
+            }
+        };
+        let rows = match parsed {
+            Some(r) if r.iter().filter(|i| matches!(i, AlignItem::Row(_))).count() > 1 => r,
+            _ => {
+                self.c.reset(mark);
+                return None;
+            }
+        };
+        self.c.span(open, close, "ABAP-VALUE-001");
+        let rows = b::align_broken(rows);
+        // `KEY name COMPONENTS` stays in front of the components; after
+        // `KEY name` alone, the components start below `KEY`.
+        let body = if head.is_empty() {
+            rows
+        } else if components {
+            b::concat(vec![b::concat(head), self.sp(k), b::hang(vec![rows])])
+        } else {
+            b::concat(vec![b::concat(head), self.hl(k), rows])
+        };
+        Some(b::concat(vec![
+            self.t(open),
+            self.sp(open + 1),
+            b::hang(vec![body]),
+            self.sp(close),
+            self.t(close),
+        ]))
+    }
+
+    /// One table row `( … )` at `open`: its components flat if they fit.
+    fn table_row(&mut self, open: usize) -> Option<(Doc, bool)> {
+        let close = self.matching(open)?;
+        let mark = self.c.mark();
+        let mut named = false;
+        let row = {
+            let mut inner = P {
+                c: &mut *self.c,
+                pos: open + 1,
+                end: close,
+                first: self.first,
+                blank: false,
+                last_call: false,
+                period_at: close,
+            };
+            if inner.is_named_row(open + 1) {
+                named = true;
+                // A parameter keyword ends the rows early; the row must
+                // still be used up, or its rest would be lost.
+                inner.rows().filter(|_| inner.at_end()).map(b::align)
+            } else {
+                inner.expr().filter(|_| inner.at_end())
+            }
+        };
+        let doc = match row {
+            Some(r) => b::group(vec![
+                self.t(open),
+                self.sp(open + 1),
+                r,
+                self.sp(close),
+                self.t(close),
+            ]),
+            None => {
+                self.c.reset_spans(mark);
+                self.raw(open, close)
+            }
+        };
+        self.pos = close + 1;
+        Some((doc, named))
+    }
+
+    /// Aligned style (ABAP-VALUE-001): `BASE …` or `LET … IN` on the first
+    /// line, then component assignments and table rows; broken when there
+    /// are two or more components, two or more rows of which one has a
+    /// component, or a `BASE`/`LET` with content after it. `None` for other
+    /// bodies (a single value, `FOR`, …).
+    fn ctor_body_aligned(&mut self, lp: usize, rp: usize) -> Option<Doc> {
+        let mut parts: Vec<(usize, Doc)> = Vec::new();
+        let mut lead = false;
+        let start = self.pos;
+        if self.is(start, "BASE") && !self.glued(start + 1) {
+            let kw = self.kw(start);
+            self.pos = start + 1;
+            let e = self.expr()?;
+            parts.push((start, b::concat(vec![kw, self.sp(start + 1), e])));
+            lead = true;
+        } else if self.is(start, "LET") {
+            parts.push((start, self.let_expr()?));
+            lead = true;
+        }
+        let mut comps = 0;
+        if !self.at_end() && self.is_named_row(self.pos) {
+            let at = self.pos;
+            let mut rows = Vec::new();
+            while !self.at_end() && self.kind(self.pos) != LPAREN {
+                let name = self.pos;
+                if !self.is_named_row(name) || self.glued(name) {
+                    return None;
+                }
+                if !rows.is_empty() && self.c.commented[name] {
+                    rows.push(AlignItem::Break);
+                }
+                self.pos = name + 2;
+                let value = self.expr()?;
+                rows.push(b::row(
+                    vec![self.t(name)],
+                    vec![
+                        self.sp(name + 1),
+                        self.t(name + 1),
+                        self.sp(name + 2),
+                        value,
+                    ],
+                ));
+                comps += 1;
+            }
+            parts.push((at, b::align_broken(rows)));
+        }
+        let mut n_rows = 0;
+        let mut named_row = false;
+        while !self.at_end() {
+            let open = self.pos;
+            if self.kind(open) != LPAREN || self.glued(open) {
+                return None;
+            }
+            let (d, named) = self.table_row(open)?;
+            named_row |= named;
+            n_rows += 1;
+            parts.push((open, d));
+        }
+        let content = parts.len() - usize::from(lead);
+        let broken = comps > 1
+            || (n_rows > 1 && named_row)
+            || (lead && content > 0)
+            || (comps > 0 && n_rows > 0);
+        if !broken || (lead && content == 0) {
+            return None;
+        }
+        let mut docs = Vec::new();
+        for (n, (at, d)) in parts.into_iter().enumerate() {
+            if n > 0 {
+                docs.push(self.hl(at));
+            }
+            docs.push(d);
+        }
+        self.c.span(lp, rp, "ABAP-VALUE-001");
+        let content = b::shared(b::concat(docs));
+        Some(self.hanging(lp, rp, content.clone(), content))
+    }
+
     /// Constructor body: rows `( … )`, component assignments, or one value.
     fn ctor_body(&mut self, lp: usize, rp: usize) -> Option<Doc> {
         let first = self.pos;
+        if self.c.style == Style::Aligned {
+            let mark = self.c.mark();
+            if let Some(d) = self.ctor_body_aligned(lp, rp) {
+                return Some(d);
+            }
+            self.c.reset(mark);
+            self.pos = first;
+        }
         if self.kind(first) == LPAREN && !self.glued(first) {
             // Table rows.
             let mut items = Vec::new();
@@ -1306,7 +1530,7 @@ impl<'c, 'a> P<'c, 'a> {
                 return None;
             }
             self.c.span(lp, rp, "ABAP-VALUE-001");
-            let a = b::shared(b::align(rows));
+            let a = b::shared(self.rows_doc(rows));
             return Some(self.hanging(lp, rp, a.clone(), a));
         }
         self.call_args(lp, rp, false)

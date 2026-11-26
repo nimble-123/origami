@@ -2355,6 +2355,19 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
             .bare
             .then(|| b::concat(vec![b::concat(head), p.period()]));
     }
+    if p.c.style == Style::Aligned
+        && matches!(
+            spec.lead,
+            ["RAISE", "EXCEPTION"] | ["RAISE", "RESUMABLE", "EXCEPTION"] | ["RAISE", "EVENT"]
+        )
+    {
+        let saved = p.c.mark();
+        if let Some(body) = raise_exporting(p, start, spec) {
+            return Some(b::concat(vec![b::concat(head), body, p.period()]));
+        }
+        p.c.reset(saved);
+        p.pos = start + spec.lead.len();
+    }
     if p.c.style == Style::Aligned && matches!(spec.lead, ["SORT"] | ["CATCH"]) {
         let saved = p.c.mark();
         if let Some(body) = one_per_line(p, start, spec) {
@@ -2397,6 +2410,50 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
         mark_sql_keywords(p, start, p.end);
     }
     Some(b::group(vec![b::concat(head), body, p.period()]))
+}
+
+/// `RAISE EXCEPTION TYPE … EXPORTING a = 1 b = 2`, `RAISE EVENT …
+/// EXPORTING …`, aligned style (ABAP-CALL-001): with two or more parameters
+/// the line breaks before `EXPORTING`, the parameters aligned behind it.
+fn raise_exporting(p: &mut P, start: usize, spec: &Spec) -> Option<Doc> {
+    let from = p.pos;
+    let exp = (from..p.end).find(|&k| p.is(k, "EXPORTING") && !p.glued(k))?;
+    if exp == from || (from..p.end).any(|k| p.c.commented[k]) {
+        return None;
+    }
+    let end = p.end;
+    p.end = exp;
+    let head = spec_body(p, spec, true);
+    p.end = end;
+    let head = head?;
+    let kw = p.kw(exp);
+    let mut rows = Vec::new();
+    p.pos = exp + 1;
+    while !p.at_end() {
+        let name = p.pos;
+        if p.kind(name) != WORD || !p.is(name + 1, "=") || p.glued(name + 1) || p.glued(name) {
+            return None;
+        }
+        p.pos = name + 2;
+        let value = p.expr()?;
+        rows.push(b::row_cols(
+            vec![if rows.is_empty() {
+                vec![kw.clone()]
+            } else {
+                Vec::new()
+            }],
+            vec![p.t(name)],
+            vec![p.sp(name + 1), p.t(name + 1), p.sp(name + 2), value],
+        ));
+    }
+    if rows.len() < 2 {
+        return None;
+    }
+    p.c.span(start, p.end, "ABAP-CALL-001");
+    Some(b::concat(vec![
+        head,
+        b::cont(vec![p.hl(exp), b::align_broken(rows)]),
+    ]))
 }
 
 /// `SORT itab BY a b` and `CATCH cx_a cx_b`, aligned style (ABAP-ALIGN-009):
