@@ -9,7 +9,7 @@
 
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { BinaryResolver } from "./binary";
+import { BinaryResolver, isUnresolved, Unresolved } from "./binary";
 import { computeEdits } from "./edits";
 import { formatText, Log, TextOutcome } from "./format";
 import { decode, encode, SCHEME } from "./previewUri";
@@ -35,8 +35,8 @@ export interface PreviewDeps {
   log: Log;
   /** Problems panel and status bar for an outcome. */
   report: (document: vscode.TextDocument, outcome: TextOutcome, timeoutMs: number) => void;
-  /** Status bar when no origami binary satisfies required_version. */
-  mismatch: () => void;
+  /** Status bar when no usable origami binary was found. */
+  unresolved: (u: Unresolved) => void;
 }
 
 function nameOf(uri: vscode.Uri): string {
@@ -105,11 +105,9 @@ export class PreviewManager implements vscode.TextDocumentContentProvider, vscod
 
   private async format(document: vscode.TextDocument, text: string): Promise<TextOutcome | undefined> {
     const resolved = await this.deps.resolver.resolve(document);
-    if (!resolved) {
-      this.deps.mismatch();
-      void vscode.window.showWarningMessage(
-        "origami: no origami binary satisfies required_version in origami.toml.",
-      );
+    if (isUnresolved(resolved)) {
+      this.deps.unresolved(resolved);
+      void vscode.window.showWarningMessage(`origami: ${resolved.message}`);
       return undefined;
     }
     const cts = new vscode.CancellationTokenSource();

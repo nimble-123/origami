@@ -3,7 +3,7 @@
 
 import * as vscode from "vscode";
 import * as fs from "node:fs";
-import { BinaryResolver } from "./binary";
+import { BinaryResolver, isUnresolved, Unresolved } from "./binary";
 import { formatDocument, FORMAT_TIMEOUT_MS, TextOutcome } from "./format";
 import { toEditorRange } from "./diagnosticsModel";
 import { PreviewManager } from "./preview";
@@ -105,10 +105,9 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
-  const mismatch = () =>
-    setStatus("origami: version mismatch", "No origami binary satisfies required_version in origami.toml.");
+  const unresolved = (u: Unresolved) => setStatus(u.status, u.message);
 
-  const previews = new PreviewManager({ resolver, log, report: reportOutcome, mismatch });
+  const previews = new PreviewManager({ resolver, log, report: reportOutcome, unresolved });
   // Enables "Preview Changes" in the command palette.
   const updateFormattable = () => {
     const doc = vscode.window.activeTextEditor?.document;
@@ -124,8 +123,8 @@ export function activate(context: vscode.ExtensionContext): void {
   ): Promise<vscode.TextEdit[]> {
     {
       const resolved = await resolver.resolve(document);
-      if (!resolved) {
-        mismatch();
+      if (isUnresolved(resolved)) {
+        unresolved(resolved);
         return [];
       }
       const outcome = await formatDocument(document, resolved, token, log, ranges);
