@@ -5,7 +5,7 @@
 //! (scripts/abap-cleaner-compare/keywords.py). The cases are written in the
 //! compact style, so their line breaks do not depend on the style rules.
 
-use origami_core::{Code, LanguageHint, Options, Style, format};
+use origami_core::{Case, Code, LanguageHint, Options, Style, format};
 
 fn check(cases: &[(&str, &str)]) {
     check_style(Style::Compact, "t.prog.abap", cases);
@@ -827,6 +827,76 @@ ENDLOOP.
     ]);
 }
 
+/// ABAP SQL aggregate functions are keywords where a bracket follows; a column
+/// that is only named like one is a name.
+#[test]
+fn sql_aggregate_functions() {
+    check(&[
+        (
+            "select string_agg( name, ',' ) from t into @data(agg).\n",
+            "SELECT STRING_AGG( name, ',' ) FROM t INTO @DATA(agg).\n",
+        ),
+        (
+            "select median( x ) from t into @lv.\n",
+            "SELECT MEDIAN( x ) FROM t INTO @lv.\n",
+        ),
+        (
+            "select stddev( a ) as s, var( a ) as v, corr( a, b ) as c, corr_spearman( a, b ) as r from t into @ls.\n",
+            "SELECT STDDEV( a )           AS s,\n       VAR( a )              AS v,\n       CORR( a, b )          AS c,\n       CORR_SPEARMAN( a, b ) AS r\n    FROM t\n    INTO @ls.\n",
+        ),
+        (
+            "select a, string_agg( name, ',' order by name ) as s from t group by a into table @lt.\n",
+            "SELECT a,\n       STRING_AGG( name, ',' ORDER BY name ) AS s\n    FROM t\n    GROUP BY a\n    INTO TABLE @lt.\n",
+        ),
+        (
+            "select var, median from t into table @lt.\n",
+            "SELECT var, median FROM t INTO TABLE @lt.\n",
+        ),
+        (
+            "select var as stddev, corr from t where var = 1 into table @lt.\n",
+            "SELECT var  AS stddev,\n       corr\n    FROM t\n    WHERE var = 1\n    INTO TABLE @lt.\n",
+        ),
+        (
+            "select max( var ) from t into @lv.\n",
+            "SELECT MAX( var ) FROM t INTO @lv.\n",
+        ),
+    ]);
+}
+
+/// The aggregate functions follow `abap.keyword_case`. A word with a
+/// lower-case letter keeps its case unless it is a keyword, so the mixed case
+/// tells a function from a name.
+#[test]
+fn sql_aggregate_functions_follow_the_keyword_case_option() {
+    let hint = LanguageHint::Path("t.prog.abap".into());
+    let mut opts = Options::default();
+    opts.lang.style = Style::Compact;
+    opts.lang.abap_keyword_case = Case::Lower;
+    for (input, expected) in [
+        (
+            "Select String_Agg( name, ',' ) From t Into @Data(agg).\n",
+            "select string_agg( name, ',' ) from t into @data(agg).\n",
+        ),
+        (
+            "Select Median( x ) From t Into @lv.\n",
+            "select median( x ) from t into @lv.\n",
+        ),
+        (
+            "Select Max( x ) From t Into @lv.\n",
+            "select max( x ) from t into @lv.\n",
+        ),
+        (
+            "Select Var, Median From t Into Table @lt.\n",
+            "select Var, Median from t into table @lt.\n",
+        ),
+    ] {
+        let r = format(input.as_bytes(), &hint, &opts);
+        assert!(!r.has(Code::W003), "not recognized: {input}");
+        let out = String::from_utf8(r.output.expect("output")).unwrap();
+        assert_eq!(out, expected, "input: {input}");
+    }
+}
+
 /// A name in an operand position stays a name, even when it is spelled like
 /// a keyword of the statement elsewhere.
 #[test]
@@ -850,6 +920,43 @@ fn operands_named_like_keywords() {
             "lv = VALUE #( lt[ KEY key COMPONENTS a = 1 ] ).\n",
         ),
     ]);
+}
+
+/// The operand of `BASE` is a name, also when it is spelled like an operator
+/// (`BASE lt ( 1 )` is not the comparison `BASE LT ( 1 )`).
+#[test]
+fn base_operand_named_like_operator() {
+    let names = [
+        "lt", "le", "gt", "ge", "eq", "ne", "in", "key", "base", "lt_tab",
+    ];
+    let mut compact = Vec::new();
+    let mut aligned = Vec::new();
+    for name in names {
+        for (low, up) in [
+            ("value #", "VALUE #"),
+            ("new #", "NEW #"),
+            ("value ty", "VALUE ty"),
+        ] {
+            compact.push((
+                format!("x = {low}( base {name} ( 1 ) ).\n"),
+                format!("x = {up}( BASE {name} ( 1 ) ).\n"),
+            ));
+        }
+        aligned.push((
+            format!("x = value #( base {name} ( 1 ) ).\n"),
+            format!("x = VALUE #( BASE {name}\n             ( 1 ) ).\n"),
+        ));
+    }
+    let compact: Vec<(&str, &str)> = compact
+        .iter()
+        .map(|(a, b)| (a.as_str(), b.as_str()))
+        .collect();
+    let aligned: Vec<(&str, &str)> = aligned
+        .iter()
+        .map(|(a, b)| (a.as_str(), b.as_str()))
+        .collect();
+    check(&compact);
+    check_style(Style::Aligned, "t.prog.abap", &aligned);
 }
 
 #[test]

@@ -170,9 +170,15 @@ RESULT`, `TYPE RESPONSE FOR MAPPED LATE`), inline `FIELD-SYMBOL( )`,
 function arguments and constructor bodies, table keys (`[ KEY k COMPONENTS …
 ]`), format options of string templates (`{ d DATE = ISO }`), text symbols
 with a numeric ID (`TEXT-001`), and in ABAP SQL the aggregate functions
-(`COUNT( )`, `SUM( )`, `MIN( )`, `MAX( )`, `AVG( )`) and `CAST( … AS CHAR( n )
-)`. Other SQL functions (`length( )`, `substring( )`) are built-in functions
-and keep their case.
+(`COUNT( )`, `SUM( )`, `MIN( )`, `MAX( )`, `AVG( )`, `STRING_AGG( )`,
+`MEDIAN( )`, `STDDEV( )`, `VAR( )`, `CORR( )`, `CORR_SPEARMAN( )`) and `CAST( …
+AS CHAR( n ) )`. Other SQL functions (`length( )`, `substring( )`) are
+built-in functions and keep their case.
+
+Approved by the maintainer, Nils Lutz, on 2026-11-26: `STRING_AGG`, `MEDIAN`,
+`STDDEV`, `VAR`, `CORR` and `CORR_SPEARMAN` are upper-cased like the other
+aggregate functions, and only where a bracket follows the word directly. A
+column or variable named `var` or `median` is a name and keeps its case.
 
 ```abap
 before: data(lv_count) = lines( mt_items ).

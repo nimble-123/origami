@@ -1650,6 +1650,10 @@ impl<'c, 'a> P<'c, 'a> {
             let a = b::shared(self.rows_doc(rows));
             return Some(self.hanging(lp, rp, a.clone(), a));
         }
+        // `BASE lt ( 1 )`: an operand and a row, not the comparison `BASE LT …`.
+        if self.is(first, "BASE") && first + 1 < rp && !self.glued(first + 1) {
+            return None;
+        }
         self.call_args(lp, rp, false)
     }
 

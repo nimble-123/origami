@@ -3493,7 +3493,22 @@ const SQL_WORDS: &[&str] = &[
 
 /// SQL functions written as keywords when a bracket follows (`COUNT( * )`,
 /// `CAST( … )`); other SQL functions are written like built-in functions.
-const SQL_FUNCTIONS: &[&str] = &["COUNT", "SUM", "MIN", "MAX", "AVG", "CAST", "OVER"];
+/// Holds every aggregate function of `block_pairs::AGGREGATES`.
+const SQL_FUNCTIONS: &[&str] = &[
+    "COUNT",
+    "SUM",
+    "MIN",
+    "MAX",
+    "AVG",
+    "STRING_AGG",
+    "MEDIAN",
+    "STDDEV",
+    "VAR",
+    "CORR",
+    "CORR_SPEARMAN",
+    "CAST",
+    "OVER",
+];
 
 /// Dictionary types in `CAST( … AS CHAR( 6 ) )`.
 const SQL_TYPES: &[&str] = &[
@@ -5240,4 +5255,17 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
     // The header at the continuation indent too, where an end-of-line
     // comment breaks it.
     Some(b::group(vec![b::cont(head), b::cont(groups), p.period()]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SQL_FUNCTIONS;
+    use crate::block_pairs::AGGREGATES;
+
+    #[test]
+    fn every_aggregate_function_is_a_sql_function() {
+        for f in AGGREGATES.iter().filter(|f| f.bytes().all(|b| b != b'(')) {
+            assert!(SQL_FUNCTIONS.contains(f), "{f}");
+        }
+    }
 }
