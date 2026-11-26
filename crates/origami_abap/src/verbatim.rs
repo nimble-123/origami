@@ -107,39 +107,38 @@ fn skip_to_eol(b: &[u8], j: usize) -> usize {
         .unwrap_or(b.len())
 }
 
-/// End of a string template that starts at `|`: `\` escapes the next byte and
+/// End of a string template that starts at `|`: `\\` escapes the next byte and
 /// `{ … }` embeds an expression, which may hold literals and templates.
+/// Iterative, so that deep nesting cannot exhaust the stack: `open` holds one
+/// entry per open template (`false`) or embedded expression (`true`).
 fn skip_template(b: &[u8], j: usize) -> usize {
+    let mut open = vec![false];
     let mut k = j + 1;
     while k < b.len() {
+        let embedded = *open.last().unwrap_or(&false);
         match b[k] {
-            b'\\' => k += 2,
-            b'|' => return k + 1,
-            b'{' => k = skip_embedded(b, k + 1),
-            _ => k += 1,
-        }
-    }
-    b.len()
-}
-
-/// End of an embedded expression, directly after its closing `}`.
-fn skip_embedded(b: &[u8], from: usize) -> usize {
-    let mut depth = 0u32;
-    let mut k = from;
-    while k < b.len() {
-        match b[k] {
-            b'\'' => k = skip_quoted(b, k, b'\''),
-            b'`' => k = skip_quoted(b, k, b'`'),
-            b'|' => k = skip_template(b, k),
-            b'{' => {
-                depth += 1;
+            b'\\' if !embedded => k += 2,
+            b'|' if !embedded => {
+                open.pop();
+                k += 1;
+                if open.is_empty() {
+                    return k;
+                }
+            }
+            b'{' if !embedded => {
+                open.push(true);
                 k += 1;
             }
-            b'}' if depth == 0 => return k + 1,
-            b'}' => {
-                depth -= 1;
+            b'}' if embedded => {
+                open.pop();
                 k += 1;
             }
+            b'|' => {
+                open.push(false);
+                k += 1;
+            }
+            b'\'' if embedded => k = skip_quoted(b, k, b'\''),
+            b'`' if embedded => k = skip_quoted(b, k, b'`'),
             _ => k += 1,
         }
     }

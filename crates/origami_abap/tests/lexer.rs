@@ -162,6 +162,17 @@ fn macro_body_skips_templates_and_backquote_literals() {
 }
 
 #[test]
+fn macro_body_with_deeply_nested_templates_does_not_overflow() {
+    let n = 200_000;
+    let body = format!("lv = {}|it's|{}.", "|{ ".repeat(n), " }|".repeat(n));
+    let src = format!("DEFINE m.\n  {body}\nEND-OF-DEFINITION.\nm x.\n");
+    let (ts, text) = toks(&src);
+    let opaque: Vec<_> = ts.tokens.iter().filter(|t| t.kind == OPAQUE).collect();
+    assert_eq!(opaque.len(), 1);
+    assert!(!opaque[0].text(&text).contains("END-OF-DEFINITION"));
+}
+
+#[test]
 fn verbatim_regions() {
     let src = "METHOD m BY DATABASE PROCEDURE FOR HDB LANGUAGE SQLSCRIPT.\n  -- endmethod. in comment\n  x = \"ENDMETHOD\";\n  ENDMETHOD.\n";
     let (ts, text) = toks(src);
