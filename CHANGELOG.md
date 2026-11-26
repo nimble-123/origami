@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.3](https://github.com/nimble-123/origami/compare/v0.4.2...v0.4.3) (2026-11-26)
+
+
+### Fixes
+
+* **abap:** accept macros with templates, more SQL aggregates and pragma-led declarations ([#106](https://github.com/nimble-123/origami/issues/106)) ([9fb2983](https://github.com/nimble-123/origami/commit/9fb2983efe1cb8c1bb9224bc5e74f4f329b1598d))
+* **cds:** bound case nesting and keep comment lines before a closing bracket indented (CDS-BLOCK-001, CDS-KEY-001) ([#113](https://github.com/nimble-123/origami/issues/113)) ([f12da00](https://github.com/nimble-123/origami/commit/f12da006b3a027a8b71c80d65a4054e51c0e2513))
+* **cli:** close the option injection in --changed and validate MCP tool arguments ([#109](https://github.com/nimble-123/origami/issues/109)) ([20773db](https://github.com/nimble-123/origami/commit/20773db0cf75f3951ad5eb15e0cabe137b4009c5))
+* **cli:** find origami.toml from subdirectories, keep symlinks, survive a closed stdout ([#108](https://github.com/nimble-123/origami/issues/108)) ([3971310](https://github.com/nimble-123/origami/commit/39713101acfc974a3aa8ca486cfb0824e52a85b0))
+* **core:** enforce the 255-character limit for comment lines and close two gaps in the self-check ([#112](https://github.com/nimble-123/origami/issues/112)) ([f275ed4](https://github.com/nimble-123/origami/commit/f275ed42ced8e4403593b629177d256430485c10))
+* **site:** playground timeout loop, keyboard access, self-hosted fonts and a CSP ([#105](https://github.com/nimble-123/origami/issues/105)) ([dfca0c7](https://github.com/nimble-123/origami/commit/dfca0c74416d9ee7313c6b2887093893e0a80b79))
+* **vscode:** log errors always, survive early binary exits, find the binary reliably ([#104](https://github.com/nimble-123/origami/issues/104)) ([a4c29de](https://github.com/nimble-123/origami/commit/a4c29de66f0beb6fcb8ccc0f467c3266e7d92c5f))
+
+
+### Formatting output
+
+* **abap:** keep an overlong comment line as written instead of the whole file (ABAP-COMMENT-003) ([#117](https://github.com/nimble-123/origami/issues/117)) ([fee245d](https://github.com/nimble-123/origami/commit/fee245d793671a55b0c4d3a691488f68336fb975))
+* **abap:** keep names spelled like constructor keywords in operand positions (ABAP-CASE-001) ([#120](https://github.com/nimble-123/origami/issues/120)) ([32d71dc](https://github.com/nimble-123/origami/commit/32d71dc14b12491c1015064dc233d7e88ec3d93e))
+* **abap:** keep parameter tables aligned across comment lines (ABAP-CALL-003, ABAP-ALIGN-001) ([#118](https://github.com/nimble-123/origami/issues/118)) ([3b05469](https://github.com/nimble-123/origami/commit/3b05469876bee4685d18d013ee75415fdcf5ef90))
+* **abap:** treat GET node as an event block (ABAP-EVENT-001) ([#107](https://github.com/nimble-123/origami/issues/107)) ([f2f5dad](https://github.com/nimble-123/origami/commit/f2f5dadbff5f470f43da33f6f75214fbc658613c))
+* **abap:** upper-case the newer SQL aggregate functions, keep the operand of BASE as written (ABAP-CASE-001) ([#119](https://github.com/nimble-123/origami/issues/119)) ([13ba036](https://github.com/nimble-123/origami/commit/13ba0360c97f83b1f21428dd6840f1e94d665fcc))
+
 ## [0.4.2](https://github.com/nimble-123/origami/compare/v0.4.1...v0.4.2) (2026-11-26)
 
 
