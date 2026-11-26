@@ -87,6 +87,7 @@ fn opts(width: u16) -> PrintOptions {
         blank_after_comments: Default::default(),
         forced_blanks: Default::default(),
         comment_overrides: Default::default(),
+        line_limit: None,
     }
 }
 

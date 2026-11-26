@@ -11,4 +11,4 @@ mod ir;
 mod printer;
 
 pub use ir::{AlignFit, AlignItem, AlignRow, Doc};
-pub use printer::{PrintOptions, print, print_bounded};
+pub use printer::{PrintOptions, print, print_bounded, print_sparing};

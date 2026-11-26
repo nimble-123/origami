@@ -17,14 +17,21 @@ mod stmt;
 pub mod structure;
 pub mod verbatim;
 
-use origami_layout::{PrintOptions, print_bounded};
+use origami_layout::{PrintOptions, print_sparing};
 use origami_syntax::{
-    LangOptions, LangResult, SourceText, Stats, Style, TokenIndex, TokenStream, Unit, UnitId,
-    max_output_len, output_limit_diagnostic,
+    Code, Diagnostic, LangOptions, LangResult, SourceText, Stats, Style, TokenIndex, TokenStream,
+    Unit, UnitId, max_output_len, output_limit_diagnostic,
 };
 use std::collections::BTreeSet;
 
 pub use lexer::lex;
+
+/// ABAP's limit on the length of a source line (INVARIANTS 1.5).
+const MAX_LINE: usize = 255;
+
+/// W002 for a comment line kept within `MAX_LINE` (ABAP-COMMENT-003).
+const SPARED_COMMENT: &str = "Comment line left as written, indented only as far as fits: \
+                              formatting would exceed 255 characters per line";
 
 /// Formats ABAP source. Units in `quarantine` are printed as written
 /// (re-indented only); units in `opaque` are printed byte for byte.
@@ -162,13 +169,22 @@ fn format_with(
         blank_after_comments: laid.blank_after_comments.clone(),
         forced_blanks: laid.forced_blanks.clone(),
         comment_overrides,
+        line_limit: Some(MAX_LINE),
     };
     let limit = max_output_len(src.text().len());
     let (output, diagnostics) =
-        match print_bounded(&laid.doc, src, &print_stream, &print_opts, limit) {
+        match print_sparing(&laid.doc, src, &print_stream, &print_opts, limit) {
             // In identity mode nothing is formatted, so no W003 is reported.
-            Some(output) if identity => (output, Vec::new()),
-            Some(output) => (output, laid.diagnostics),
+            Some((output, _)) if identity => (output, Vec::new()),
+            Some((output, spared)) => {
+                let mut diagnostics = laid.diagnostics;
+                // ABAP-COMMENT-003: comment lines kept within 255 characters.
+                diagnostics.extend(spared.into_iter().map(|k| {
+                    let t = &print_stream.trivia[k];
+                    Diagnostic::new(Code::W002, SPARED_COMMENT, t.start..t.end)
+                }));
+                (output, diagnostics)
+            }
             None => (src.text().to_string(), vec![output_limit_diagnostic()]),
         };
     LangResult {

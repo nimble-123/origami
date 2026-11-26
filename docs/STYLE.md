@@ -1164,7 +1164,34 @@ after:  " tax is added later
         lv_tax = lv_total * lv_rate. " rounded
 ```
 
-**Compact:** comments are not changed.
+Approved by the maintainer, Nils Lutz, on 2026-11-26. An own-line `"`
+comment line that would be longer than 255 characters once formatted (with
+the space and its indentation), while its input line was not, keeps its
+text as written, without the space, and is indented only as far as it fits:
+by its usual indentation or by 255 minus the length of the comment, whichever
+is less (INVARIANTS.md, rule 1.5). The text stays unchanged even where the
+space would fit with less indentation. W002 reports the line, on every run,
+since its formatted form still would not fit; a second run prints it the
+same way. Everything else in the file is formatted as usual, including the
+statement the comment belongs to. `*` comments stay in column 1
+(GEN-COMMENT-001), and an end-of-line comment that would pass column 255
+still leaves its statement as written, or the whole file if that is not
+enough (W002, INVARIANTS.md section 2). In the example the comment
+has 252 characters; indented by 4 with the space it would end at column 257.
+
+```text
+before: IF a = b.
+        IF c = d.
+        "keeps its text … (252 characters)
+        WRITE a.
+after:  IF a = b.
+          IF c = d.
+           "keeps its text … (252 characters, now ending at column 255)
+            WRITE a.
+```
+
+**Compact:** comments are not changed; a comment line that would be longer
+than 255 characters at its usual indentation is indented as above.
 
 ### ABAP-CALL-003: CALL FUNCTION and CALL METHOD
 Milestone: M1

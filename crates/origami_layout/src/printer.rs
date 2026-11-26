@@ -31,7 +31,7 @@ use origami_syntax::{
     Case, CommentSyntax, Placement, SourceText, TokenIndex, TokenStream, TriviaKind, TriviaPosition,
 };
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// Characters the lexers treat as blanks between tokens.
 const BLANKS: [char; 3] = [' ', '\t', '\r'];
@@ -61,6 +61,11 @@ pub struct PrintOptions {
     /// The comment lines in front of one token use them only if no
     /// replacement ends past the width while being longer than the original.
     pub comment_overrides: BTreeMap<usize, String>,
+    /// Hard limit of a line in characters (ABAP: 255, INVARIANTS 1.5). An
+    /// own-line comment that would end past it, while its input line did
+    /// not, keeps its text and is indented only as far as it fits
+    /// (ABAP-COMMENT-003); see [`print_sparing`].
+    pub line_limit: Option<usize>,
 }
 
 pub fn print(doc: &Doc, src: &SourceText, tokens: &TokenStream, opts: &PrintOptions) -> String {
@@ -77,8 +82,20 @@ pub fn print_bounded(
     opts: &PrintOptions,
     max_len: usize,
 ) -> Option<String> {
+    print_sparing(doc, src, tokens, opts, max_len).map(|(out, _)| out)
+}
+
+/// Like [`print_bounded`], and also returns the trivia indices of the comment
+/// lines kept within `PrintOptions::line_limit`, in order.
+pub fn print_sparing(
+    doc: &Doc,
+    src: &SourceText,
+    tokens: &TokenStream,
+    opts: &PrintOptions,
+    max_len: usize,
+) -> Option<(String, Vec<usize>)> {
     if opts.identity {
-        return Some(src.text().to_string());
+        return Some((src.text().to_string(), Vec::new()));
     }
     let ctx = Ctx::new(src.text(), tokens, opts, max_len);
     let mut p = Printer::new(&ctx);
@@ -90,7 +107,8 @@ pub fn print_bounded(
     if p.overflow {
         return None;
     }
-    Some(p.finish())
+    let out = p.finish();
+    Some((out, ctx.spared.into_inner().into_iter().collect()))
 }
 
 /// A space, for joining aligned rows printed flat.
@@ -148,6 +166,8 @@ struct Ctx<'a> {
     max_len: usize,
     /// Decided choices: whether the first branch fits.
     trials: RefCell<HashMap<TrialKey, bool>>,
+    /// Comment lines kept within the line limit (`Printer::fit_line_limit`).
+    spared: RefCell<BTreeSet<usize>>,
 }
 
 impl<'a> Ctx<'a> {
@@ -199,6 +219,7 @@ impl<'a> Ctx<'a> {
             trailing,
             max_len,
             trials: RefCell::new(HashMap::new()),
+            spared: RefCell::new(BTreeSet::new()),
         }
     }
 
@@ -672,7 +693,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                 self.blank_line();
             }
             let t = &self.ctx.tokens.trivia[l.trivia];
-            let text = match overrides.get(&l.trivia) {
+            let mut text = match overrides.get(&l.trivia) {
                 Some(new) if use_overrides => new.clone(),
                 _ => self.comment_text(l.trivia).to_string(),
             };
@@ -684,6 +705,8 @@ impl<'c, 'a> Printer<'c, 'a> {
                 }
             ) {
                 self.pending_indent = Some(0);
+            } else {
+                self.fit_line_limit(l.trivia, &mut text);
             }
             self.write(&text, indent);
             self.newline(indent);
@@ -700,6 +723,33 @@ impl<'c, 'a> Printer<'c, 'a> {
                 .unwrap_or(false)
         {
             self.blank_line();
+        }
+    }
+
+    /// An own-line comment `k` about to be written as `text` that would end
+    /// past `PrintOptions::line_limit`, while its input line did not, keeps
+    /// its input text and moves left until it fits (ABAP-COMMENT-003).
+    fn fit_line_limit(&mut self, k: usize, text: &mut String) {
+        let Some(limit) = self.ctx.opts.line_limit else {
+            return;
+        };
+        let col = self.column();
+        if col + text.chars().count() <= limit {
+            return;
+        }
+        let src = self.ctx.src;
+        let t = &self.ctx.tokens.trivia[k];
+        let (a, b) = (t.start as usize, t.end as usize);
+        let line_start = src[..a].rfind('\n').map_or(0, |p| p + 1);
+        let line_end = src[b..].find('\n').map_or(src.len(), |p| b + p);
+        if src[line_start..line_end].chars().count() > limit {
+            return;
+        }
+        let own = t.text(src);
+        self.pending_indent = Some(col.min(limit - own.chars().count()));
+        *text = own.to_string();
+        if self.trial.is_none() {
+            self.ctx.spared.borrow_mut().insert(k);
         }
     }
 

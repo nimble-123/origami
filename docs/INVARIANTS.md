@@ -24,6 +24,12 @@ equal when all of these hold:
 
 ## 2. What happens on a violation
 
+Before the check, the printer keeps own-line `"` comment lines within 255
+characters itself: one that formatting would lengthen past 255, while its
+input line was not, keeps its text and is indented only as far as it fits
+(ABAP-COMMENT-003, W002 for the line). Its unit is formatted as usual. The
+check below still verifies the output; it covers every other line.
+
 1. The core finds the units (ABAP: one statement or chain; CDS family: see
    below) that contain the mismatching tokens or the new overlong lines (a
    line of comments only belongs to the unit of the token its comments are
@@ -56,7 +62,8 @@ refines them to annotations, list elements, statements and headers.
 | own-line comment with no token after it | own line | virtual end-of-file anchor |
 
 Printing rules (from M1): `*` comments stay in column 1 unchanged; other own-line
-comments are printed at the indent of the token they lead; only the first line
+comments are printed at the indent of the token they lead, or less where an
+ABAP line would pass 255 characters (section 2); only the first line
 of a multi-line `/* */` comment is re-indented; an end-of-line comment forces a
 line break after it.
 
