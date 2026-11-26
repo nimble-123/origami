@@ -317,7 +317,10 @@ export function journey() {
     });
     const lines = kept ? 1 : k < 1 ? 1 + Math.round((d.lines - 1) * k) : d.lines;
     tokensBox.style.setProperty("--lines", 4);
-    tokensBox.style.setProperty("--cols", k < 0.5 ? SOURCE.length : Math.max(...d.output.split("\n").map((l) => l.length)));
+    // As written, the line gets room to its right, so the sheet can scroll to
+    // a token start and no token is cut at the left edge.
+    st.textCols = kept || k < 0.5 ? SOURCE.length : Math.max(...d.output.split("\n").map((l) => l.length));
+    tokensBox.style.setProperty("--cols", kept ? SOURCE.length + 30 : st.textCols);
 
     // The note's lines get a bracket (Explain).
     const note = d.review.notes.find((n) => n.text.includes("because")) ?? d.review.notes[0];
@@ -420,7 +423,7 @@ export function journey() {
     const left = Math.round((scroll.scrollLeft - pad) / ch);
     // From the laid-out width, not scrollWidth, which counts tokens still
     // moving to their places.
-    const right = Math.round((pad + tokensBox.offsetWidth - scroll.scrollLeft - scroll.clientWidth + pad) / ch);
+    const right = Math.round(st.textCols - (scroll.scrollLeft - pad + scroll.clientWidth - pad) / ch);
     const top = `${scroll.offsetTop + parseFloat(getComputedStyle(scroll).paddingTop) - 2}px`;
     const height = `${tokensBox.offsetHeight + 4}px`;
     for (const [el, n, sign] of [[edgeL, left, "+"], [edgeR, right, "+"]]) {
