@@ -203,6 +203,7 @@ let ready = false;
 let nextId = 0;
 let inflight = null; // { id, timer }
 let queued = null; // the newest request made while a run was in flight
+let timedOut = null; // the request that hit the timeout; not run again until it changes
 
 function ruleLink(text, rule) {
   const span = document.createElement("span");
@@ -348,6 +349,7 @@ function dispatch() {
     // The worker is stuck in a long run: stop it and start a new one.
     worker.terminate();
     inflight = null;
+    timedOut = job;
     showError(
       `origami took longer than ${RUN_TIMEOUT_MS / 1000} seconds on this input and was stopped. Try a smaller input.`,
     );
@@ -360,7 +362,10 @@ function dispatch() {
 function run() {
   paintInput();
   if (!ready) return;
-  queued = { source: input.value, opts: options() };
+  const job = { source: input.value, opts: options() };
+  // The restarted worker would hang on the same request again.
+  if (timedOut && timedOut.source === job.source && JSON.stringify(timedOut.opts) === JSON.stringify(job.opts)) return;
+  queued = job;
   if (!inflight) dispatch();
 }
 
