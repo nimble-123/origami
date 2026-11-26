@@ -2684,6 +2684,31 @@ fn gap(p: &P, i: usize, skip: Option<usize>) -> Doc {
     if skip == Some(i) { b::empty() } else { p.sp(i) }
 }
 
+/// Keywords of `SUBMIT` that take an operand (the last word of a phrase).
+const SUBMIT_OPERAND_AFTER: &[&str] = &[
+    "WITH",
+    "SELECTION-SET",
+    "SIGN",
+    "IN",
+    "USER",
+    "JOB",
+    "NUMBER",
+    "PARAMETERS",
+    "LINE-SIZE",
+    "LINE-COUNT",
+    "SELECTION-TABLE",
+    "EQ",
+    "NE",
+    "CP",
+    "NP",
+    "GT",
+    "GE",
+    "LT",
+    "LE",
+    "BETWEEN",
+    "AND",
+];
+
 /// Operands and clauses of a keyword statement, from `p.pos` to `p.end`.
 fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
     let skip = (!first_gap).then_some(p.pos);
@@ -2727,7 +2752,15 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
         } else {
             phrase_at(p, i, spec.clauses)
         };
-        let mut n_word = if repeated {
+        // SUBMIT: the word after an operator or after a keyword that takes
+        // an operand is that operand (`WITH s_b IN lt`, `= number`).
+        let submit_operand = spec.lead == ["SUBMIT"]
+            && (prev_kw.as_deref().is_some_and(|w| {
+                SUBMIT_OPERAND_AFTER.contains(&w) && !(w == "WITH" && p.is(i, "SELECTION-TABLE"))
+            }) || (i > p.first
+                && p.kind(i - 1) == WORD
+                && matches!(p.text(i - 1), "=" | "<>" | "<" | ">" | "<=" | ">=")));
+        let mut n_word = if repeated || submit_operand {
             0
         } else {
             phrase_at(p, i, spec.words)
@@ -3744,7 +3777,9 @@ fn decl_tokens(p: &mut P, from: usize, to: usize) -> Vec<Doc> {
             "ANY" | "INDEX" => p.is(i + 1, "TABLE"),
             // `SORTED TABLE`, `WITH NON-UNIQUE SORTED KEY sk`
             "STANDARD" | "SORTED" | "HASHED" => p.is(i + 1, "TABLE") || p.is(i + 1, "KEY"),
-            "LINE" | "RANGE" => p.is(i + 1, "OF"),
+            // `WITH HEADER LINE`
+            "LINE" => p.is(i + 1, "OF") || prev_kw.as_deref() == Some("HEADER"),
+            "RANGE" => p.is(i + 1, "OF"),
             "REF" => p.is(i + 1, "TO"),
             _ => true,
         };
@@ -4664,8 +4699,6 @@ struct SigRow {
     ty: Vec<Doc>,
     /// `OPTIONAL` / `DEFAULT …`, with the gap before it.
     opt: Option<(Doc, Vec<Doc>)>,
-    /// The line has a comment line in front of it.
-    brk: bool,
 }
 
 /// `VALUE(x)` / `REFERENCE(x)` or a plain name, `a..ne`.
@@ -4697,7 +4730,6 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
             return None;
         }
         let kw = p.kw(i);
-        let commented_kw = i > first_kw && p.c.commented[i];
         let j = i + 1;
         let section_end = (j..p.end)
             .find(|&k| is_section(p, k, SECTIONS))
@@ -4736,7 +4768,6 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
                 name,
                 ty: Vec::new(),
                 opt: None,
-                brk: commented_kw,
             });
             i = section_end;
             continue;
@@ -4751,7 +4782,7 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
         }
         params.push((s, section_end));
         let mut kw = Some(kw);
-        for (n, (a, e)) in params.into_iter().enumerate() {
+        for (a, e) in params {
             let ne = name_end(p, a, e);
             let name = param_name(p, a, ne);
             let mut ty = Vec::new();
@@ -4780,11 +4811,6 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
                 name,
                 ty,
                 opt,
-                brk: if n == 0 {
-                    commented_kw
-                } else {
-                    p.c.commented[a]
-                },
             });
         }
         i = section_end;
@@ -4795,10 +4821,9 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
     let with_opt = rows.iter().filter(|r| r.opt.is_some()).count();
     let opt_col = with_opt > 0 && with_opt * 100 >= params * 40;
     let mut items = Vec::new();
+    // Comment lines do not end the table: all names, types and `OPTIONAL`
+    // / `DEFAULT` stay in their columns (ABAP-METHODS-001).
     for r in rows {
-        if r.brk && !items.is_empty() {
-            items.push(AlignItem::Break);
-        }
         let kw_cell = r.kw.map_or_else(Vec::new, |k| vec![k]);
         // The type cell starts with its own gap; strip it, the name cell
         // brings the separator space.
@@ -4821,12 +4846,7 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
         };
         items.push(b::row_cols(vec![kw_cell, r.name], head, tail));
     }
-    let multi = items
-        .iter()
-        .filter(|i| !matches!(i, AlignItem::Break))
-        .count()
-        > 1;
-    if multi {
+    if items.len() > 1 {
         // A table of two or more lines always starts below the method name.
         p.c.multi_line = true;
         return Some(b::cont(vec![p.hl(first_kw), b::align_broken(items)]));
@@ -5064,6 +5084,9 @@ const CALL_HEADER_WORDS: &[&str] = &[
     "KEEPING",
     "LOGICAL",
     "WORK",
+    // `DESTINATION IN GROUP DEFAULT`
+    "GROUP",
+    "DEFAULT",
 ];
 
 fn is_group(p: &P, i: usize) -> bool {
@@ -5084,14 +5107,30 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
     head.push(p.sp(p.pos));
     head.push(p.expr()?);
     // Header words (DESTINATION, STARTING NEW TASK, IN UPDATE TASK, …).
+    // The word after a header word that takes an operand is that operand
+    // (`STARTING NEW TASK task`, `IN GROUP group`).
+    let mut operand_next = false;
     while !p.at_end() && !is_group(p, p.pos) {
         let i = p.pos;
         head.push(p.sp(i));
-        if p.kind(i) == WORD && !p.glued(i) && CALL_HEADER_WORDS.contains(&p.upper(i).as_str()) {
+        if !operand_next
+            && p.kind(i) == WORD
+            && !p.glued(i)
+            && CALL_HEADER_WORDS.contains(&p.upper(i).as_str())
+        {
             head.push(p.kw(i));
+            operand_next = match p.upper(i).as_str() {
+                "TASK" => p.is(i - 1, "NEW"),
+                "UNIT" => p.is(i - 1, "BACKGROUND"),
+                "DESTINATION" => !p.is(i + 1, "IN"),
+                "GROUP" => !p.is(i + 1, "DEFAULT"),
+                "PERFORMING" | "CALLING" => true,
+                _ => false,
+            };
             p.pos += 1;
         } else {
             head.push(p.expr()?);
+            operand_next = false;
         }
     }
     let aligned = p.c.style == Style::Aligned;
@@ -5140,9 +5179,6 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
                 {
                     return None;
                 }
-                if !rows.is_empty() && p.c.commented[name] {
-                    rows.push(AlignItem::Break);
-                }
                 let eq = name + 1;
                 p.pos = eq + 1;
                 let value = p.expr()?;
@@ -5151,10 +5187,22 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
                 } else {
                     p.t(name)
                 };
-                rows.push(b::row(
-                    vec![name_doc],
-                    vec![p.sp(eq), p.t(eq), p.sp(eq + 1), value],
-                ));
+                let mut tail = vec![p.sp(eq), p.t(eq), p.sp(eq + 1), value];
+                // RFC: `EXCEPTIONS system_failure = 1 MESSAGE msg`.
+                let m = p.pos;
+                if p.is(k, "EXCEPTIONS")
+                    && p.is(m, "MESSAGE")
+                    && !p.glued(m)
+                    && !p.is(m + 1, "=")
+                    && m + 1 < p.end
+                {
+                    tail.push(p.sp(m));
+                    tail.push(p.kw(m));
+                    p.pos = m + 1;
+                    tail.push(p.sp(p.pos));
+                    tail.push(p.expr()?);
+                }
+                rows.push(b::row(vec![name_doc], tail));
             }
             if rows.is_empty() {
                 return None;
@@ -5184,10 +5232,12 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
     if aligned && !table.is_empty() {
         // ABAP-CALL-003: each group on its own line, even when it would fit.
         return Some(b::group(vec![
-            b::concat(head),
+            b::cont(head),
             b::cont(vec![p.hl(first_group), b::align_broken(table)]),
             p.period(),
         ]));
     }
-    Some(b::group(vec![b::concat(head), b::cont(groups), p.period()]))
+    // The header at the continuation indent too, where an end-of-line
+    // comment breaks it.
+    Some(b::group(vec![b::cont(head), b::cont(groups), p.period()]))
 }

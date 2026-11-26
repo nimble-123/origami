@@ -5,4 +5,13 @@ CLASS lcl DEFINITION.
     METHODS reset IMPORTING iv_hard TYPE abap_bool.
     METHODS e_with_a_quite_long_method_name IMPORTING iv_a_parameter_with_a_long_name TYPE zif_some_interface=>ty_some_long_type_name iv_b TYPE i.
     CLASS-METHODS create IMPORTING iv_a TYPE i DEFAULT 1 iv_b TYPE string OPTIONAL iv_c TYPE REF TO zcl_x RAISING zcx_a zcx_b.
+    METHODS read IMPORTING
+      " the key
+      iv_id TYPE i
+      " the language
+      iv_lang TYPE sy-langu OPTIONAL
+* old: iv_text TYPE string
+      EXPORTING es_data TYPE ty_data
+      " last
+      .
 ENDCLASS.

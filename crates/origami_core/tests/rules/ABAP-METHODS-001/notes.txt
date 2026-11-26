@@ -1,3 +1,4 @@
 3: ABAP-METHODS-001: each section and parameter on its own line
 12: ABAP-METHODS-001: each section and parameter on its own line
 16: ABAP-METHODS-001: each section and parameter on its own line
+22: ABAP-METHODS-001: each section and parameter on its own line

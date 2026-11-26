@@ -165,6 +165,23 @@ fn nested_calls_are_not_exponential() {
     run(Language::Abap, &src, &Options::default());
 }
 
+/// A parser that tries one reading of a bracket and then another (an
+/// expression, then a logical expression; the aligned, then the compact
+/// constructor body) parses each inner bracket once, not once per attempt
+/// (which doubles at every level).
+#[test]
+fn retried_parses_are_not_exponential() {
+    for (open, close) in [
+        ("xsdbool( f( ", " ) IS INITIAL )"),
+        ("NEW #( ", " c )"),
+        ("VALUE #( ( ", " ) ( a ) b )"),
+    ] {
+        let src = format!("REPORT z.\nlv = {}.\n", nested(open, "x", close, 24));
+        let r = run(Language::Abap, &src, &Options::default());
+        assert!(!r.has(Code::W004), "{:?}", r.diagnostics);
+    }
+}
+
 /// Explaining the breaks looks up comments and rule spans once per break,
 /// not by scanning all of them for each.
 #[test]
