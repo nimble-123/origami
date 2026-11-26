@@ -854,7 +854,7 @@ Approved by the maintainer, Nils Lutz, on 2026-11-21. The statements of an event
 as in the ADT pretty printer. An event block ends at the next event keyword or
 processing block (`FORM`, `MODULE`, `FUNCTION`, `CLASS`, `INTERFACE`).
 
-Proposed for approval by the maintainer: the logical database event
+Approved by the maintainer, Nils Lutz, on 2026-11-26: the logical database event
 `GET node [LATE] [FIELDS …]` is an event block too. It is one outside a
 processing block, unless the word after `GET` is one of `BADI`, `BIT`,
 `CURSOR`, `DATASET`, `LOCALE`, `PARAMETER`, `PERMISSIONS`, `PF-STATUS`,
