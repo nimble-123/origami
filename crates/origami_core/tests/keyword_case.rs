@@ -922,6 +922,43 @@ fn operands_named_like_keywords() {
     ]);
 }
 
+/// The operand of `BASE` is a name, also when it is spelled like an operator
+/// (`BASE lt ( 1 )` is not the comparison `BASE LT ( 1 )`).
+#[test]
+fn base_operand_named_like_operator() {
+    let names = [
+        "lt", "le", "gt", "ge", "eq", "ne", "in", "key", "base", "lt_tab",
+    ];
+    let mut compact = Vec::new();
+    let mut aligned = Vec::new();
+    for name in names {
+        for (low, up) in [
+            ("value #", "VALUE #"),
+            ("new #", "NEW #"),
+            ("value ty", "VALUE ty"),
+        ] {
+            compact.push((
+                format!("x = {low}( base {name} ( 1 ) ).\n"),
+                format!("x = {up}( BASE {name} ( 1 ) ).\n"),
+            ));
+        }
+        aligned.push((
+            format!("x = value #( base {name} ( 1 ) ).\n"),
+            format!("x = VALUE #( BASE {name}\n             ( 1 ) ).\n"),
+        ));
+    }
+    let compact: Vec<(&str, &str)> = compact
+        .iter()
+        .map(|(a, b)| (a.as_str(), b.as_str()))
+        .collect();
+    let aligned: Vec<(&str, &str)> = aligned
+        .iter()
+        .map(|(a, b)| (a.as_str(), b.as_str()))
+        .collect();
+    check(&compact);
+    check_style(Style::Aligned, "t.prog.abap", &aligned);
+}
+
 #[test]
 fn more_keywords() {
     check(&[
