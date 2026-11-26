@@ -9,7 +9,7 @@
 use crate::block_pairs::Role;
 use crate::kinds::*;
 use crate::statements;
-use crate::stmt::{AlignKey, Ctx, DeclCols, P, Row, Stmt, decl_columns};
+use crate::stmt::{AlignKey, CtorScan, Ctx, DeclCols, P, Row, Stmt, decl_columns};
 use crate::structure::Statement;
 use origami_layout::{Doc, builder as b};
 use origami_syntax::{
@@ -266,7 +266,7 @@ pub fn layout(
             let mark_ctor = |ctx: &mut Ctx| {
                 let mut p = P::new(ctx, st.tokens.start, st.tokens.end - 1, blank);
                 let end = p.end;
-                p.mark_ctor_keywords(st.tokens.start, end, false);
+                p.mark_ctor_keywords(st.tokens.start, end, CtorScan::Nested);
             };
             match parsed {
                 Some(d) => {

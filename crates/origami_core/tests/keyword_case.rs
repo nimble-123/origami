@@ -959,6 +959,101 @@ fn base_operand_named_like_operator() {
     check_style(Style::Aligned, "t.prog.abap", &aligned);
 }
 
+/// Formats `expected` (a statement in its final case) in both styles and
+/// compares it with the layout ignored: the case of every word must stay.
+fn check_case_in_both_styles(expected: &str) {
+    let squash = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let hint = LanguageHint::Path("t.prog.abap".into());
+    for style in [Style::Compact, Style::Aligned] {
+        let mut opts = Options::default();
+        opts.lang.style = style;
+        for src in [expected.to_ascii_lowercase(), expected.to_string()] {
+            let r = format(src.as_bytes(), &hint, &opts);
+            assert!(!r.has(Code::W003), "not recognized: {src}");
+            let out = String::from_utf8(r.output.expect("output")).unwrap();
+            assert_eq!(squash(&out), squash(expected), "{style:?} input: {src}");
+        }
+    }
+}
+
+/// A word that is spelled like a constructor keyword but stands where the
+/// grammar wants an operand is a name: the operand of `BASE ( … )`, the whole
+/// content of a row or body, the first operand of `SWITCH` and `FILTER`, an
+/// iteration source, a component after `EXCEPT` of `CORRESPONDING`.
+#[test]
+fn operands_named_like_constructor_keywords() {
+    let names = [
+        "in", "base", "for", "let", "then", "until", "while", "where", "default", "optional",
+        "mapping", "except", "using", "group", "index", "into", "next", "init", "when", "else",
+    ];
+    let templates = [
+        "x = VALUE #( BASE QQ ( 1 ) ).",
+        "x = CORRESPONDING #( BASE ( QQ ) src ).",
+        "x = VALUE #( ( QQ ) ).",
+        "x = VALUE #( LET QQ = 1 IN ( QQ ) ).",
+        "x = VALUE #( LET y = QQ IN ( y ) ).",
+        "x = VALUE #( FOR QQ IN y ( QQ ) ).",
+        "x = VALUE #( FOR y IN QQ ( y ) ).",
+        "x = VALUE #( FOR y IN QQ WHERE ( a = QQ ) ( y ) ).",
+        "x = VALUE #( FOR GROUPS g OF y IN QQ GROUP BY y-a ( g ) ).",
+        "x = VALUE #( tab[ 1 ] DEFAULT QQ ).",
+        "x = CORRESPONDING #( src MAPPING a = QQ EXCEPT QQ ).",
+        "x = CORRESPONDING #( src EXCEPT a QQ ).",
+        "x = REDUCE i( INIT s = QQ FOR y IN QQ NEXT s = s + QQ ).",
+        "x = COND #( WHEN QQ IS INITIAL THEN QQ ELSE QQ ).",
+        "x = SWITCH #( QQ WHEN 1 THEN QQ ELSE QQ ).",
+        "x = VALUE #( QQ ).",
+        "x = CONV i( QQ ).",
+        "x = FILTER #( QQ EXCEPT IN QQ WHERE a = b ).",
+        "x = VALUE #( BASE ( VALUE #( FOR y IN QQ ( y ) ) ) ( QQ ) ).",
+    ];
+    for name in names {
+        for t in templates {
+            check_case_in_both_styles(&t.replace("QQ", name));
+        }
+    }
+}
+
+/// Keywords in keyword positions stay upper case, also inside `BASE ( … )`.
+#[test]
+fn constructor_keywords_in_keyword_positions() {
+    for src in [
+        "x = VALUE #( FOR wa IN itab WHERE ( a = 1 ) ( wa ) ).",
+        "x = VALUE #( LET y = 1 IN ( y ) ).",
+        "x = VALUE #( BASE ls ( 1 ) ).",
+        "x = VALUE #( BASE ls FOR y IN z ( y ) ).",
+        "x = VALUE #( FOR i = 1 UNTIL i > 3 ( i ) ).",
+        "x = VALUE #( FOR i = 1 WHILE i < 3 ( i ) ).",
+        "x = VALUE #( FOR y IN z INDEX INTO i ( y ) ).",
+        "x = VALUE #( FOR GROUPS g OF y IN z GROUP BY y-a ( VALUE #( FOR m IN GROUP g ( m ) ) ) ).",
+        "x = VALUE #( tab[ 1 ] DEFAULT 0 ).",
+        "x = VALUE #( tab[ 1 ] OPTIONAL ).",
+        "x = FILTER #( itab EXCEPT IN ftab WHERE a = b ).",
+        "x = FILTER #( itab EXCEPT IN ftab USING KEY k WHERE a = b ).",
+        "x = FILTER #( itab EXCEPT USING KEY k WHERE a = b ).",
+        "x = FILTER #( itab IN ftab WHERE a = b ).",
+        "x = REDUCE i( INIT s = 0 FOR y IN z NEXT s = s + y ).",
+        "x = REDUCE i( LET q = 1 IN INIT s = q FOR y IN z NEXT s = s + y ).",
+        "x = COND #( WHEN a = 1 THEN b ELSE c ).",
+        "x = COND #( LET q = 1 IN WHEN a = q THEN b ELSE c ).",
+        "x = SWITCH #( a WHEN 1 THEN b ELSE c ).",
+        "x = CONV i( LET q = 1 IN q ).",
+        "x = CORRESPONDING #( BASE ( lt ) src MAPPING a = b EXCEPT c d ).",
+        "x = CORRESPONDING #( src EXCEPT * ).",
+        "x = CORRESPONDING #( DEEP src ).",
+        "x = CORRESPONDING #( DEEP BASE ( dst ) src ).",
+        "x = CORRESPONDING #( APPENDING ( dst ) src ).",
+        "x = CORRESPONDING #( DEEP APPENDING ( dst ) src ).",
+        "x = CORRESPONDING #( src MAPPING a = b EXCEPT c ).",
+        "x = VALUE #( BASE ( VALUE #( FOR y IN z ( y ) ) ) ( 1 ) ).",
+        "x = VALUE #( BASE ( VALUE #( LET q = 1 IN ( q ) ) ) ( 1 ) ).",
+        "x = VALUE #( BASE ( VALUE #( BASE ls ( 1 ) ) ) ( 2 ) ).",
+        "x = CORRESPONDING #( BASE ( VALUE #( BASE ls ( 1 ) ) ) src ).",
+    ] {
+        check_case_in_both_styles(src);
+    }
+}
+
 #[test]
 fn more_keywords() {
     check(&[

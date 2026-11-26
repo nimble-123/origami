@@ -422,7 +422,7 @@ impl<'c, 'a> P<'c, 'a> {
     fn mark_template_options(&mut self, from: usize, to: usize) {
         self.mark_phrases(from + 1, to);
         // Constructor bodies inside embedded expressions (`{ COND #( … ) }`).
-        self.mark_ctor_keywords(from + 1, to, false);
+        self.mark_ctor_keywords(from + 1, to, CtorScan::Nested);
         let part = |k: u16| matches!(k, TEMPLATE_HEAD | TEMPLATE_MIDDLE | TEMPLATE_TAIL);
         let mut depth = 0i32;
         for k in from + 1..to {
@@ -1657,16 +1657,30 @@ impl<'c, 'a> P<'c, 'a> {
         self.call_args(lp, rp, false)
     }
 
-    /// Marks the keywords of a constructor body (`from..to`, bracket depth 0)
-    /// and, recursively, of nested constructor bodies. With `words` false,
-    /// only nested constructors are searched. A word right after a keyword
-    /// that takes an operand (`FOR line IN`, `BASE base`) is a name; so is a
-    /// word followed by `=` or by a glued `(`, `[` or selector.
-    pub fn mark_ctor_keywords(&mut self, from: usize, to: usize, words: bool) {
+    /// Marks the keywords of the constructor bodies in `from..to` (see
+    /// `CtorScan`). A word of `CTOR_WORDS` is a keyword only where the
+    /// grammar allows it; in an operand position it is a name: right after a
+    /// keyword that takes an operand (`FOR line IN`, `BASE base`) or after an
+    /// operator, before `=` or a glued `(`, `[` or selector, as the whole
+    /// content of a bracket or body, as the first operand of a body that does
+    /// not start with a keyword (`SWITCH #( word WHEN …`), and after `EXCEPT`
+    /// of `CORRESPONDING`.
+    pub fn mark_ctor_keywords(&mut self, from: usize, to: usize, scan: CtorScan) {
+        let words = matches!(scan, CtorScan::Body(_));
+        let body_op = match scan {
+            CtorScan::Body(op) => op,
+            _ => None,
+        };
         let mut prev: Option<String> = None;
+        // After `EXCEPT` of `CORRESPONDING`: component names to the end.
+        let mut names_only = false;
+        // After `LET`: its `IN` ends the declarations; a keyword may follow.
+        let mut in_let = false;
+        let mut after_let_in = false;
         let mut i = from;
         while i < to {
             let k = self.kind(i);
+            let let_in = std::mem::take(&mut after_let_in);
             if k == TEMPLATE_HEAD {
                 let mut depth = 0;
                 let mut j = i;
@@ -1709,7 +1723,7 @@ impl<'c, 'a> P<'c, 'a> {
                     && !self.glued(ty)
                     && self.kind(ty - 1) == WORD
                     && CTOR_OPS.contains(&self.upper(ty - 1).as_str());
-                if ctor && words {
+                if ctor && scan != CtorScan::Nested {
                     self.c.keywords.push(ty - 1);
                 }
                 if k == LBRACKET {
@@ -1726,7 +1740,20 @@ impl<'c, 'a> P<'c, 'a> {
                 if call && k == LPAREN {
                     self.mark_raw_args(i, close);
                 }
-                self.mark_ctor_keywords(i + 1, close, ctor || (words && k == LPAREN && !call));
+                let inner = if ctor {
+                    let op = CTOR_OPS.iter().find(|o| **o == self.upper(ty - 1));
+                    CtorScan::Body(op.copied())
+                } else if k != LPAREN || call {
+                    CtorScan::Nested
+                } else if scan == CtorScan::Operand || prev.as_deref() == Some("BASE") {
+                    // `BASE ( itab )`: an operand expression.
+                    CtorScan::Operand
+                } else if words {
+                    CtorScan::Body(None)
+                } else {
+                    CtorScan::Nested
+                };
+                self.mark_ctor_keywords(i + 1, close, inner);
                 prev = None;
                 i = close + 1;
                 continue;
@@ -1740,18 +1767,39 @@ impl<'c, 'a> P<'c, 'a> {
                 // A word equal to the keyword before it is a name
                 // (`IN GROUP group`).
                 let repeated = prev.as_deref() == Some(w.as_str());
-                let operand = repeated
-                    || prev.as_deref().is_some_and(|p| {
-                        CTOR_TAKES_OPERAND.contains(&p)
-                            && !matches!(
-                                (p, w.as_str()),
-                                (_, "NOT" | "THROW")
-                                    | ("IN", "GROUP" | "FOR")
-                                    | ("MAPPING", "FROM" | "TO")
-                                    | ("EXCEPT", "IN" | "WHERE" | "USING")
-                                    | ("FOR", "GROUPS")
-                            )
-                    });
+                // `IN GROUP group`; a word `group` alone is an iteration source.
+                let group_ref = self.kind(i + 1) == WORD
+                    && i + 1 < to
+                    && !self.glued(i + 1)
+                    && self.text(i + 1) != "="
+                    && match self.upper(i + 1).as_str() {
+                        "GROUP" => !self.is(i + 2, "BY"),
+                        n => !CTOR_WORDS.contains(&n),
+                    };
+                let operand = !let_in
+                    && (repeated
+                        || prev.as_deref().is_some_and(|p| {
+                            CTOR_TAKES_OPERAND.contains(&p)
+                                && !matches!(
+                                    (p, w.as_str()),
+                                    (_, "NOT" | "THROW")
+                                        | ("MAPPING", "FROM" | "TO")
+                                        | ("EXCEPT", "IN" | "WHERE" | "USING")
+                                        | ("FOR", "GROUPS")
+                                )
+                                && !(p == "IN" && w == "GROUP" && group_ref)
+                        }));
+                // The grammar allows no keyword here: the whole content of a
+                // bracket or body, the first word of a body that does not
+                // start with one, the components after `EXCEPT` of
+                // `CORRESPONDING`, a word after `LET … IN` that starts no part.
+                let name_position = names_only
+                    || (w == "LET" && !(i + 2 < to && self.text(i + 2) == "="))
+                    || (i == from && i + 1 == to)
+                    || (i == from && body_op.is_some_and(|op| !leads(op, &w)))
+                    || (let_in
+                        && !(matches!(w.as_str(), "INIT" | "WHEN" | "FOR")
+                            && body_op.is_none_or(|op| leads(op, &w))));
                 // A word right after an operator is an operand (`name = key`).
                 let after_op = i > from
                     && self.kind(i - 1) == WORD
@@ -1777,8 +1825,18 @@ impl<'c, 'a> P<'c, 'a> {
                     && !next_call
                     && !operand
                     && !after_op
+                    && !name_position
                 {
                     self.c.keywords.push(i);
+                    match w.as_str() {
+                        "LET" => in_let = true,
+                        "IN" if in_let => {
+                            in_let = false;
+                            after_let_in = true;
+                        }
+                        "EXCEPT" => names_only = body_op == Some("CORRESPONDING"),
+                        _ => {}
+                    }
                     prev = Some(w);
                     i += 1;
                     continue;
@@ -2058,6 +2116,31 @@ impl<'c, 'a> P<'c, 'a> {
         self.pos = start;
         self.c.reset(saved_kw);
         None
+    }
+}
+
+/// What `mark_ctor_keywords` looks for in a range.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum CtorScan {
+    /// Only the constructors inside: the range itself is not a body.
+    Nested,
+    /// An operand expression (`BASE ( … )`): no keywords of its own, but the
+    /// constructors inside.
+    Operand,
+    /// The body of a constructor operator; `None` for a row or bracket in a
+    /// body, and where the operator is not known.
+    Body(Option<&'static str>),
+}
+
+/// True when the body of `op` may start with the keyword `w`.
+fn leads(op: &str, w: &str) -> bool {
+    match op {
+        "VALUE" | "NEW" => matches!(w, "BASE" | "LET" | "FOR"),
+        "REDUCE" => matches!(w, "LET" | "INIT"),
+        "COND" => matches!(w, "LET" | "WHEN"),
+        "CORRESPONDING" => matches!(w, "BASE" | "DEEP" | "APPENDING"),
+        "FILTER" => false,
+        _ => w == "LET",
     }
 }
 
