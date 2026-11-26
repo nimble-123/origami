@@ -59,6 +59,26 @@ fn is_event(words: &[String]) -> bool {
             matches!(w(1), "SELECTION-SCREEN" | "LINE-SELECTION" | "USER-COMMAND")
                 || (w(1).starts_with("PF") && w(1)[2..].parse::<u8>().is_ok())
         }
+        // Logical database event `GET node [LATE] [FIELDS …]`: any `GET`
+        // that is not one of the statements below.
+        "GET" => {
+            !w(1).is_empty()
+                && !matches!(
+                    w(1),
+                    "BADI"
+                        | "BIT"
+                        | "CURSOR"
+                        | "DATASET"
+                        | "LOCALE"
+                        | "PARAMETER"
+                        | "PERMISSIONS"
+                        | "PF-STATUS"
+                        | "PROPERTY"
+                        | "REFERENCE"
+                        | "RUN"
+                        | "TIME"
+                )
+        }
         _ => false,
     }
 }
@@ -173,7 +193,11 @@ pub fn check(text: &str, stream: &TokenStream) -> Result<Vec<Statement>, Diagnos
                 };
                 // An event block ends at the next event or processing block
                 // on its level, and before a closer meant for an outer block.
-                let event = keyword && is_event(&words);
+                // `GET node` is an event only outside processing blocks;
+                // inside one it is a statement such as `GET TIME`.
+                let event = keyword
+                    && is_event(&words)
+                    && (words[0] != "GET" || blocks.last().is_none_or(|b| b.0 == EVENT));
                 let ends_event = event
                     || matches!(role, Some(Role::Opener(c)) if ENDS_EVENT.contains(&c))
                     || role == Some(Role::Closer);

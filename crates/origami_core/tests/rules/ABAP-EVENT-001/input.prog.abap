@@ -9,6 +9,9 @@ endif.
 start-of-selection.
 perform load_data.
 write: / 'Done'.
+get time.
+get pernr late.
+write pernr-pernr.
 form load_data.
 data lt_flights type standard table of sflight with empty key.
 endform.
