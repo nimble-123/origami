@@ -59,6 +59,17 @@ updates:
       npm-abaplint-oracle:
         patterns: ["*"]
 
+  - package-ecosystem: npm
+    directory: /tools/publish
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      npm-publish-tools:
+        patterns: ["*"]
+
   # "/" covers the workflows in .github/workflows and the root action.yml.
   - package-ecosystem: github-actions
     directory: /

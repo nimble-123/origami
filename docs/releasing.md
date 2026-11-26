@@ -210,8 +210,9 @@ attestations existed it prints a warning and checks the checksum only; set
 
 Actions are pinned to full commit SHAs with the version in a comment, and the
 build tools to exact versions (`cargo-zigbuild`, `ziglang`, `cargo-about`,
-`cargo-cyclonedx`, `vsce`, `ovsx`). Dependabot (`.github/dependabot.yml`) opens
-a grouped weekly pull request per ecosystem, including the SHAs of the actions.
-The `ziglang`, `cargo-zigbuild`, `ovsx` and `vsce` versions in `release.yml`
-are not covered by Dependabot; update them by hand when a release build asks
-for it.
+`cargo-cyclonedx`). `vsce` and `ovsx` are installed from the lockfile in
+`tools/publish` (`npm ci --ignore-scripts`), so their dependencies are fixed too.
+Dependabot (`.github/dependabot.yml`) opens a grouped weekly pull request per
+ecosystem, including the SHAs of the actions and the npm lockfiles. The
+`ziglang` and `cargo-zigbuild` versions in `release.yml` are not covered by
+Dependabot; update them by hand when a release build asks for it.
