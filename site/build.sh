@@ -10,7 +10,11 @@ rustup target add wasm32-unknown-unknown >/dev/null 2>&1 || true
 cargo build --release -p origami_wasm --target wasm32-unknown-unknown
 rm -rf site/dist
 mkdir -p site/dist/assets
-cp site/index.html site/abap-cleaner.html site/style.css site/app.js site/worker.js site/dist/
+cp site/index.html site/abap-cleaner.html site/style.css site/app.js site/worker.js site/nav.js site/crane.js site/dist/
+# three.js (MIT, see THIRD_PARTY_NOTICES.md) for the crane in the hero, loaded
+# by crane.js only after the page has rendered.
+mkdir -p site/dist/vendor
+cp site/vendor/three.module.min.js site/vendor/three.LICENSE site/dist/vendor/
 mkdir -p site/dist/fonts
 cp site/fonts/*.woff2 site/dist/fonts/
 cp target/wasm32-unknown-unknown/release/origami_wasm.wasm site/dist/origami.wasm

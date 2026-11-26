@@ -58,7 +58,9 @@
   --measure: 68ch;
   --page: 72rem;
   --gutter: clamp(1rem, 4vw, 2.5rem);
+  --header: 4.25rem;
   --ease: cubic-bezier(0.2, 0, 0, 1);
+  --target: 40px;
   color-scheme: light;
 }
 
@@ -75,7 +77,7 @@
     --valley-wash: #20303b;
     --mountain-wash: #37222c;
     --fold-shadow: rgba(0, 0, 0, 0.4);
-    --outline: oklch(1 0 0 / 0.08);
+    --outline: oklch(1 0 0 / 0.1);
     --syn-keyword: #bb9af7;
     --syn-string: #9ece6a;
     --syn-number: #ff9e64;
@@ -85,12 +87,20 @@
   }
 }
 
+/* Touch screens get 44px targets. */
+@media (pointer: coarse) {
+  :root { --target: 44px; }
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scroll-behavior: smooth;
+  scroll-padding-top: var(--header);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -111,7 +121,7 @@ a:hover { text-decoration-thickness: 2px; }
 code, pre, textarea, .code { font-family: var(--mono); }
 code { font-size: 0.82em; }
 
-h1, h2 { font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; text-wrap: balance; margin: 0; }
+h1, h2, h3 { font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; text-wrap: balance; margin: 0; }
 p, li, dd { text-wrap: pretty; }
 
 .sr-only {
@@ -120,44 +130,95 @@ p, li, dd { text-wrap: pretty; }
 }
 
 .skip { position: absolute; left: -999px; top: 0.5rem; }
-.skip:focus { left: var(--gutter); background: var(--sheet); padding: 0.5rem 0.75rem; z-index: 2; }
+.skip:focus { left: var(--gutter); background: var(--sheet); padding: 0.5rem 0.75rem; z-index: 20; }
+
+@media (scripting: enabled) { .noscript-note { display: none; } }
+.noscript-note { color: var(--ink-soft); font-size: var(--t-sm); margin: 0.5rem 0 0; }
 
 /* ---- page frame -------------------------------------------------------- */
 
-.top, main > section, .foot {
+.top-in, main > section, .foot {
   width: min(100% - 2 * var(--gutter), var(--page));
   margin-inline: auto;
 }
 
+/* The header stays on the paper while the page scrolls; a crease appears
+   under it once the page has moved. */
 .top {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 1rem; padding-block: 1.25rem;
+  position: sticky; top: 0; z-index: 10;
+  background: var(--paper);
+  border-bottom: 1px dashed transparent;
+  transition-property: border-color; transition-duration: 150ms; transition-timing-function: var(--ease);
+}
+.top.scrolled { border-bottom-color: var(--crease); }
+.top-in {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 0 1rem; min-height: var(--header); padding-block: 0.6rem;
 }
 
 .brand {
-  display: inline-flex; align-items: center; gap: 0.6rem;
+  display: inline-flex; align-items: center; gap: 0.6rem; min-height: 44px;
   color: var(--ink); text-decoration: none;
   font-weight: 800; font-size: var(--t-md); letter-spacing: -0.02em;
 }
 .brand img { display: block; }
 
-.top { flex-wrap: wrap; }
 .top nav { display: flex; gap: 0.25rem; flex-wrap: wrap; margin-right: -0.65rem; }
-@media (max-width: 40rem) {
-  .top nav { margin-left: -0.65rem; }
-  .top nav a { padding-inline: 0.55rem; font-size: var(--t-sm); }
-}
 .top nav a {
+  position: relative;
   color: var(--ink-soft); text-decoration: none; font-weight: 500;
   padding: 0.6rem 0.65rem; border-radius: 4px; min-height: 44px;
   display: inline-flex; align-items: center;
   transition-property: color, background-color; transition-duration: 150ms; transition-timing-function: var(--ease);
 }
 .top nav a:hover { color: var(--ink); background: var(--valley-wash); }
+/* The section in view: ink text over a valley crease. */
+.top nav a[aria-current] { color: var(--ink); }
+.top nav a[aria-current]::after {
+  content: ""; position: absolute; left: 0.65rem; right: 0.65rem; bottom: 0.45rem;
+  border-bottom: 1.5px dashed var(--valley);
+}
+
+.menu-button {
+  display: none; align-items: center; gap: 0.5rem;
+  min-height: 44px; padding: 0 0.75rem; margin-right: -0.75rem;
+  border: 0; border-radius: 4px; background: transparent; color: var(--ink);
+  font: 600 var(--t-base) var(--sans); cursor: pointer;
+  transition-property: background-color, scale; transition-duration: 150ms; transition-timing-function: var(--ease);
+}
+.menu-button:hover { background: var(--valley-wash); }
+.menu-button:active { scale: 0.96; }
+.menu-button:focus-visible { outline-offset: -2px; }
+.menu-button .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.menu-button path { transition-property: opacity, scale; transition-duration: 200ms; transition-timing-function: var(--ease); transform-origin: center; transform-box: view-box; }
+.menu-button .menu-close { opacity: 0; scale: 0.25; }
+.menu-button[aria-expanded="true"] .menu-open { opacity: 0; scale: 0.25; }
+.menu-button[aria-expanded="true"] .menu-close { opacity: 1; scale: 1; }
+
+/* Small screens: the sections behind a menu button. Without scripting the
+   links stay in the header and wrap. */
+@media (scripting: enabled) and (max-width: 52rem) {
+  .menu-button { display: inline-flex; }
+  .top nav {
+    display: none; position: absolute; left: 0; right: 0; top: 100%;
+    flex-direction: column; gap: 0; margin: 0;
+    padding: 0.25rem var(--gutter) 1rem;
+    background: var(--paper); border-bottom: 1px dashed var(--crease);
+  }
+  .top nav.open { display: flex; }
+  .top nav a { min-height: 48px; font-size: var(--t-md); font-weight: 600; color: var(--ink); padding-inline: 0; border-radius: 0; }
+  .top nav a + a { border-top: 1px dashed var(--crease); }
+  .top nav a:hover { background: transparent; color: var(--valley); }
+  .top nav a[aria-current]::after { left: auto; right: 0; bottom: auto; top: 50%; width: 1.5rem; }
+}
+@media (scripting: none) and (max-width: 40rem) {
+  .top nav { margin-left: -0.65rem; }
+  .top nav a { padding-inline: 0.55rem; font-size: var(--t-sm); }
+}
 
 /* Sections are separated by a crease: a dashed rule. */
 .band {
-  padding-block: clamp(3rem, 7vw, 5rem);
+  padding-block: clamp(3rem, 7vw, 5.5rem);
   border-top: 1px dashed var(--crease);
 }
 
@@ -181,41 +242,21 @@ p, li, dd { text-wrap: pretty; }
   background: linear-gradient(225deg, var(--paper) 50%, var(--crease) 50%);
   border-bottom-left-radius: 2px;
   box-shadow: -1px 1px 2px var(--fold-shadow);
+  pointer-events: none;
 }
 
-/* ---- hero -------------------------------------------------------------- */
-
-.hero {
-  display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(2rem, 5vw, 3.5rem);
-  padding-block: clamp(2.5rem, 7vw, 5.5rem) clamp(3rem, 7vw, 5rem);
-}
-
-.hero h1 {
-  font-size: clamp(var(--t-xl), 6.2vw, 4.4rem);
-  line-height: 1.02; letter-spacing: -0.035em;
-  max-width: 14ch;
-}
-
-.lede { font-size: var(--t-md); line-height: 1.45; max-width: 46ch; color: var(--ink-soft); margin: 1.25rem 0 1.75rem; }
-
-.install-line {
-  display: inline-flex; align-items: center; gap: 0.25rem;
-  background: var(--sheet); border: 1px solid var(--crease); border-radius: 6px;
-  padding: 0.25rem 0.25rem 0.25rem 1rem; max-width: 100%;
-}
-.install-line code { font-size: 0.85rem; white-space: nowrap; overflow-x: auto; min-width: 0; }
-.install-line code::before { content: "$ "; color: var(--valley); }
+/* ---- buttons ------------------------------------------------------------ */
 
 .copy {
   position: relative; display: inline-grid; place-items: center;
-  min-width: 40px; min-height: 40px; padding: 0 0.5rem;
+  min-width: var(--target); min-height: var(--target); padding: 0 0.6rem;
   border: 0; border-radius: 4px; background: transparent; color: var(--ink-soft);
   font: 500 var(--t-sm) var(--sans); cursor: pointer;
   transition-property: color, background-color, scale; transition-duration: 150ms; transition-timing-function: var(--ease);
 }
 .copy:hover { color: var(--ink); background: var(--valley-wash); }
 .copy:disabled { color: var(--ink-dim); background: transparent; cursor: default; }
-.copy:active { scale: 0.96; }
+.copy:active:not(:disabled) { scale: 0.96; }
 .copy .icon {
   grid-area: 1 / 1; width: 18px; height: 18px;
   fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
@@ -224,89 +265,284 @@ p, li, dd { text-wrap: pretty; }
 .copy .icon-done { opacity: 0; scale: 0.25; filter: blur(4px); color: var(--valley); }
 .copy.done .icon-copy { opacity: 0; scale: 0.25; filter: blur(4px); }
 .copy.done .icon-done { opacity: 1; scale: 1; filter: blur(0); }
+.copy.text { font-weight: 600; color: var(--valley); }
+.copy.text:hover { color: var(--valley); }
+.copy.text:disabled { color: var(--ink-dim); }
 .copy.text.done { color: var(--valley); }
 .copy.failed { color: var(--mountain); }
 
+/* ---- hero -------------------------------------------------------------- */
+
+.hero {
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "crane" "copy" "sheet" "hint";
+  column-gap: clamp(2rem, 5vw, 4rem);
+  padding-block: clamp(1rem, 4vw, 3.5rem) clamp(3rem, 7vw, 5rem);
+}
+.hero > * { min-width: 0; }
+.hero-copy { grid-area: copy; }
+.hero h1 {
+  font-size: clamp(2.25rem, 6.2vw, 4.4rem);
+  line-height: 1.02; letter-spacing: -0.035em;
+  max-width: 14ch;
+}
+.lede { font-size: var(--t-md); line-height: 1.45; max-width: 46ch; color: var(--ink-soft); margin: 1.25rem 0 1.75rem; }
+
+.install-line {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  background: var(--sheet); border: 1px solid var(--crease); border-radius: 6px;
+  padding: 0.25rem 0.25rem 0.25rem 1rem; max-width: 100%;
+}
+.install-line code { font-size: 0.85rem; white-space: nowrap; overflow-x: auto; min-width: 0; scrollbar-width: none; }
+.install-line code::before { content: "$ "; color: var(--valley); }
+
 .hero-links { margin: 1rem 0 0; font-weight: 500; }
 
-/* The long line sticks out of the sheet until it is folded into it. */
-.hero { overflow-x: clip; }
-.hero > * { min-width: 0; }
-.hero-sheet { margin: 0; padding: 1.5rem 1.5rem 1.25rem; overflow-x: auto; }
-@media (min-width: 64rem) { .hero-sheet { overflow-x: visible; } }
+/* The 3D crane (crane.js, three.js). Its box is reserved, so nothing moves
+   when the canvas appears; without WebGL it shows the logo. */
+.crane {
+  grid-area: crane; position: relative;
+  height: clamp(9.5rem, 40vw, 13rem);
+  margin-inline: calc(-1 * var(--gutter));
+}
+.crane canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  touch-action: pan-y; cursor: grab; opacity: 0;
+  transition-property: opacity; transition-duration: 400ms; transition-timing-function: var(--ease);
+}
+.crane canvas.on { opacity: 1; }
+.crane canvas.grabbing { cursor: grabbing; }
+.crane-still { display: none; }
+.crane-still img { display: block; width: auto; height: 100%; margin-inline: auto; }
+@media (scripting: none) { .crane-still { display: block; height: 100%; } }
+.crane.still .crane-still { display: block; height: 82%; margin-top: 4%; }
 
-/* Token grid: every token is placed by (line, column) in ch units, so the
-   fold moves each token from its place in the long line to its place in the
-   formatted lines. */
+@media (min-width: 48rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr);
+    grid-template-areas: "copy crane" "sheet sheet" "hint hint";
+    align-items: center;
+    padding-top: clamp(2rem, 5vw, 4rem);
+  }
+  .crane { height: auto; aspect-ratio: 1 / 0.86; margin: 0 calc(-1 * var(--gutter)) 0 -2rem; }
+}
+
+/* The sheet: the formatted call and a right margin that can be dragged. */
+.hero-sheet { grid-area: sheet; margin: clamp(2rem, 5vw, 3rem) 0 0; }
+.hero-scroll {
+  overflow-x: auto; overscroll-behavior-x: contain;
+  padding: 2.6rem 1.5rem 1.1rem;
+  scrollbar-width: thin; scrollbar-color: var(--crease) transparent;
+}
+.hero-canvas {
+  --w: 72;
+  position: relative; width: max-content; min-width: 100%;
+  font: 400 12.5px / 1 var(--mono);
+}
+
+/* Token grid: every token is placed by (line, column) in ch units, so a
+   change of line width moves each token from its old place to its new one. */
 .hero-code {
-  --lh: 1.7em;
+  --lh: 1.75em; --lines: 3; --cols: 104;
+  --dur: 220ms; --stagger: 0ms;
   position: relative;
-  font: 400 13px / 1 var(--mono);
-  height: calc(3 * var(--lh));
-  min-width: 72ch;
+  height: calc(var(--lines) * var(--lh));
+  width: calc(max(var(--cols), var(--w)) * 1ch + 4ch);
+  transition-property: height; transition-duration: var(--dur); transition-timing-function: var(--ease);
 }
 .hero-code .tok {
   position: absolute; left: 0; top: 0; white-space: pre;
   line-height: var(--lh);
   translate: calc(var(--x) * 1ch) calc(var(--y) * var(--lh));
-  transition: translate 640ms var(--ease);
-  transition-delay: calc(var(--y) * 70ms);
+  transition-property: translate; transition-duration: var(--dur); transition-timing-function: var(--ease);
+  transition-delay: calc(var(--y) * var(--stagger));
 }
-.hero-code .kw { color: var(--syn-keyword); }
+.hero-code.instant .tok { transition: none; }
 
 /* Syntax colors (Tokyo Night) in the hero and the playground output. */
 .kw { color: var(--syn-keyword); }
 .str { color: var(--syn-string); }
 .num-lit { color: var(--syn-number); }
 .com { color: var(--syn-comment); font-style: italic; }
+
 .hero-code .crease {
   position: absolute; top: 0; width: 0; height: var(--lh);
   border-left: 1.5px dashed var(--valley);
   translate: calc(var(--x) * 1ch - 0.5ch) 0;
   opacity: 0;
-  transition: opacity 180ms var(--ease);
-  transition-delay: calc(var(--i) * 90ms);
+  transition-property: opacity; transition-duration: 180ms; transition-timing-function: var(--ease);
+  transition-delay: calc(var(--i) * 80ms);
 }
 .hero-code.creased .crease { opacity: 1; }
 .hero-code.folded .crease { opacity: 0; transition-delay: 0ms; }
 
-.note {
-  font: 600 0.78rem / 1.5 var(--mono); color: var(--ink);
-  margin: 0;
+/* The margin: a valley crease at column --w, with the width on a tab and a
+   grip; the whole 44px band around the line can be dragged. */
+.margin {
+  position: absolute; top: -2.1rem; bottom: -0.5rem;
+  left: calc(var(--w) * 1ch); width: 44px; margin-left: -22px;
+  cursor: ew-resize; touch-action: pan-y;
+  border-radius: 4px; outline-offset: -2px;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
+.margin::before {
+  content: ""; position: absolute; left: 50%; top: 1.5rem; bottom: 0;
+  border-left: 1.5px dashed var(--valley); translate: -0.75px 0;
+}
+.margin-label {
+  position: absolute; left: 50%; top: 0; translate: -50% 0;
+  min-width: 2.6em; padding: 0.2rem 0.35rem;
+  background: var(--valley); color: var(--sheet); border-radius: 3px;
+  font: 600 11px / 1.1 var(--mono); font-variant-numeric: tabular-nums; text-align: center;
+}
+.margin-grip {
+  position: absolute; left: 50%; top: calc(1.5rem + 0.875em * 3 + 0.4rem); translate: -50% -50%;
+  width: 12px; height: 28px; border-radius: 3px;
+  background: var(--sheet); border: 1.5px solid var(--valley);
+  transition-property: scale, background-color; transition-duration: 150ms; transition-timing-function: var(--ease);
+}
+.margin-grip::before, .margin-grip::after {
+  content: ""; position: absolute; top: 7px; bottom: 7px; border-left: 1.5px solid var(--valley);
+}
+.margin-grip::before { left: 2.5px; }
+.margin-grip::after { right: 2.5px; }
+.margin:hover .margin-grip, .margin.dragging .margin-grip { background: var(--valley-wash); }
+.margin.dragging .margin-grip { scale: 1.08; }
+.margin[aria-disabled="true"] { cursor: default; }
+.margin[aria-disabled="true"] .margin-label { background: var(--ink-dim); }
+.margin[aria-disabled="true"]::before, .margin[aria-disabled="true"] .margin-grip { border-color: var(--ink-dim); }
+.margin[aria-disabled="true"] .margin-grip::before, .margin[aria-disabled="true"] .margin-grip::after { border-color: var(--ink-dim); }
+.margin.nudge { animation: nudge 700ms var(--ease) 1; }
+@keyframes nudge {
+  0%, 100% { translate: 0 0; }
+  35% { translate: 10px 0; }
+  70% { translate: -3px 0; }
+}
+
+/* Without scripting: the formatted call as plain text, no margin. With
+   scripting the text stays for assistive technology. */
+.hero-static {
+  margin: 0; padding: 0 1.5rem 1rem; overflow-x: auto;
+  font: 400 12.5px / 1.75 var(--mono);
+}
+@media (scripting: enabled) {
+  .hero-static { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: pre; }
+}
+@media (scripting: none) {
+  .hero-scroll { display: none; }
+}
+
+.note { font: 600 0.78rem / 1.5 var(--mono); color: var(--ink); margin: 0; }
 .note-mark { color: var(--valley); }
 .hero-note {
-  margin-top: 1rem; padding-top: 0.85rem; border-top: 1px dashed var(--crease);
-  opacity: 0; translate: 0 4px;
-  transition-property: opacity, translate; transition-duration: 300ms; transition-timing-function: var(--ease);
+  margin: 0 1.5rem; padding: 0.85rem 0 1.1rem; border-top: 1px dashed var(--crease);
+  font-variant-numeric: tabular-nums;
 }
-.hero-note.show { opacity: 1; translate: 0 0; }
+@media (scripting: enabled) {
+  .hero-note {
+    opacity: 0; translate: 0 4px;
+    transition-property: opacity, translate; transition-duration: 300ms; transition-timing-function: var(--ease);
+  }
+  .hero-note.show { opacity: 1; translate: 0 0; }
+}
+.hero-hint {
+  grid-area: hint; margin: 0.75rem 0 0; color: var(--ink-soft); font-size: var(--t-sm);
+  visibility: hidden;
+}
+.hero-hint.show { visibility: visible; }
 
-@media (min-width: 64rem) {
-  /* Headline left, lede and install right; the sheet spans the page below,
-     wide enough for the long line before it folds. */
-  .hero { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); align-items: end; column-gap: 4rem; }
-  .hero-sheet { grid-column: 1 / -1; }
-  .lede { margin-top: 0; }
+@media (max-width: 40rem) {
+  .crane { height: clamp(8.5rem, 36vw, 11rem); }
+  .lede { font-size: var(--t-base); margin-block: 1rem 1.5rem; }
+  .install-line { padding-left: 0.75rem; }
+  .install-line code { font-size: 11px; }
+  .hero-scroll { padding-inline: 1rem; }
+  .hero-canvas, .hero-static { font-size: 10.5px; }
+  .hero-note { margin-inline: 1rem; font-size: 0.72rem; }
+  .hero-static { padding-inline: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-code .tok, .hero-note, .margin-grip, .crane canvas { transition: none; }
+  .margin.nudge { animation: none; }
 }
 
 /* ---- playground --------------------------------------------------------- */
 
-.pg-controls { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; margin-bottom: 1rem; }
-.pg-controls label { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 500; color: var(--ink-soft); }
+/* Settings: a select for the example, segments for every setting with two
+   or three values. On small screens the row scrolls sideways. */
+.pg-controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; margin-bottom: 1.25rem;
+}
+.pg-controls label.pg-example, .seg-label { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 500; color: var(--ink-soft); font-size: var(--t-sm); }
 select {
   font: 500 var(--t-sm) var(--sans); color: var(--ink);
   background: var(--sheet); border: 1px solid var(--crease); border-radius: 4px;
-  min-height: 40px; padding: 0 0.6rem;
+  min-height: var(--target); padding: 0 0.6rem;
 }
+.seg { display: inline-flex; align-items: center; gap: 0; }
+.seg-label { margin-right: 0.5rem; white-space: nowrap; }
+.seg label { position: relative; display: inline-flex; }
+.seg input {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+  opacity: 0; cursor: pointer;
+}
+.seg label > span {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--target); min-width: var(--target); padding: 0 0.75rem;
+  font: 500 var(--t-sm) var(--sans); white-space: nowrap; color: var(--ink-soft);
+  background: var(--sheet); border: 1px solid var(--crease); margin-left: -1px;
+  font-variant-numeric: tabular-nums;
+  transition-property: color, background-color, border-color; transition-duration: 150ms; transition-timing-function: var(--ease);
+}
+.seg label:nth-child(2) > span { border-radius: 4px 0 0 4px; margin-left: 0; }
+.seg label:last-child > span { border-radius: 0 4px 4px 0; }
+.seg input:hover + span { color: var(--ink); }
+.seg input:checked + span {
+  position: relative; z-index: 1;
+  color: var(--valley); background: var(--valley-wash); border-color: var(--valley); font-weight: 600;
+}
+.seg input:focus-visible + span { outline: 2px solid var(--valley); outline-offset: 2px; z-index: 2; }
+
+@media (max-width: 56rem) {
+  .pg-controls {
+    flex-wrap: nowrap; overflow-x: auto; gap: 1.25rem;
+    margin-inline: calc(-1 * var(--gutter)); padding: 0.25rem var(--gutter) 0.75rem;
+    scrollbar-width: thin; scrollbar-color: var(--crease) transparent;
+  }
+  .pg-controls > * { flex: none; }
+}
+
+/* Below 56rem one pane at a time, with a two-item switch. */
+.pg-tabs { display: flex; gap: 0; margin-bottom: 0.75rem; border-bottom: 1px solid var(--crease); }
+.pg-tabs[hidden] { display: none; }
+.pg-tabs [role="tab"], .inst-tabs [role="tab"] {
+  position: relative; display: inline-flex; align-items: center; gap: 0.45rem;
+  min-height: 44px; padding: 0 1rem; margin-bottom: -1px;
+  border: 0; border-bottom: 2px solid transparent; background: transparent; border-radius: 4px 4px 0 0;
+  color: var(--ink-soft); font: 600 var(--t-base) var(--sans); cursor: pointer;
+  transition-property: color, border-color, background-color; transition-duration: 150ms; transition-timing-function: var(--ease);
+}
+.pg-tabs [role="tab"]:hover, .inst-tabs [role="tab"]:hover { color: var(--ink); background: var(--valley-wash); }
+.pg-tabs [role="tab"][aria-selected="true"], .inst-tabs [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--valley); }
+.pg-tabs [role="tab"]:focus-visible, .inst-tabs [role="tab"]:focus-visible { outline-offset: -2px; }
+.tab-badge {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--valley);
+  scale: 1; transition-property: scale, opacity; transition-duration: 200ms; transition-timing-function: var(--ease);
+}
+.tab-badge:not(.on) { scale: 0.25; opacity: 0; }
 
 .pg { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
 @media (min-width: 56rem) { .pg { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 .pg-pane { min-width: 0; display: flex; flex-direction: column; }
+.pg.tabbed .pg-pane[hidden] { display: none; }
+.pg.tabbed .pane-label > label, .pg.tabbed .pane-label > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.pg.tabbed .pane-label { justify-content: flex-end; }
 
 .pane-label {
-  display: flex; align-items: center; justify-content: space-between;
-  min-height: 40px; font-weight: 600;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  min-height: var(--target); font-weight: 600; margin-bottom: 0.25rem;
 }
 
 .code {
@@ -316,10 +552,11 @@ select {
 }
 textarea.code { resize: vertical; tab-size: 2; white-space: pre; }
 textarea.code:focus-visible { outline-offset: 0; }
+@media (max-width: 40rem) { .code { font-size: 11.5px; height: clamp(20rem, 58vh, 30rem); } }
 
 /* The input: a transparent textarea over a highlighted copy of its text.
    Both have the same font, padding, border and scroll position. */
-.editor { position: relative; }
+.editor { position: relative; border-radius: 4px; }
 .editor pre {
   position: absolute; inset: 0; height: auto;
   overflow: hidden; tab-size: 2; white-space: pre; pointer-events: none;
@@ -330,6 +567,14 @@ textarea.code:focus-visible { outline-offset: 0; }
   border: 1px solid transparent; border-radius: 4px;
 }
 .editor textarea::selection { background: color-mix(in oklab, var(--valley) 30%, transparent); color: transparent; }
+/* A file dragged over the editor: a valley crease around it. */
+.editor.drop::after {
+  content: "Drop to open the file"; position: absolute; inset: 0;
+  display: grid; place-items: center; pointer-events: none;
+  border: 2px dashed var(--valley); border-radius: 4px;
+  background: color-mix(in srgb, var(--valley-wash) 80%, transparent);
+  color: var(--valley); font-weight: 600;
+}
 
 .output { padding: 0.9rem 0; }
 .output .ln {
@@ -350,14 +595,12 @@ textarea.code:focus-visible { outline-offset: 0; }
 .output.plain { padding-inline: 1rem; white-space: pre; }
 .output .empty { padding: 0 1rem; color: var(--ink-soft); font-family: var(--sans); font-size: var(--t-sm); }
 
-.status { min-height: 1.6em; margin: 0.9rem 0 0; color: var(--ink-soft); font-size: var(--t-sm); }
+.status { min-height: 1.6em; margin: 0.9rem 0 0; color: var(--ink-soft); font-size: var(--t-sm); font-variant-numeric: tabular-nums; }
 .status .num { font-variant-numeric: tabular-nums; }
 .status.error { color: var(--mountain); }
 
-/* ---- figures, facts, install ------------------------------------------ */
+/* ---- figures, facts, photos -------------------------------------------- */
 
-/* Photos: a paper crane folded in the theme's colors (docs/brand.md). The
-   left part of the photo is empty, so the caption sits there on wide screens. */
 .photo { margin: 0; position: relative; }
 .photo img { display: block; width: 100%; height: auto; border-radius: 4px; outline: 1px solid var(--outline); outline-offset: -1px; }
 .photo figcaption { margin-top: 1.25rem; }
@@ -373,25 +616,64 @@ textarea.code:focus-visible { outline-offset: 0; }
 .split .section-head { margin-bottom: 0; }
 .detail { display: block; width: 100%; max-width: 14rem; height: auto; border-radius: 4px; outline: 1px solid var(--outline); outline-offset: -1px; }
 @media (min-width: 48rem) { .split { grid-template-columns: minmax(0, 1fr) 14rem; } }
+@media (max-width: 47.99rem) { .detail { max-width: 9rem; } }
 
 .figure { margin: 0; }
 .figure img { display: block; width: 100%; height: auto; border-radius: 4px; outline: 1px solid var(--outline); outline-offset: -1px; }
 .figure.terminal img { outline: none; }
 .figure figcaption { margin-top: 0.75rem; color: var(--ink-soft); font-size: var(--t-sm); max-width: var(--measure); }
+.scroll-hint { display: none; }
+
+/* Wide diagrams keep a readable size on small screens: they scroll sideways
+   inside a sheet, with a hint and a visible scroll bar. */
+@media (max-width: 47.99rem) {
+  .figure.wide .figure-scroll {
+    overflow-x: auto; overscroll-behavior-x: contain;
+    margin-inline: calc(-1 * var(--gutter)); padding: 0 var(--gutter) 0.75rem;
+    scrollbar-width: thin; scrollbar-color: var(--crease) transparent;
+  }
+  .figure.wide img { width: 44rem; max-width: none; }
+  .figure.wide.terminal img { width: 46rem; }
+  .scroll-hint { display: block; margin: 0.25rem 0 0; color: var(--ink-soft); font-size: var(--t-sm); }
+}
 
 .facts { list-style: none; padding: 0; margin: 2.25rem 0 0; display: grid; gap: 1.25rem 2.5rem; }
 @media (min-width: 56rem) { .facts { grid-template-columns: 1.1fr 1fr 0.9fr; } }
 .facts li { padding-top: 0.85rem; border-top: 1px solid var(--crease); color: var(--ink-soft); }
 .facts strong { color: var(--ink); font-weight: 600; }
 
-.install { display: grid; gap: 0.5rem 2rem; margin: 0; max-width: 60rem; }
-@media (min-width: 48rem) { .install { grid-template-columns: 13rem 1fr; } }
-.install dt { font-weight: 600; padding-top: 0.9rem; }
-.install dd { margin: 0; padding-top: 0.9rem; color: var(--ink-soft); }
-@media (min-width: 48rem) {
-  .install dt, .install dd { border-top: 1px dashed var(--crease); }
+/* ---- install ------------------------------------------------------------ */
+
+.inst { max-width: 52rem; }
+.inst-tabs {
+  display: flex; gap: 0; margin-bottom: 1.25rem; border-bottom: 1px solid var(--crease);
+  overflow-x: auto; scrollbar-width: none;
 }
-.install dd code { color: var(--ink); }
+.inst-tabs [role="tab"] { flex: none; font-size: var(--t-sm); padding-inline: 0.85rem; }
+@media (max-width: 52rem) {
+  .inst-tabs { margin-inline: calc(-1 * var(--gutter)); padding-inline: calc(var(--gutter) - 0.85rem); }
+}
+.inst-panel h3 { font-size: var(--t-md); font-weight: 700; letter-spacing: -0.01em; margin: 0 0 0.4rem; }
+.inst-panel p { margin: 0 0 0.9rem; color: var(--ink-soft); max-width: var(--measure); }
+.inst-panel + .inst-panel { margin-top: 2rem; }
+.inst.tabbed .inst-panel + .inst-panel { margin-top: 0; }
+.inst.tabbed .inst-panel h3 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.inst.tabbed .inst-panel[hidden] { display: none; }
+.inst-panel:focus-visible { outline-offset: 6px; }
+
+.snippet { position: relative; display: flex; align-items: flex-start; }
+.snippet pre {
+  flex: 1; min-width: 0; margin: 0; padding: 0.95rem 1rem;
+  overflow-x: auto; font-size: 12.5px; line-height: 1.6; color: var(--ink);
+  scrollbar-width: thin; scrollbar-color: var(--crease) transparent;
+}
+.snippet .copy { flex: none; margin: 0.35rem 0.35rem 0 0; }
+@media (max-width: 40rem) { .snippet pre { font-size: 11.5px; } }
+
+.usage { margin-top: 2.75rem; max-width: 52rem; }
+.usage h3 { font-size: var(--t-md); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 0.75rem; }
+.snippet-plain { margin: 0; padding: 0.95rem 1rem; overflow-x: auto; font-size: 12.5px; line-height: 1.6; }
+@media (max-width: 40rem) { .snippet-plain { font-size: 11.5px; } }
 
 /* ---- comparison page (abap-cleaner.html) -------------------------------- */
 
@@ -415,6 +697,7 @@ textarea.code:focus-visible { outline-offset: 0; }
   margin: 0; padding: 0.9rem 1rem; overflow-x: auto;
   font: 400 12.5px / 1.6 var(--mono); color: var(--ink); white-space: pre;
 }
+@media (max-width: 40rem) { .code-block { font-size: 11.5px; } }
 .code-block:focus-visible { outline-offset: 0; }
 .cmp-pane.before .code-block { background: transparent; border-style: dashed; color: var(--ink-soft); }
 /* origami's pane gets the valley crease, as broken lines do in the playground. */

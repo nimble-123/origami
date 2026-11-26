@@ -1,6 +1,7 @@
-// Web Worker for the playground: runs origami (WebAssembly, see
+// Web Worker for the hero and the playground: runs origami (WebAssembly, see
 // crates/origami_wasm) off the main thread, so a slow input cannot freeze the
-// page. app.js terminates and restarts this worker when a run takes too long.
+// page. app.js sends the requests of both, and terminates and restarts this
+// worker when a run takes too long.
 //
 // Messages in:  { id, source, opts: { cds, width, lower, compact } }
 // Messages out: { type: "ready" } | { type: "load-error" }
@@ -40,7 +41,7 @@ onmessage = async ({ data: { id, source, opts } }) => {
   const t0 = performance.now();
   try {
     const result = review(source, opts);
-    result.ms = Math.max(1, Math.round(performance.now() - t0));
+    result.ms = performance.now() - t0;
     postMessage({ type: "result", id, result });
   } catch {
     // A panic aborts the instance; start a fresh one.
