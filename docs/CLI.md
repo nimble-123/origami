@@ -106,6 +106,10 @@ Limits:
   already rewritten stay rewritten. Other requests (`ping`, `tools/list`)
   are answered while a call runs. `notifications/cancelled` cancels a call;
   it then gets no reply.
+* A cancelled call may take a moment to stop. A call that writes waits for
+  it, and so does any call after one that wrote; if it has not stopped within
+  one deadline, the waiting call gets the JSON-RPC error -32002 and is not
+  started. At most 16 calls wait; further ones get -32002 at once.
 * A `format_files` result carries about 100 KB of file entries and diffs.
   Beyond that, the remaining changed files are listed with
   `diff_omitted: true`, then not at all (`omitted` counts them);

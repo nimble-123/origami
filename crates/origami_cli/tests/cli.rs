@@ -1209,6 +1209,107 @@ fn mcp_blocked_calls_can_be_cancelled_and_time_out() {
     assert_eq!(replies[1]["error"]["code"], -32001);
 }
 
+/// A named pipe `z.prog.abap` that blocks whoever reads it.
+#[cfg(unix)]
+fn blocking_fifo(d: &Path) {
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(d.join("z.prog.abap"))
+            .status()
+            .unwrap()
+            .success()
+    );
+}
+
+/// A call that missed its deadline may still be running. No second call
+/// that writes starts before it has stopped: it is refused instead.
+#[cfg(unix)]
+#[test]
+fn mcp_does_not_overlap_writes_with_a_call_that_is_still_running() {
+    let d = dir();
+    blocking_fifo(d.path());
+    write(d.path(), "b.prog.abap", "lv_a   =   1.\n");
+    let call = |id, path: &str| {
+        tool_call(
+            id,
+            "format_files",
+            serde_json::json!({"paths": [path], "write": true}),
+        )
+    };
+    let replies = mcp_session(
+        d.path(),
+        &[("ORIGAMI_MCP_TIMEOUT", "0.3")],
+        &[call(1, "z.prog.abap"), call(2, "b.prog.abap")],
+    );
+    assert_eq!(replies[0]["id"], 1);
+    assert_eq!(replies[0]["error"]["code"], -32001, "{}", replies[0]);
+    assert_eq!(replies[1]["id"], 2);
+    assert_eq!(replies[1]["error"]["code"], -32002, "{}", replies[1]);
+    assert_eq!(
+        fs::read_to_string(d.path().join("b.prog.abap")).unwrap(),
+        "lv_a   =   1.\n"
+    );
+}
+
+/// A read-only call is not held up by a read-only call that is still stuck.
+#[cfg(unix)]
+#[test]
+fn mcp_serves_reads_while_a_stuck_read_lingers() {
+    let d = dir();
+    blocking_fifo(d.path());
+    let replies = mcp_session(
+        d.path(),
+        &[("ORIGAMI_MCP_TIMEOUT", "0.3")],
+        &[
+            tool_call(
+                1,
+                "format_files",
+                serde_json::json!({"paths": ["z.prog.abap"]}),
+            ),
+            tool_call(
+                2,
+                "format",
+                serde_json::json!({"source": "x   =   1.\n", "language": "abap"}),
+            ),
+        ],
+    );
+    assert_eq!(replies[0]["error"]["code"], -32001, "{}", replies[0]);
+    assert_eq!(replies[1]["result"]["content"][0]["text"], "x = 1.\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn mcp_bounds_the_queue_of_waiting_calls() {
+    let d = dir();
+    blocking_fifo(d.path());
+    let mut messages = vec![tool_call(
+        1,
+        "format_files",
+        serde_json::json!({"paths": ["z.prog.abap"]}),
+    )];
+    for id in 2..=30 {
+        messages.push(tool_call(
+            id,
+            "format",
+            serde_json::json!({"source": "x = 1.\n", "language": "abap"}),
+        ));
+    }
+    let replies = mcp_session(d.path(), &[("ORIGAMI_MCP_TIMEOUT", "1")], &messages);
+    assert_eq!(replies.len(), 30);
+    let refused = replies
+        .iter()
+        .filter(|r| r["error"]["code"] == -32002)
+        .count();
+    assert!((1..29).contains(&refused), "{refused} refused");
+    // The refusal comes at once, before the first call's deadline.
+    assert_eq!(replies[0]["error"]["code"], -32002, "{}", replies[0]);
+    assert!(
+        replies
+            .iter()
+            .any(|r| r["id"] == 1 && r["error"]["code"] == -32001)
+    );
+}
+
 #[test]
 fn mcp_format_files_caps_the_result() {
     let d = dir();
