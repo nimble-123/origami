@@ -1301,6 +1301,35 @@ fn changed_ignores_the_diff_prefix_settings() {
 }
 
 #[test]
+fn changed_honors_the_ignore_rules_of_a_directory_walk() {
+    let d = git_repo(&[
+        (".origamiignore", "generated/\n"),
+        ("generated/a.prog.abap", "lv_a = 1.\n"),
+        ("src/b.prog.abap", "lv_b = 1.\n"),
+        ("src/skip.prog.abap", "lv_c = 1.\n"),
+    ]);
+    write(d.path(), "src/.origamiignore", "skip.prog.abap\n");
+    for f in [
+        "generated/a.prog.abap",
+        "src/b.prog.abap",
+        "src/skip.prog.abap",
+    ] {
+        write(d.path(), f, "lv_a   =   2.\n");
+    }
+    write(d.path(), "generated/new.prog.abap", "lv_a   =   3.\n");
+    origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--changed"])
+        .assert()
+        .code(0);
+    let read = |f: &str| fs::read_to_string(d.path().join(f)).unwrap();
+    assert_eq!(read("src/b.prog.abap"), "lv_a = 2.\n");
+    assert_eq!(read("generated/a.prog.abap"), "lv_a   =   2.\n");
+    assert_eq!(read("generated/new.prog.abap"), "lv_a   =   3.\n");
+    assert_eq!(read("src/skip.prog.abap"), "lv_a   =   2.\n");
+}
+
+#[test]
 fn changed_outside_git_says_so_in_one_line() {
     let d = tempfile::tempdir().unwrap();
     let out = origami()

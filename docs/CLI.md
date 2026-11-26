@@ -52,7 +52,10 @@ in the range is reformatted completely). The result passes the same
 self-check as a full run; if the selected changes cannot stand on their own,
 the file stays as written and W001 is reported. `--changed` runs
 `git diff -U0 --relative REF` and `git ls-files --others --exclude-standard`
-in the current directory; outside a git repository it is a usage error.
+in the current directory; outside a git repository, or with a REF that is not
+a commit, it is a usage error. `--changed` skips the files a directory walk
+skips (`.gitignore`, `.origamiignore`, hidden files); a file named on the
+command line is always taken.
 `--changed` takes the next argument as the revision unless it starts with
 `-`: `origami --changed main src/` compares against `main`, and
 `origami --changed src/` would read `src/` as a revision. To pass paths,

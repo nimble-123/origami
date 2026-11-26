@@ -4,8 +4,8 @@
 //! directory, as git prints them with `--relative`.
 
 use origami_core::detect::{FileKind, by_file_name};
-use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::collections::{BTreeMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Line ranges to format; `None` formats the whole file.
@@ -204,6 +204,15 @@ pub fn files(rev: &str, paths: &[PathBuf]) -> Result<Vec<(PathBuf, Ranges)>, Str
         result.push((PathBuf::from(f), None));
     }
     result.retain(|(f, _)| f.is_file());
+    // The same files a directory walk finds: .gitignore, .origamiignore and
+    // hidden files apply; a file named in `paths` is always taken.
+    let canonical = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+    let walked: HashSet<PathBuf> = crate::walk::files(&[PathBuf::from(".")])
+        .iter()
+        .chain(paths.iter().filter(|p| p.is_file()))
+        .map(|p| canonical(p))
+        .collect();
+    result.retain(|(f, _)| walked.contains(&canonical(f)));
     Ok(result)
 }
 
