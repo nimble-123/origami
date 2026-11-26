@@ -64,11 +64,11 @@ pub fn render(path: &str, input: &[u8], e: &Explained, color: bool) -> String {
     let mut loose = Vec::new();
     for n in &e.notes {
         let (start, end) = (*n.lines.start() as usize, *n.lines.end() as usize);
-        let anchor = added
-            .iter()
-            .rev()
-            .find(|&&l| l >= start && l <= end)
-            .or_else(|| added.iter().find(|&&l| l >= start));
+        // `added` is ascending: binary search, not a scan per note.
+        let anchor = added[..added.partition_point(|&l| l <= end)]
+            .last()
+            .filter(|&&l| l >= start)
+            .or_else(|| added.get(added.partition_point(|&l| l < start)));
         match anchor {
             Some(&l) => anchored.entry(l).or_default().push(&n.text),
             None => loose.push(n.text.as_str()),

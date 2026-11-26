@@ -30,7 +30,7 @@ fn hint(code: Code) -> &'static str {
         Code::E031 => "Check that the file is writable.",
         Code::W001 => "The unit was kept as written; no action needed.",
         Code::W002 => "The unit was kept as written (255-character limit); no action needed.",
-        Code::W004 => "The unit was kept as written (nesting depth); no action needed.",
+        Code::W004 => "Kept as written (nesting-depth or size limit); no action needed.",
         Code::W101 => "Remove or fix the key in origami.toml.",
         Code::X001 | Code::X002 => {
             "Internal error; the file was not changed. Report it with the file."
