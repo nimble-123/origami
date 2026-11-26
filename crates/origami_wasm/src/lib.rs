@@ -7,10 +7,15 @@
 //! 3. reads `result_len()` bytes at the returned pointer: a JSON document
 //!    (see [`review_json`]); then `dealloc(result, result_len())`.
 //!
+//! `lex(ptr, len, cds)` works the same way and returns the tokens of a source
+//! (see [`lex_json`]), so the page can show them and compare them the way the
+//! self-check does.
+//!
 //! The core does no I/O, so nothing else is needed. A panic aborts the
 //! instance (wasm32 has no unwinding); the page then starts a new one.
 
 use origami_core::{Case, LanguageHint, Options, Status, Style, explain};
+use origami_syntax::{Language, SourceText};
 use serde_json::json;
 use std::cell::Cell;
 
@@ -87,6 +92,81 @@ pub fn review_json(
     .to_string()
 }
 
+/// The tokens of `source` as the self-check sees them, as JSON:
+/// `{status: "ok", tokens: [{start, end, class, glued}], comments: [{start,
+/// end}]}` with byte offsets into the UTF-8 source, or `{status: "error",
+/// message, offset}` when it does not lex. `class` is `word`, `literal`,
+/// `pragma`, `verbatim` (AMDP, native SQL, macro bodies) or `punct`. ABAP,
+/// or with `cds` the CDS family (lexed as a data definition).
+pub fn lex_json(source: &str, cds: bool) -> String {
+    let src = SourceText::from_normalized(source);
+    let lexed = if cds {
+        origami_cds::lex(&src, Language::Ddls)
+    } else {
+        origami_abap::lex(&src)
+    };
+    let stream = match lexed {
+        Ok(s) => s,
+        Err(d) => {
+            return json!({
+                "status": "error",
+                "message": d.message,
+                "offset": d.start,
+            })
+            .to_string();
+        }
+    };
+    let class = |kind: u16| -> &'static str {
+        if cds {
+            use origami_cds::kinds as k;
+            match kind {
+                k::STRING => "literal",
+                k::IDENT | k::DOLLAR_IDENT | k::ENUM_VALUE | k::NUMBER => "word",
+                _ => "punct",
+            }
+        } else {
+            use origami_abap::kinds as k;
+            match kind {
+                k::WORD => "word",
+                k::CHAR_LITERAL
+                | k::STRING_LITERAL
+                | k::TEMPLATE_FULL
+                | k::TEMPLATE_HEAD
+                | k::TEMPLATE_MIDDLE
+                | k::TEMPLATE_TAIL => "literal",
+                k::PRAGMA => "pragma",
+                k::OPAQUE => "verbatim",
+                _ => "punct",
+            }
+        }
+    };
+    let tokens: Vec<_> = stream
+        .tokens
+        .iter()
+        .map(|t| json!({"start": t.start, "end": t.end, "class": class(t.kind), "glued": t.glued}))
+        .collect();
+    let comments: Vec<_> = stream
+        .trivia
+        .iter()
+        .filter(|t| t.is_comment())
+        .map(|t| json!({"start": t.start, "end": t.end}))
+        .collect();
+    json!({"status": "ok", "tokens": tokens, "comments": comments}).to_string()
+}
+
+/// Hands a JSON result to JavaScript as a boxed slice: capacity == length,
+/// which `dealloc(ptr, result_len())` relies on.
+fn into_result(json: String) -> *mut u8 {
+    let mut out = json.into_bytes();
+    if out.is_empty() {
+        // Not reachable (the JSON is never empty); keeps `alloc_len` honest.
+        out.push(b' ');
+    }
+    let out = out.into_boxed_slice();
+    RESULT_LEN.with(|l| l.set(out.len()));
+    Box::into_raw(out).cast::<u8>()
+}
+
 /// The size of the allocation behind a buffer of `len` bytes: at least one
 /// byte, so that every buffer has a real allocation.
 fn alloc_len(len: usize) -> usize {
@@ -149,22 +229,32 @@ pub unsafe extern "C" fn review(
     let source = String::from_utf8_lossy(&input[..len]);
     let width = u16::try_from(width).unwrap_or(120);
     let indent = u8::try_from(indent).unwrap_or(2);
-    let mut out =
-        review_json(&source, cds != 0, width, indent, lower != 0, compact != 0).into_bytes();
-    if out.is_empty() {
-        // Not reachable (the JSON is never empty); keeps `alloc_len` honest.
-        out.push(b' ');
-    }
-    // A boxed slice has capacity == length, which `dealloc(ptr, result_len())`
-    // relies on.
-    let out = out.into_boxed_slice();
-    RESULT_LEN.with(|l| l.set(out.len()));
-    Box::into_raw(out).cast::<u8>()
+    into_result(review_json(
+        &source,
+        cds != 0,
+        width,
+        indent,
+        lower != 0,
+        compact != 0,
+    ))
+}
+
+/// Lexes the `len` bytes at `ptr` (frees them) and returns a pointer to the
+/// JSON result of [`lex_json`]; its length is `result_len()`.
+///
+/// # Safety
+/// `ptr` must come from `alloc(len)` and hold `len` initialized bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn lex(ptr: *mut u8, len: usize, cds: u32) -> *mut u8 {
+    // SAFETY: `ptr` comes from `alloc(len)` and JavaScript wrote `len` bytes.
+    let input = unsafe { take_buffer(ptr, len) };
+    let source = String::from_utf8_lossy(&input[..len]);
+    into_result(lex_json(&source, cds != 0))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{alloc, dealloc, result_len, review, review_json};
+    use super::{alloc, dealloc, lex, lex_json, result_len, review, review_json};
 
     #[test]
     fn formats_and_explains() {
@@ -223,6 +313,53 @@ mod tests {
         // Zero bytes still get a real allocation; invalid UTF-8 is replaced.
         assert_eq!(ffi_review(b"", 0)["status"], "unchanged");
         let _ = ffi_review(b"lv_a = '\xff\xfe'.\n", 0);
+    }
+
+    #[test]
+    fn lexes_tokens_and_comments() {
+        let v: serde_json::Value =
+            serde_json::from_str(&lex_json("lv_a = 'x'. \"note\nlv_b = 1 ##NEEDED.\n", false))
+                .unwrap();
+        assert_eq!(v["status"], "ok");
+        let classes: Vec<_> = v["tokens"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["class"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            classes,
+            [
+                "word", "word", "literal", "punct", "word", "word", "word", "pragma", "punct"
+            ]
+        );
+        assert_eq!(v["tokens"][3]["glued"], true);
+        assert_eq!(v["comments"][0]["start"], 12);
+        let v: serde_json::Value = serde_json::from_str(&lex_json(
+            "define view entity Z as select from t { key a }\n",
+            true,
+        ))
+        .unwrap();
+        assert_eq!(v["status"], "ok");
+        let v: serde_json::Value = serde_json::from_str(&lex_json("lv_a = 'x\n", false)).unwrap();
+        assert_eq!(v["status"], "error");
+    }
+
+    #[test]
+    fn ffi_lex_round_trip() {
+        let source = b"lv_a = 1.\n";
+        let ptr = alloc(source.len());
+        // SAFETY: `alloc(len)` returns at least `len` writable bytes.
+        unsafe { std::ptr::copy_nonoverlapping(source.as_ptr(), ptr, source.len()) };
+        // SAFETY: `ptr` comes from `alloc(source.len())` and holds those bytes.
+        let res = unsafe { lex(ptr, source.len(), 0) };
+        let len = result_len();
+        // SAFETY: `lex` returns `result_len()` initialized bytes at `res`.
+        let json = unsafe { std::slice::from_raw_parts(res, len) }.to_vec();
+        // SAFETY: `res` and `len` come from `lex` / `result_len`.
+        unsafe { dealloc(res, len) };
+        let v: serde_json::Value = serde_json::from_slice(&json).unwrap();
+        assert_eq!(v["tokens"].as_array().unwrap().len(), 4);
     }
 
     #[test]

@@ -9,7 +9,7 @@ const wasmPath =
   new URL("../../../target/wasm32-unknown-unknown/release/origami_wasm.wasm", import.meta.url);
 const { instance } = await WebAssembly.instantiate(await readFile(wasmPath), {});
 const wasm = instance.exports;
-for (const name of ["memory", "alloc", "dealloc", "review", "result_len"]) {
+for (const name of ["memory", "alloc", "dealloc", "review", "lex", "result_len"]) {
   assert.ok(name in wasm, `missing export: ${name}`);
 }
 
@@ -39,6 +39,28 @@ assert.equal(r.diagnostics[0].code, "E003");
 // CDS.
 r = review("define view entity Z as select from t { key a, b }\n", { cds: true });
 assert.equal(r.language, "ddls");
+
+// The tokens the self-check compares, with byte offsets and a class.
+function lex(source, cds = false) {
+  const bytes = new TextEncoder().encode(source);
+  const ptr = wasm.alloc(bytes.length);
+  new Uint8Array(wasm.memory.buffer, ptr, bytes.length).set(bytes);
+  const res = wasm.lex(ptr, bytes.length, cds ? 1 : 0);
+  const len = wasm.result_len();
+  const json = new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, res, len));
+  wasm.dealloc(res, len);
+  return JSON.parse(json);
+}
+let t = lex("lv_a = 'x'. \"note\n");
+assert.equal(t.status, "ok");
+assert.deepEqual(t.tokens.map((x) => x.class), ["word", "word", "literal", "punct"]);
+assert.deepEqual([t.tokens[0].start, t.tokens[0].end], [0, 4]);
+assert.equal(t.comments.length, 1);
+assert.equal(lex("define view entity Z as select from t { key a }\n", true).status, "ok");
+assert.equal(lex("lv_a = 'x\n").status, "error");
+const lexBefore = wasm.memory.buffer.byteLength;
+for (let i = 0; i < 2000; i++) lex("lv_a = 1. lv_b = 2.\n");
+assert.ok(wasm.memory.buffer.byteLength <= lexBefore + 65536 * 4, "lex leaks a buffer");
 
 // Empty input, then many round trips: every buffer is freed, memory stays flat.
 assert.equal(review("").status, "unchanged");
