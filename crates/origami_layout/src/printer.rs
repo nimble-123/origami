@@ -966,6 +966,14 @@ impl<'c, 'a> Printer<'c, 'a> {
             self.line_empty = true;
             if n == last {
                 self.pending_indent = Some(target);
+                // One-line block comments in front of the token on its line
+                // (`/* a */ b`) are part of the gap too; the blanks after
+                // them stay as they are.
+                let comments = trimmed.trim_end_matches(BLANKS);
+                if !comments.is_empty() {
+                    self.write(comments, indent);
+                    self.write(&trimmed[comments.len()..], indent);
+                }
             } else if trimmed.trim_end_matches(BLANKS).is_empty() {
                 self.pending_indent = None;
             } else {
