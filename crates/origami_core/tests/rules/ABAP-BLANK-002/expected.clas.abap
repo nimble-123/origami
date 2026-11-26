@@ -5,8 +5,9 @@ CLASS zcl_rates DEFINITION PUBLIC.
     METHODS reset.
     METHODS calculate_all.
 
-    METHODS calculate IMPORTING iv_amount   TYPE p
-                                iv_currency TYPE waers.
+    METHODS calculate
+      IMPORTING iv_amount   TYPE p
+                iv_currency TYPE waers.
 
     TYPES: BEGIN OF ty_rate,
              currency TYPE waers,
