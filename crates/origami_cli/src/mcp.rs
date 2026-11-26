@@ -396,7 +396,7 @@ fn tools() -> Value {
                     "changed": {"type": "string", "description": "Git revision, e.g. HEAD or main: only format lines changed against it."}
                 }
             },
-            "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+            "annotations": {"readOnlyHint": false, "destructiveHint": true, "idempotentHint": true, "openWorldHint": false}
         }
     ])
 }
@@ -786,6 +786,25 @@ fn within_budget(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn format_files_is_announced_as_destructive() {
+        let tools = tools();
+        let annotations = |name: &str| {
+            tools
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|t| t["name"] == name)
+                .map(|t| t["annotations"].clone())
+                .unwrap()
+        };
+        // It rewrites files with `write: true`.
+        let files = annotations("format_files");
+        assert_eq!(files["readOnlyHint"], false);
+        assert_eq!(files["destructiveHint"], true);
+        assert_eq!(annotations("format")["readOnlyHint"], true);
+    }
 
     #[test]
     fn read_line_caps_long_lines_and_keeps_reading() {
