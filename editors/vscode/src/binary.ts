@@ -130,6 +130,7 @@ export class BinaryResolver {
       return { result: trusted ? NOT_FOUND : NOT_FOUND_UNTRUSTED, transient: false };
     }
     let transient = false;
+    let configError: string | undefined;
     for (const binary of candidates) {
       if (!configPath) {
         return { result: { binary, configPath }, transient };
@@ -139,21 +140,26 @@ export class BinaryResolver {
         case "satisfied":
           return { result: { binary, configPath }, transient };
         case "config":
-          // The same for every binary: report it instead of a version mismatch.
-          this.log(`origami: ${configPath}: ${probe.message}`);
-          return {
-            result: {
-              status: "origami: invalid origami.toml",
-              message: `${path.basename(configPath)}: ${probe.message}`,
-            },
-            transient,
-          };
+          // Exit 3 is also a usage error: an older binary on PATH may not
+          // know the probe's flags, so the next candidate still gets a try.
+          this.log(`origami: ${binary}: ${configPath}: ${probe.message}`);
+          configError ??= probe.message;
+          break;
         case "transient":
           transient = true;
           break;
         case "unsatisfied":
           break;
       }
+    }
+    if (configError !== undefined) {
+      return {
+        result: {
+          status: "origami: invalid origami.toml",
+          message: `${path.basename(configPath ?? "origami.toml")}: ${configError}`,
+        },
+        transient,
+      };
     }
     return { result: NO_MATCH, transient };
   }
