@@ -3,3 +3,4 @@
 4: ABAP-CALL-001: one parameter per line
 6: ABAP-CALL-002: each parameter group on its own line
 10: ABAP-CALL-002: each parameter group on its own line
+12: ABAP-CALL-002: each parameter group on its own line

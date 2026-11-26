@@ -337,7 +337,7 @@ impl<'a> Ctx<'a> {
             Inner::AlignGroup(items, _, broken) => {
                 let rows = items
                     .iter()
-                    .filter(|i| !matches!(i, AlignItem::Break))
+                    .filter(|i| !matches!(i, AlignItem::Break | AlignItem::Split))
                     .count();
                 (*broken && rows > 1)
                     | items
@@ -1196,25 +1196,54 @@ impl<'c, 'a> Printer<'c, 'a> {
         fits
     }
 
+    /// Indent for a cell of an aligned row: a cell whose first token has
+    /// comment lines in front of it starts at the current column, so the
+    /// comments and the token stay in the cell's column.
+    fn cell_indent(&self, cell: &[Doc], col: usize) -> usize {
+        match cell.iter().find_map(first_token) {
+            Some(i) if self.ctx.has_leading_comments(i) => self.column(),
+            _ => col,
+        }
+    }
+
+    /// Padding of an aligned cell. At the start of a line it becomes
+    /// indentation, so comment lines in front of the next token do not
+    /// leave a line of blanks behind.
+    fn pad(&mut self, n: usize, indent: usize) {
+        match self.pending_indent {
+            Some(p) if self.line_empty && !self.pending_eol => self.pending_indent = Some(p + n),
+            _ => self.write(&" ".repeat(n), indent),
+        }
+    }
+
     fn align_group(&mut self, items: &[AlignItem], fit: AlignFit, indent: usize, width: usize) {
         let col = self.column().max(indent);
-        // Split into segments at `Break`.
-        let mut segments: Vec<Vec<&AlignItem>> = vec![Vec::new()];
+        // Split into segments at `Break` and `Split`; segments joined by
+        // `Split` form one block for the lead columns.
+        let mut segments: Vec<(usize, Vec<&AlignItem>)> = vec![(0, Vec::new())];
         for it in items {
             match it {
-                AlignItem::Break => segments.push(Vec::new()),
-                _ => segments.last_mut().unwrap().push(it),
+                AlignItem::Break => segments.push((segments.len(), Vec::new())),
+                AlignItem::Split => segments.push((segments.last().unwrap().0, Vec::new())),
+                _ => segments.last_mut().unwrap().1.push(it),
             }
         }
-        let mut first_row = true;
-        for seg in segments.iter().filter(|s| !s.is_empty()) {
-            let rows: Vec<&crate::ir::AlignRow> = seg
-                .iter()
+        fn rows_of<'x>(seg: &[&'x AlignItem]) -> Vec<&'x crate::ir::AlignRow> {
+            seg.iter()
                 .filter_map(|it| match it {
                     AlignItem::Row(r) => Some(r),
                     _ => None,
                 })
-                .collect();
+                .collect()
+        }
+        let mut blocks: Vec<Vec<&crate::ir::AlignRow>> = vec![Vec::new(); segments.len()];
+        for (block, seg) in &segments {
+            blocks[*block].extend(rows_of(seg));
+        }
+        let mut first_row = true;
+        for (block, seg) in segments.iter().filter(|s| !s.1.is_empty()) {
+            let rows = rows_of(seg);
+            let block_rows = &blocks[*block];
             let heads: Vec<Option<usize>> =
                 rows.iter().map(|r| self.ctx.flat_width(&r.head)).collect();
             // A row without lead columns and without a tail (`OTHERS` in
@@ -1225,8 +1254,8 @@ impl<'c, 'a> Printer<'c, 'a> {
                 !open_row(r) && !matches!(r.tail.first().map(|d| &d.0), Some(Inner::Space))
             });
             // Lead columns: each as wide as its widest cell among the rows
-            // with content after it.
-            let n_cols = rows.iter().map(|r| r.lead.len()).max().unwrap_or(0);
+            // of the block with content after it.
+            let n_cols = block_rows.iter().map(|r| r.lead.len()).max().unwrap_or(0);
             let after = |r: &crate::ir::AlignRow, c: usize| {
                 r.lead.iter().skip(c + 1).any(|x| !x.is_empty())
                     || !r.head.is_empty()
@@ -1234,7 +1263,7 @@ impl<'c, 'a> Printer<'c, 'a> {
             };
             let mut cells_flat = true;
             let mut col_w = vec![0usize; n_cols];
-            for r in &rows {
+            for r in block_rows {
                 for (c, cell) in r.lead.iter().enumerate() {
                     match self.ctx.flat_width(cell) {
                         Some(w) if after(r, c) => col_w[c] = col_w[c].max(w),
@@ -1312,14 +1341,15 @@ impl<'c, 'a> Printer<'c, 'a> {
                         );
                         continue;
                     }
-                    AlignItem::Break => continue,
+                    AlignItem::Break | AlignItem::Split => continue,
                 };
                 for (c, cell) in r.lead.iter().enumerate() {
+                    let at = self.cell_indent(cell, col);
                     self.run(
                         cell.iter()
                             .rev()
                             .map(|d| Cmd {
-                                indent: col,
+                                indent: at,
                                 mode: Mode::Flat,
                                 doc: d,
                             })
@@ -1327,15 +1357,16 @@ impl<'c, 'a> Printer<'c, 'a> {
                     );
                     if aligned && after(r, c) {
                         let w = self.ctx.flat_width(cell).unwrap_or(0);
-                        self.write(&" ".repeat(col_w[c] - w), col);
+                        self.pad(col_w[c] - w, col);
                     }
                 }
+                let at = self.cell_indent(&r.head, col);
                 self.run(
                     r.head
                         .iter()
                         .rev()
                         .map(|d| Cmd {
-                            indent: col,
+                            indent: at,
                             mode: Mode::Flat,
                             doc: d,
                         })
@@ -1409,6 +1440,31 @@ fn same_line_gap(gap: &str) -> String {
         out.push(' ');
     }
     out
+}
+
+/// The first token of a doc, if it has one.
+fn first_token(doc: &Doc) -> Option<TokenIndex> {
+    match &doc.0 {
+        Inner::Token { index, .. } => Some(*index),
+        Inner::Unknown { first, .. }
+        | Inner::Verbatim { first, .. }
+        | Inner::Opaque { first, .. } => Some(*first),
+        Inner::Group(ds)
+        | Inner::Indent(ds)
+        | Inner::Cont(ds)
+        | Inner::Hang(ds)
+        | Inner::Concat(ds) => ds.iter().find_map(first_token),
+        Inner::Choice(a, _) => first_token(a),
+        Inner::Shared(d) => first_token(d),
+        Inner::Fill(items) => items
+            .iter()
+            .find_map(|(s, c)| first_token(s).or_else(|| first_token(c))),
+        Inner::AlignGroup(items, ..) => items
+            .iter()
+            .filter_map(AlignItem::docs)
+            .find_map(|mut docs| docs.find_map(first_token)),
+        Inner::Space | Inner::SoftLine | Inner::SoftBreak | Inner::HardLine => None,
+    }
 }
 
 /// The last token of a doc, if it has one.

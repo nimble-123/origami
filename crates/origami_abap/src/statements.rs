@@ -4664,8 +4664,6 @@ struct SigRow {
     ty: Vec<Doc>,
     /// `OPTIONAL` / `DEFAULT …`, with the gap before it.
     opt: Option<(Doc, Vec<Doc>)>,
-    /// The line has a comment line in front of it.
-    brk: bool,
 }
 
 /// `VALUE(x)` / `REFERENCE(x)` or a plain name, `a..ne`.
@@ -4697,7 +4695,6 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
             return None;
         }
         let kw = p.kw(i);
-        let commented_kw = i > first_kw && p.c.commented[i];
         let j = i + 1;
         let section_end = (j..p.end)
             .find(|&k| is_section(p, k, SECTIONS))
@@ -4736,7 +4733,6 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
                 name,
                 ty: Vec::new(),
                 opt: None,
-                brk: commented_kw,
             });
             i = section_end;
             continue;
@@ -4751,7 +4747,7 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
         }
         params.push((s, section_end));
         let mut kw = Some(kw);
-        for (n, (a, e)) in params.into_iter().enumerate() {
+        for (a, e) in params {
             let ne = name_end(p, a, e);
             let name = param_name(p, a, ne);
             let mut ty = Vec::new();
@@ -4780,11 +4776,6 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
                 name,
                 ty,
                 opt,
-                brk: if n == 0 {
-                    commented_kw
-                } else {
-                    p.c.commented[a]
-                },
             });
         }
         i = section_end;
@@ -4795,10 +4786,9 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
     let with_opt = rows.iter().filter(|r| r.opt.is_some()).count();
     let opt_col = with_opt > 0 && with_opt * 100 >= params * 40;
     let mut items = Vec::new();
+    // Comment lines do not end the table: all names, types and `OPTIONAL`
+    // / `DEFAULT` stay in their columns (ABAP-METHODS-001).
     for r in rows {
-        if r.brk && !items.is_empty() {
-            items.push(AlignItem::Break);
-        }
         let kw_cell = r.kw.map_or_else(Vec::new, |k| vec![k]);
         // The type cell starts with its own gap; strip it, the name cell
         // brings the separator space.
@@ -4821,12 +4811,7 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
         };
         items.push(b::row_cols(vec![kw_cell, r.name], head, tail));
     }
-    let multi = items
-        .iter()
-        .filter(|i| !matches!(i, AlignItem::Break))
-        .count()
-        > 1;
-    if multi {
+    if items.len() > 1 {
         // A table of two or more lines always starts below the method name.
         p.c.multi_line = true;
         return Some(b::cont(vec![p.hl(first_kw), b::align_broken(items)]));
@@ -5173,6 +5158,9 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
                             first = false;
                             AlignItem::Row(r)
                         }
+                        // A comment line ends the `=` alignment
+                        // (ABAP-ALIGN-001), not the keyword column.
+                        AlignItem::Break => AlignItem::Split,
                         other => other.clone(),
                     });
                 }

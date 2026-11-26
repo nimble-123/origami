@@ -22,4 +22,14 @@ CLASS lcl DEFINITION.
         RAISING
           zcx_a
           zcx_b.
+    METHODS read
+        IMPORTING
+          " the key
+          iv_id TYPE i
+          " the language
+          iv_lang TYPE sy-langu OPTIONAL
+* old: iv_text TYPE string
+        EXPORTING
+          es_data TYPE ty_data.
+" last
 ENDCLASS.

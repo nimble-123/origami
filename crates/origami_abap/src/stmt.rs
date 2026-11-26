@@ -1195,6 +1195,9 @@ impl<'c, 'a> P<'c, 'a> {
                                 first = false;
                                 AlignItem::Row(r)
                             }
+                            // A comment line ends the `=` alignment
+                            // (ABAP-ALIGN-001), not the keyword column.
+                            AlignItem::Break => AlignItem::Split,
                             other => other,
                         });
                     }

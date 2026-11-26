@@ -86,6 +86,10 @@ pub enum AlignItem {
     /// Ends the current alignment segment (a blank line or comment line in
     /// the input).
     Break,
+    /// Ends the current segment like `Break`, but the lead columns keep
+    /// their widths across it (a comment line in a parameter table: the
+    /// keyword column goes on).
+    Split,
     /// A line of its own that is not aligned and does not end the segment
     /// (a chain item without the anchor).
     Line(Vec<Doc>),
@@ -110,7 +114,7 @@ impl AlignItem {
                     .chain(d.iter())
                     .chain([].iter()),
             ),
-            AlignItem::Break => None,
+            AlignItem::Break | AlignItem::Split => None,
         }
     }
 }
