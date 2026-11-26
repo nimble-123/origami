@@ -32,7 +32,23 @@ jobs:
 ```
 
 Without `version`, the action downloads the release that matches the tag it
-is used at (`@v0.4.2`), else the latest release.
+is used at (`@v0.4.2`), else the latest release. When the action is pinned by
+commit SHA or used at a branch or another floating ref, the binary version is
+not pinned with it: the action prints a warning (it does not fail) and
+installs the newest release. Set `version: v0.4.2` to pin the binary as well.
+
+"The newest release" means the newest one that has a binary and a `.sha256`
+file for the runner: release-please creates a release when it tags, and the
+binaries are attached some time later, so the action skips a release that has
+none yet. It fails, with a message, if none of the 30 newest releases has one.
+
+The action checks the checksum of the download and its build provenance
+attestation. Releases made before attestations existed have none; for them it
+prints a warning and checks the checksum only, unless `require-attestation:
+"true"` is set, which refuses them. Only "there is no attestation" (HTTP 404 or
+an empty list) counts as none: any other error while looking it up (rate limit,
+server error, a token without access) fails the step, as does a binary whose
+attestation does not verify.
 
 ## GitLab CI
 
@@ -94,3 +110,18 @@ origami --check
 The JSON diagnostics (`--diagnostics json`, on stderr) follow
 [schemas/diagnostics.v1.json](../schemas/diagnostics.v1.json);
 `--diagnostics sarif` produces SARIF 2.1.0 for tools that read it.
+
+## origami's own CI
+
+For contributors: `.github/workflows/ci.yml` skips the jobs that build and
+test the code when a pull request changes only documentation (the `changes`
+job decides). Files under `site/` and `docs/assets/` are documentation for
+that decision, with one exception: `site/build.sh` copies several of them
+(`site/{index.html,abap-cleaner.html,style.css,app.js,worker.js}` and files
+from `docs/assets/`), so a change to any of them still runs the `wasm` job,
+which builds the site, while the other code jobs are skipped.
+
+The `action` job runs the composite action itself (`uses: ./`) on
+`tests/action-fixture` with a pinned, released `version`, so that a change to
+`action.yml` is exercised before it ships. The pin is not updated by
+release-please; raise it by hand when the action needs a newer binary.

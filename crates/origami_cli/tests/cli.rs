@@ -250,6 +250,28 @@ fn config_discovery_and_flag_precedence() {
 }
 
 #[test]
+fn discovery_walks_above_a_relative_working_directory() {
+    let d = dir();
+    write(d.path(), "origami.toml", "line_width = 300\n");
+    write(d.path(), "src/a.clas.abap", CLASS);
+    // From the project root and from below it, the same file is found.
+    for (cwd, file) in [(".", "src/a.clas.abap"), ("src", "a.clas.abap")] {
+        origami()
+            .current_dir(d.path().join(cwd))
+            .arg(file)
+            .assert()
+            .code(3);
+    }
+    // Also through `..`.
+    write(d.path(), "other/b.clas.abap", CLASS);
+    origami()
+        .current_dir(d.path().join("src"))
+        .arg("../other/b.clas.abap")
+        .assert()
+        .code(3);
+}
+
+#[test]
 fn discovery_stops_at_git_root() {
     let outer = tempfile::tempdir().unwrap();
     write(outer.path(), "origami.toml", "line_width = 300\n");
@@ -411,6 +433,167 @@ fn sarif_output_is_json() {
     let doc = json_of(&out.stderr);
     assert_eq!(doc["version"], "2.1.0");
     assert_eq!(doc["runs"][0]["results"][0]["ruleId"], "E004");
+}
+
+#[cfg(unix)]
+#[test]
+fn writing_through_a_symlink_keeps_the_link_and_formats_the_target() {
+    let d = dir();
+    write(d.path(), "real/a.prog.abap", "lv_a   =   1.\n");
+    let link = d.path().join("link.prog.abap");
+    std::os::unix::fs::symlink("real/a.prog.abap", &link).unwrap();
+    origami()
+        .current_dir(d.path())
+        .arg("link.prog.abap")
+        .assert()
+        .code(0);
+    assert!(
+        fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(
+        fs::read_to_string(d.path().join("real/a.prog.abap")).unwrap(),
+        "lv_a = 1.\n"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_read_only_file_is_not_replaced_and_reports_e031() {
+    use std::os::unix::fs::PermissionsExt;
+    let d = dir();
+    write(d.path(), "a.prog.abap", "lv_a   =   1.\n");
+    let file = d.path().join("a.prog.abap");
+    fs::set_permissions(&file, fs::Permissions::from_mode(0o444)).unwrap();
+    // Root can write a 0444 file, so there is nothing to test as root.
+    if fs::OpenOptions::new().write(true).open(&file).is_ok() {
+        return;
+    }
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--diagnostics", "json", "a.prog.abap"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(
+        json_of(&out.stderr)["files"][0]["diagnostics"][0]["code"],
+        "E031"
+    );
+    assert_eq!(fs::read_to_string(&file).unwrap(), "lv_a   =   1.\n");
+    assert_eq!(
+        fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+        0o444
+    );
+}
+
+/// Runs origami with stdout closed before it writes (like `| head -c1`) and
+/// returns its exit code and stderr.
+#[cfg(unix)]
+fn run_with_closed_stdout(args: &[&str], stdin: &str) -> (Option<i32>, String) {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let mut child = Command::new(env!("CARGO_BIN_EXE_origami"))
+        .args(args)
+        .env_remove("CLAUDECODE")
+        .env_remove("ORIGAMI_DIAGNOSTICS")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take());
+    let mut input = child.stdin.take().unwrap();
+    let _ = input.write_all(stdin.as_bytes());
+    drop(input);
+    let out = child.wait_with_output().unwrap();
+    (out.status.code(), String::from_utf8(out.stderr).unwrap())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_closed_stdout_is_not_an_internal_error() {
+    let (code, err) = run_with_closed_stdout(&["--version"], "");
+    assert_eq!((code, err.as_str()), (Some(0), ""));
+    let (code, err) = run_with_closed_stdout(&["--version", "--json"], "");
+    assert_eq!((code, err.as_str()), (Some(0), ""));
+    // The diff of a changed source goes to stdout, the verdict is exit 1.
+    let (code, err) = run_with_closed_stdout(
+        &["--check", "--diff", "--stdin", "--language", "abap"],
+        "lv_a   =   1.\n",
+    );
+    assert_eq!(code, Some(1), "{err}");
+    assert!(!err.contains("X002"), "{err}");
+    let (code, err) = run_with_closed_stdout(
+        &["--review", "--stdin", "--language", "abap"],
+        "lv_a   =   1.\n",
+    );
+    assert_eq!(code, Some(1), "{err}");
+    assert!(!err.contains("X002"), "{err}");
+}
+
+#[test]
+fn sarif_uris_are_percent_encoded_and_pseudo_paths_have_no_location() {
+    let d = dir();
+    write(d.path(), "my dir/bad#1.prog.abap", "ENDIF.\n");
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--diagnostics", "sarif"])
+        .output()
+        .unwrap();
+    let doc = json_of(&out.stderr);
+    let loc = &doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"];
+    assert_eq!(loc["artifactLocation"]["uri"], "my%20dir/bad%231.prog.abap");
+    // A usage error belongs to no file.
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--diagnostics", "sarif", "--lines", "x", "my dir"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    let result = &json_of(&out.stderr)["runs"][0]["results"][0];
+    assert_eq!(result["ruleId"], "E021");
+    assert!(result.get("locations").is_none(), "{result}");
+}
+
+// Unix quoting; on Windows the paths have backslashes and double quotes.
+#[cfg(unix)]
+#[test]
+fn agent_next_command_quotes_paths() {
+    let d = dir();
+    write(d.path(), "my dir/a.prog.abap", "lv_a   =   1.\n");
+    write(d.path(), "b.prog.abap", "lv_b   =   2.\n");
+    write(d.path(), "it's.prog.abap", "lv_c   =   3.\n");
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--check", "--diagnostics", "agent"])
+        .output()
+        .unwrap();
+    let err = String::from_utf8(out.stderr).unwrap();
+    let next = err.lines().last().unwrap();
+    // Sorted by path, so the order is fixed.
+    assert_eq!(
+        next,
+        "NEXT: run `origami b.prog.abap 'it'\\''s.prog.abap' 'my dir/a.prog.abap'` to apply the formatting."
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn file_names_with_control_characters_are_escaped_in_text_output() {
+    let d = dir();
+    write(d.path(), "a\x1b[31m.prog.abap", "lv_a   =   1.\n");
+    for format in ["human", "agent"] {
+        let out = origami()
+            .current_dir(d.path())
+            .args(["--check", "--diagnostics", format])
+            .output()
+            .unwrap();
+        let err = String::from_utf8(out.stderr).unwrap();
+        assert!(!err.contains('\x1b'), "{format}: {err:?}");
+        assert!(err.contains("a\\x1b[31m.prog.abap"), "{format}: {err:?}");
+    }
 }
 
 #[test]
@@ -1084,6 +1267,55 @@ fn mcp_rejects_bad_line_ranges() {
 }
 
 #[test]
+fn mcp_rejects_wrongly_typed_arguments() {
+    let d = dir();
+    write(d.path(), "a.prog.abap", "lv_a   =   1.\n");
+    let bad = [
+        (
+            "format_files",
+            serde_json::json!({"paths": "a.prog.abap", "write": true}),
+        ),
+        (
+            "format_files",
+            serde_json::json!({"paths": [1], "write": true}),
+        ),
+        (
+            "format_files",
+            serde_json::json!({"changed": 5, "write": true}),
+        ),
+        ("format_files", serde_json::json!({"write": "true"})),
+        ("format_files", serde_json::json!({"write": 1})),
+        ("format_files", serde_json::json!("write")),
+        ("format", serde_json::json!({"source": 5})),
+        (
+            "format",
+            serde_json::json!({"source": "x = 1.", "filename": 3}),
+        ),
+        (
+            "format",
+            serde_json::json!({"source": "x = 1.", "language": ["abap"]}),
+        ),
+        (
+            "format",
+            serde_json::json!({"source": "x = 1.", "lines": "1:2"}),
+        ),
+    ];
+    let messages: Vec<String> = bad
+        .iter()
+        .enumerate()
+        .map(|(i, (tool, args))| tool_call(i as u32 + 1, tool, args.clone()))
+        .collect();
+    let replies = mcp_session(d.path(), &[], &messages);
+    for ((tool, args), r) in bad.iter().zip(&replies) {
+        assert_eq!(r["error"]["code"], -32602, "{tool} {args}: {r}");
+    }
+    assert_eq!(
+        fs::read_to_string(d.path().join("a.prog.abap")).unwrap(),
+        "lv_a   =   1.\n"
+    );
+}
+
+#[test]
 fn mcp_rejects_too_long_messages_and_keeps_serving() {
     let d = dir();
     let big = tool_call(
@@ -1160,6 +1392,107 @@ fn mcp_blocked_calls_can_be_cancelled_and_time_out() {
     assert_eq!(replies[1]["error"]["code"], -32001);
 }
 
+/// A named pipe `z.prog.abap` that blocks whoever reads it.
+#[cfg(unix)]
+fn blocking_fifo(d: &Path) {
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(d.join("z.prog.abap"))
+            .status()
+            .unwrap()
+            .success()
+    );
+}
+
+/// A call that missed its deadline may still be running. No second call
+/// that writes starts before it has stopped: it is refused instead.
+#[cfg(unix)]
+#[test]
+fn mcp_does_not_overlap_writes_with_a_call_that_is_still_running() {
+    let d = dir();
+    blocking_fifo(d.path());
+    write(d.path(), "b.prog.abap", "lv_a   =   1.\n");
+    let call = |id, path: &str| {
+        tool_call(
+            id,
+            "format_files",
+            serde_json::json!({"paths": [path], "write": true}),
+        )
+    };
+    let replies = mcp_session(
+        d.path(),
+        &[("ORIGAMI_MCP_TIMEOUT", "0.3")],
+        &[call(1, "z.prog.abap"), call(2, "b.prog.abap")],
+    );
+    assert_eq!(replies[0]["id"], 1);
+    assert_eq!(replies[0]["error"]["code"], -32001, "{}", replies[0]);
+    assert_eq!(replies[1]["id"], 2);
+    assert_eq!(replies[1]["error"]["code"], -32002, "{}", replies[1]);
+    assert_eq!(
+        fs::read_to_string(d.path().join("b.prog.abap")).unwrap(),
+        "lv_a   =   1.\n"
+    );
+}
+
+/// A read-only call is not held up by a read-only call that is still stuck.
+#[cfg(unix)]
+#[test]
+fn mcp_serves_reads_while_a_stuck_read_lingers() {
+    let d = dir();
+    blocking_fifo(d.path());
+    let replies = mcp_session(
+        d.path(),
+        &[("ORIGAMI_MCP_TIMEOUT", "0.3")],
+        &[
+            tool_call(
+                1,
+                "format_files",
+                serde_json::json!({"paths": ["z.prog.abap"]}),
+            ),
+            tool_call(
+                2,
+                "format",
+                serde_json::json!({"source": "x   =   1.\n", "language": "abap"}),
+            ),
+        ],
+    );
+    assert_eq!(replies[0]["error"]["code"], -32001, "{}", replies[0]);
+    assert_eq!(replies[1]["result"]["content"][0]["text"], "x = 1.\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn mcp_bounds_the_queue_of_waiting_calls() {
+    let d = dir();
+    blocking_fifo(d.path());
+    let mut messages = vec![tool_call(
+        1,
+        "format_files",
+        serde_json::json!({"paths": ["z.prog.abap"]}),
+    )];
+    for id in 2..=30 {
+        messages.push(tool_call(
+            id,
+            "format",
+            serde_json::json!({"source": "x = 1.\n", "language": "abap"}),
+        ));
+    }
+    let replies = mcp_session(d.path(), &[("ORIGAMI_MCP_TIMEOUT", "1")], &messages);
+    assert_eq!(replies.len(), 30);
+    let refused = replies
+        .iter()
+        .filter(|r| r["error"]["code"] == -32002)
+        .count();
+    assert!((1..29).contains(&refused), "{refused} refused");
+    // The refusal comes at once, before the first call's deadline.
+    assert_eq!(replies[0]["error"]["code"], -32002, "{}", replies[0]);
+    assert!(
+        replies
+            .iter()
+            .any(|r| r["id"] == 1 && r["error"]["code"] == -32001)
+    );
+}
+
 #[test]
 fn mcp_format_files_caps_the_result() {
     let d = dir();
@@ -1195,4 +1528,168 @@ fn mcp_format_files_caps_the_result() {
         "{text}"
     );
     assert!(replies[0].to_string().len() < 160 * 1024);
+}
+
+/// A temporary git work tree with one commit of `files`.
+fn git_repo(files: &[(&str, &str)]) -> tempfile::TempDir {
+    let d = tempfile::tempdir().unwrap();
+    git(d.path(), &["init", "-q"]);
+    for (name, text) in files {
+        write(d.path(), name, text);
+    }
+    git(d.path(), &["add", "."]);
+    git(d.path(), &["commit", "-qm", "init", "--allow-empty"]);
+    d
+}
+
+fn git(dir: &Path, args: &[&str]) {
+    let out = std::process::Command::new("git")
+        .args(["-c", "user.email=t@example.com", "-c", "user.name=t"])
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "git {args:?}: {out:?}");
+}
+
+#[test]
+fn changed_rejects_a_revision_that_looks_like_an_option() {
+    let d = git_repo(&[("z.prog.abap", "lv_a = 1.\n")]);
+    let outside = tempfile::tempdir().unwrap();
+    let victim = outside.path().join("victim.txt");
+    origami()
+        .current_dir(d.path())
+        .args([
+            "--no-config",
+            &format!("--changed=--output={}", victim.display()),
+        ])
+        .assert()
+        .code(3);
+    assert!(!victim.exists(), "git wrote {}", victim.display());
+    // An unknown revision is a usage error too, with a short message.
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--changed=nonexistent"])
+        .assert()
+        .code(3);
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert!(err.contains("nonexistent"), "{err}");
+    assert!(err.lines().count() < 10, "{err}");
+}
+
+/// Names git quotes, writes with a trailing tab, or leaves alone.
+#[cfg(unix)]
+const AWKWARD_NAMES: &[&str] = &[
+    "plain.prog.abap",
+    "with space.prog.abap",
+    "quo\"te.prog.abap",
+    "back\\slash.prog.abap",
+    "tab\tname.prog.abap",
+    "umlaut_ä.prog.abap",
+    "sub dir/inner.prog.abap",
+];
+
+/// `--changed` finds every changed and untracked file whatever git's diff
+/// settings and the file names are.
+#[cfg(unix)]
+fn changed_formats_awkward_files(config: &[&str]) {
+    let files: Vec<(&str, &str)> = AWKWARD_NAMES.iter().map(|n| (*n, "lv_a = 1.\n")).collect();
+    let d = git_repo(&files);
+    for kv in config.chunks(2) {
+        git(d.path(), &["config", kv[0], kv[1]]);
+    }
+    for n in AWKWARD_NAMES {
+        write(d.path(), n, "lv_a   =   2.\n");
+    }
+    write(d.path(), "new file \"x\".prog.abap", "lv_b   =   3.\n");
+    origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--changed"])
+        .assert()
+        .code(0);
+    for n in AWKWARD_NAMES {
+        assert_eq!(
+            fs::read_to_string(d.path().join(n)).unwrap(),
+            "lv_a = 2.\n",
+            "{n:?}"
+        );
+    }
+    assert_eq!(
+        fs::read_to_string(d.path().join("new file \"x\".prog.abap")).unwrap(),
+        "lv_b = 3.\n"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn changed_handles_awkward_file_names() {
+    changed_formats_awkward_files(&[]);
+}
+
+#[cfg(unix)]
+#[test]
+fn changed_ignores_the_diff_prefix_settings() {
+    changed_formats_awkward_files(&["diff.noprefix", "true"]);
+    changed_formats_awkward_files(&["diff.mnemonicPrefix", "true"]);
+}
+
+#[test]
+fn changed_honors_the_ignore_rules_of_a_directory_walk() {
+    let d = git_repo(&[
+        (".origamiignore", "generated/\n"),
+        ("generated/a.prog.abap", "lv_a = 1.\n"),
+        ("src/b.prog.abap", "lv_b = 1.\n"),
+        ("src/skip.prog.abap", "lv_c = 1.\n"),
+    ]);
+    write(d.path(), "src/.origamiignore", "skip.prog.abap\n");
+    for f in [
+        "generated/a.prog.abap",
+        "src/b.prog.abap",
+        "src/skip.prog.abap",
+    ] {
+        write(d.path(), f, "lv_a   =   2.\n");
+    }
+    write(d.path(), "generated/new.prog.abap", "lv_a   =   3.\n");
+    origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--changed"])
+        .assert()
+        .code(0);
+    let read = |f: &str| fs::read_to_string(d.path().join(f)).unwrap();
+    assert_eq!(read("src/b.prog.abap"), "lv_a = 2.\n");
+    assert_eq!(read("generated/a.prog.abap"), "lv_a   =   2.\n");
+    assert_eq!(read("generated/new.prog.abap"), "lv_a   =   3.\n");
+    assert_eq!(read("src/skip.prog.abap"), "lv_a   =   2.\n");
+}
+
+#[test]
+fn changed_outside_git_says_so_in_one_line() {
+    let d = tempfile::tempdir().unwrap();
+    let out = origami()
+        .current_dir(d.path())
+        .env("GIT_CEILING_DIRECTORIES", d.path().parent().unwrap())
+        .args(["--no-config", "--changed"])
+        .assert()
+        .code(3);
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert!(err.contains("not inside a git work tree"), "{err}");
+    assert!(err.lines().count() < 10, "{err}");
+}
+
+#[test]
+fn mcp_changed_rejects_a_revision_that_looks_like_an_option() {
+    let d = git_repo(&[("z.prog.abap", "lv_a = 1.\n")]);
+    let outside = tempfile::tempdir().unwrap();
+    let victim = outside.path().join("victim.txt");
+    let replies = mcp_session(
+        d.path(),
+        &[],
+        &[tool_call(
+            1,
+            "format_files",
+            serde_json::json!({"changed": format!("--output={}", victim.display())}),
+        )],
+    );
+    assert_eq!(replies[0]["result"]["isError"], true, "{}", replies[0]);
+    assert!(!victim.exists(), "git wrote {}", victim.display());
 }

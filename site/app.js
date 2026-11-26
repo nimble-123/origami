@@ -126,19 +126,45 @@ function hero() {
 
 // ---- copy buttons ---------------------------------------------------------
 
+// A visually hidden live region: the page says what changed, but only for
+// state changes the visitor asked for (a copy, an error, a finished run).
+const announcer = document.getElementById("announce");
+let announceTimer = 0;
+function announce(message, delay = 0) {
+  clearTimeout(announceTimer);
+  // Emptied first, so the same message twice is announced twice.
+  if (announcer) announcer.textContent = "";
+  announceTimer = setTimeout(() => {
+    if (announcer) announcer.textContent = message;
+  }, delay);
+}
+
 for (const b of document.querySelectorAll("[data-copy]")) {
+  const label = b.getAttribute("aria-label");
+  let reset = 0;
   b.addEventListener("click", async () => {
     const src = document.querySelector(b.dataset.copy);
+    const isText = b.classList.contains("text");
+    let ok = true;
     try {
       await navigator.clipboard.writeText(src.textContent);
     } catch {
-      return;
+      ok = false;
     }
-    b.classList.add("done");
-    if (b.classList.contains("text")) b.textContent = "Copied";
-    setTimeout(() => {
-      b.classList.remove("done");
-      if (b.classList.contains("text")) b.textContent = "Copy";
+    clearTimeout(reset);
+    b.classList.toggle("done", ok);
+    b.classList.toggle("failed", !ok);
+    if (isText) {
+      b.textContent = ok ? "Copied" : "Copy failed";
+      b.setAttribute("aria-label", ok ? "Copied" : "Copy failed");
+    }
+    announce(ok ? "Copied to the clipboard." : "Copying failed. Select the text and copy it by hand.");
+    reset = setTimeout(() => {
+      b.classList.remove("done", "failed");
+      if (isText) {
+        b.textContent = "Copy";
+        b.setAttribute("aria-label", label);
+      }
     }, 1600);
   });
 }
@@ -192,17 +218,22 @@ const highlight = $("pg-highlight");
 const output = $("pg-output");
 const outputText = $("pg-output-text");
 const status = $("pg-status");
+const copyButton = $("pg-copy");
 
 // origami runs in a Web Worker (worker.js). A run that takes longer than
 // RUN_TIMEOUT_MS terminates the worker and starts a new one.
 const RUN_TIMEOUT_MS = 5000;
+// A finished run is announced to screen readers only after this pause, so
+// typing is not interrupted by a message per keystroke.
+const ANNOUNCE_PAUSE_MS = 1500;
 const LOAD_ERROR = "The playground could not load origami.wasm. Install origami to try it locally.";
 
 let worker = null;
 let ready = false;
 let nextId = 0;
-let inflight = null; // { id, timer }
+let inflight = null; // { id, timer, opts }: the options the request was sent with
 let queued = null; // the newest request made while a run was in flight
+let timedOut = null; // the request that hit the timeout; not run again until it changes
 
 function ruleLink(text, rule) {
   const span = document.createElement("span");
@@ -219,23 +250,50 @@ function ruleLink(text, rule) {
   return span;
 }
 
-function render(r) {
+/** Empties the output, so a stale result is neither visible nor copyable. */
+function clearOutput(message) {
   output.replaceChildren();
+  output.classList.remove("plain");
+  outputText.textContent = "";
+  copyButton.disabled = true;
+  const p = document.createElement("p");
+  p.className = "empty";
+  p.textContent = message;
+  output.append(p);
+}
+
+/** `opts`: the options the result was made with, not the current ones. */
+function render(r, opts) {
+  output.replaceChildren();
+  output.classList.remove("plain");
   if (r.status === "error" || r.output == null) {
     const d = r.diagnostics.find((x) => x.severity !== "warning") ?? r.diagnostics[0];
-    const p = document.createElement("p");
-    p.className = "empty";
-    p.textContent = "Nothing formatted: the code has a structural error, so origami leaves it as it is.";
-    output.append(p);
-    outputText.textContent = "";
+    clearOutput("Nothing formatted: the code has a structural error, so origami leaves it as it is.");
     status.classList.add("error");
     status.textContent = d
       ? `${d.code} at line ${d.line}, column ${d.column}: ${d.message}`
       : "origami could not format this code.";
+    announce(status.textContent);
     return;
   }
   status.classList.remove("error");
   outputText.textContent = r.output;
+  copyButton.disabled = false;
+  const warnings = r.diagnostics.filter((d) => d.code !== "W003").length;
+  const num = (n) => `<span class="num">${n}</span>`;
+  const parts = [];
+  parts.push(r.changed ? "Formatted" : "Already formatted");
+  parts.push(`${num(r.notes.length)} ${r.notes.length === 1 ? "note" : "notes"} on line breaks`);
+  if (warnings) parts.push(`${num(warnings)} ${warnings === 1 ? "warning" : "warnings"}`);
+  const tail = `Took ${num(r.ms)} ms in your browser.`;
+  // A row and highlight spans per line would freeze the tab on a huge paste.
+  if (r.output.length > HIGHLIGHT_MAX) {
+    output.classList.add("plain");
+    output.textContent = r.output;
+    status.innerHTML = `${parts.join(", ")}. ${tail} Shown as plain text because the output is large.`;
+    announce(status.textContent, ANNOUNCE_PAUSE_MS);
+    return;
+  }
   const lines = r.output.replace(/\n$/, "").split("\n");
   const broken = new Set();
   const after = new Map();
@@ -251,7 +309,7 @@ function render(r) {
     row.className = broken.has(n) ? "ln broken" : "ln";
     row.dataset.n = n;
     const code = document.createElement("span");
-    code.append(...(text ? paint(text, { cds: options().cds, upper: !options().lower }) : [" "]));
+    code.append(...(text ? paint(text, { cds: opts.cds, upper: !opts.lower }) : [" "]));
     row.append(code);
     frag.append(row);
     for (const note of after.get(n) ?? []) {
@@ -266,16 +324,12 @@ function render(r) {
     }
   });
   output.append(frag);
-  const warnings = r.diagnostics.filter((d) => d.code !== "W003").length;
-  const num = (n) => `<span class="num">${n}</span>`;
-  const parts = [];
-  parts.push(r.changed ? "Formatted" : "Already formatted");
-  parts.push(`${num(r.notes.length)} ${r.notes.length === 1 ? "note" : "notes"} on line breaks`);
-  if (warnings) parts.push(`${num(warnings)} ${warnings === 1 ? "warning" : "warnings"}`);
-  status.innerHTML = `${parts.join(", ")}. Took ${num(r.ms)} ms in your browser.`;
+  status.innerHTML = `${parts.join(", ")}. ${tail}`;
+  announce(status.textContent, ANNOUNCE_PAUSE_MS);
 }
 
-// Inputs larger than this are shown without colors, so typing stays fast.
+// Inputs and outputs larger than this are shown without colors, so typing
+// stays fast and a huge paste cannot freeze the tab.
 const HIGHLIGHT_MAX = 200_000;
 
 /** Colors the copy of the input behind the textarea. */
@@ -306,12 +360,15 @@ function options() {
 let timer = 0;
 function schedule() {
   clearTimeout(timer);
+  clearTimeout(announceTimer);
   timer = setTimeout(run, 120);
 }
 
 function showError(message) {
+  clearOutput("Nothing to show: origami did not format this code.");
   status.classList.add("error");
   status.textContent = message;
+  announce(message);
 }
 
 function startWorker() {
@@ -328,11 +385,12 @@ function startWorker() {
       showError(LOAD_ERROR);
     } else if (inflight && data.id === inflight.id) {
       clearTimeout(inflight.timer);
+      const { opts } = inflight;
       inflight = null;
       if (data.type === "panic") {
         showError("origami stopped on this input (internal error). Please report it with the code.");
       } else {
-        render(data.result);
+        render(data.result, opts);
       }
       if (queued) dispatch();
     }
@@ -348,19 +406,23 @@ function dispatch() {
     // The worker is stuck in a long run: stop it and start a new one.
     worker.terminate();
     inflight = null;
+    timedOut = job;
     showError(
       `origami took longer than ${RUN_TIMEOUT_MS / 1000} seconds on this input and was stopped. Try a smaller input.`,
     );
     startWorker();
   }, RUN_TIMEOUT_MS);
-  inflight = { id, timer };
+  inflight = { id, timer, opts: job.opts };
   worker.postMessage({ id, ...job });
 }
 
 function run() {
   paintInput();
   if (!ready) return;
-  queued = { source: input.value, opts: options() };
+  const job = { source: input.value, opts: options() };
+  // The restarted worker would hang on the same request again.
+  if (timedOut && timedOut.source === job.source && JSON.stringify(timedOut.opts) === JSON.stringify(job.opts)) return;
+  queued = job;
   if (!inflight) dispatch();
 }
 
@@ -376,17 +438,30 @@ async function playground() {
   input.value = EXAMPLES.call.text;
   $("pg-example").addEventListener("change", (e) => loadExample(e.target.value));
   for (const id of ["pg-lang", "pg-width", "pg-case", "pg-style"]) $(id).addEventListener("change", run);
+  // Tab indents, which would trap keyboard users: Escape releases the trap
+  // until the next input or focus.
+  let tabIndents = true;
   input.addEventListener("input", () => {
+    tabIndents = true;
     paintInput();
     schedule();
   });
+  input.addEventListener("focus", () => {
+    tabIndents = true;
+  });
   input.addEventListener("scroll", syncScroll);
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Tab" && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
+    if (e.altKey || e.metaKey || e.ctrlKey) return;
+    if (e.key === "Escape") {
+      tabIndents = false;
+    } else if (e.key === "Tab" && !e.shiftKey && tabIndents) {
       e.preventDefault();
-      input.setRangeText("  ", input.selectionStart, input.selectionEnd, "end");
-      paintInput();
-      schedule();
+      // insertText keeps the browser's undo history; it fires "input" itself.
+      if (!document.execCommand("insertText", false, "  ")) {
+        input.setRangeText("  ", input.selectionStart, input.selectionEnd, "end");
+        paintInput();
+        schedule();
+      }
     }
   });
   try {

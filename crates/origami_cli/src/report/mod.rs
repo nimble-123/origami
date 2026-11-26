@@ -121,9 +121,38 @@ pub(crate) fn escape_controls(s: &str) -> std::borrow::Cow<'_, str> {
     std::borrow::Cow::Owned(out)
 }
 
+/// `s` as one shell word in a suggested command: unchanged when it has only
+/// safe characters, else quoted (single quotes; double quotes on Windows).
+pub(crate) fn shell_quote(s: &str) -> std::borrow::Cow<'_, str> {
+    let safe = |c: char| {
+        c.is_ascii_alphanumeric()
+            || matches!(c, '_' | '-' | '.' | '/' | ',' | '+' | '=' | '@' | '%' | ':')
+            || (cfg!(windows) && c == '\\')
+    };
+    if !s.is_empty() && s.chars().all(safe) {
+        return std::borrow::Cow::Borrowed(s);
+    }
+    if cfg!(windows) {
+        std::borrow::Cow::Owned(format!("\"{s}\""))
+    } else {
+        std::borrow::Cow::Owned(format!("'{}'", s.replace('\'', "'\\''")))
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::position;
+    use super::{position, shell_quote};
+
+    #[test]
+    fn shell_quote_quotes_only_what_needs_it() {
+        assert_eq!(shell_quote("src/a-b_c.abap"), "src/a-b_c.abap");
+        if !cfg!(windows) {
+            assert_eq!(shell_quote("my dir/a.abap"), "'my dir/a.abap'");
+            assert_eq!(shell_quote("it's"), "'it'\\''s'");
+            assert_eq!(shell_quote(""), "''");
+            assert_eq!(shell_quote("$(x)"), "'$(x)'");
+        }
+    }
 
     #[test]
     fn position_counts_lines_utf16_columns_and_lf_offsets() {

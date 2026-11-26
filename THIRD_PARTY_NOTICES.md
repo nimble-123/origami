@@ -6,6 +6,10 @@ This section is generated for each release by
 `cargo about generate about.hbs > THIRD_PARTY_NOTICES.generated.md` and
 appended here by the release workflow.
 
+## Fonts (website)
+
+The website under `site/` serves Schibsted Grotesk (Copyright 2022 The Schibsted Grotesk Project Authors, https://github.com/schibsted/schibsted-grotesk) and Martian Mono (Copyright 2022 The Martian Mono Project Authors, https://github.com/evilmartians/mono) as WOFF2 files, both under the SIL Open Font License 1.1 (https://openfontlicense.org).
+
 ## References consulted
 
 origami is an independent implementation. These projects were consulted as

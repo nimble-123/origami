@@ -83,6 +83,15 @@ pub fn run(args: &Args) -> i32 {
     }
 }
 
+/// Writes to stdout and ignores a failure: a reader that has gone away
+/// (`| head -c1`) is a normal end, as in path mode.
+fn print_stdout(text: &str) {
+    let mut stdout = std::io::stdout().lock();
+    let _ = stdout
+        .write_all(text.as_bytes())
+        .and_then(|_| stdout.flush());
+}
+
 fn usage_error(args: &Args, msg: &str) -> i32 {
     print_diagnostics(args, &[run_error("<args>", Code::E021, msg)]);
     3
@@ -116,7 +125,7 @@ fn version(args: &Args) -> i32 {
     let v = env!("CARGO_PKG_VERSION");
     let edition = Edition::E2026.as_str();
     if !args.json {
-        println!("origami {v} (style edition {edition})");
+        print_stdout(&format!("origami {v} (style edition {edition})\n"));
         return 0;
     }
     let (required, satisfies) = match &args.config {
@@ -149,7 +158,7 @@ fn version(args: &Args) -> i32 {
         "required_version": required,
         "satisfies_required_version": satisfies,
     });
-    println!("{doc}");
+    print_stdout(&format!("{doc}\n"));
     0
 }
 
@@ -385,10 +394,10 @@ fn stdin_mode(args: &Args) -> i32 {
         && report.changed
         && let Some(out) = &r.output
     {
-        print!("{}", report::diff::unified(&report.path, &input, out));
+        print_stdout(&report::diff::unified(&report.path, &input, out));
     }
     if let Some(view) = view.filter(|_| success) {
-        print!("{view}");
+        print_stdout(&view);
     }
     let mut all = configs.warnings();
     all.push(report);
