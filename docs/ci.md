@@ -110,3 +110,13 @@ origami --check
 The JSON diagnostics (`--diagnostics json`, on stderr) follow
 [schemas/diagnostics.v1.json](../schemas/diagnostics.v1.json);
 `--diagnostics sarif` produces SARIF 2.1.0 for tools that read it.
+
+## origami's own CI
+
+For contributors: `.github/workflows/ci.yml` skips the jobs that build and
+test the code when a pull request changes only documentation (the `changes`
+job decides). Files under `site/` and `docs/assets/` are documentation for
+that decision, with one exception: `site/build.sh` copies several of them
+(`site/{index.html,abap-cleaner.html,style.css,app.js,worker.js}` and files
+from `docs/assets/`), so a change to any of them still runs the `wasm` job,
+which builds the site, while the other code jobs are skipped.
