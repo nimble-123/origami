@@ -8,4 +8,5 @@ define view entity ZI_X
       descr    as Description,
 
       _Booking
+  // after the last element
 }

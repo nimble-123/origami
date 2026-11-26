@@ -92,6 +92,46 @@ fn deep_cds_braces_and_parens() {
     assert_depth_limited(&run(Language::Ddls, &parens, &Options::default()));
 }
 
+/// `n` nested `case` expressions in a select list.
+fn nested_cases(n: usize) -> String {
+    format!(
+        "define view entity Z as select from t {{ case {}1{} end as x }}\n",
+        "when a = 1 then case ".repeat(n - 1),
+        " end".repeat(n - 1)
+    )
+}
+
+/// A `case` inside a `case` counts towards the nesting limit, so a deep one
+/// is left as written before any layout is built for it. Up to the limit
+/// (the select list block is one level) it is laid out.
+#[test]
+fn deep_cds_case() {
+    assert_depth_limited(&run(
+        Language::Ddls,
+        &nested_cases(3000),
+        &Options::default(),
+    ));
+    assert_depth_limited(&run(
+        Language::Ddls,
+        &nested_cases(100),
+        &Options::default(),
+    ));
+    let r = run(Language::Ddls, &nested_cases(99), &Options::default());
+    assert!(!r.has(Code::W004), "{:?}", r.diagnostics);
+}
+
+/// The aligned style looks at every element's neighbours and comments; that
+/// work is per element, not per element and file (quadratic: minutes).
+#[test]
+fn many_cds_elements_are_linear() {
+    let elements = (0..20_000)
+        .map(|k| format!("  t.f{k} as F{k}"))
+        .collect::<Vec<_>>()
+        .join(",\n");
+    let src = format!("define view entity Z as select from t\n{{\n{elements}\n}}\n");
+    run(Language::Ddls, &src, &Options::default());
+}
+
 #[test]
 fn nesting_at_the_limit_is_laid_out() {
     // 99 blocks around a statement with one bracket level: 100 in all.

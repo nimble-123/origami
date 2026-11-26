@@ -278,6 +278,9 @@ impl<'a> Ctx<'a> {
                 Inner::SoftLine | Inner::SoftBreak | Inner::HardLine => return w,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
+                | Inner::IndentBy(_, ds)
+                | Inner::LeadIndent(ds)
+                | Inner::IndentCols(_, ds)
                 | Inner::Cont(ds)
                 | Inner::Hang(ds)
                 | Inner::Concat(ds) => stack.extend(ds.iter().rev()),
@@ -347,6 +350,9 @@ impl<'a> Ctx<'a> {
             }
             Inner::Group(ds)
             | Inner::Indent(ds)
+            | Inner::IndentBy(_, ds)
+            | Inner::LeadIndent(ds)
+            | Inner::IndentCols(_, ds)
             | Inner::Cont(ds)
             | Inner::Hang(ds)
             | Inner::Concat(ds) => ds.iter().any(|d| self.forced(d, first, end)),
@@ -378,6 +384,9 @@ impl<'a> Ctx<'a> {
                 Inner::HardLine => return None,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
+                | Inner::IndentBy(_, ds)
+                | Inner::LeadIndent(ds)
+                | Inner::IndentCols(_, ds)
                 | Inner::Cont(ds)
                 | Inner::Hang(ds)
                 | Inner::Concat(ds) => stack.extend(ds.iter().rev()),
@@ -443,6 +452,9 @@ struct Printer<'c, 'a> {
     line_empty: bool,
     /// The previous line is blank (to keep at most one blank line).
     prev_blank: bool,
+    /// The leading comments of the next token are one level deeper
+    /// (`Inner::LeadIndent`).
+    lead_deeper: bool,
 }
 
 impl<'c, 'a> Printer<'c, 'a> {
@@ -458,6 +470,7 @@ impl<'c, 'a> Printer<'c, 'a> {
             pending_eol: false,
             line_empty: true,
             prev_blank: true,
+            lead_deeper: false,
         }
     }
 
@@ -634,6 +647,7 @@ impl<'c, 'a> Printer<'c, 'a> {
     }
 
     fn leading_comments(&mut self, i: TokenIndex, indent: usize, blank: bool) {
+        let deeper = std::mem::take(&mut self.lead_deeper);
         // Never in front of a glued token (a statement glued to the period
         // of the one before stays on its line).
         if let Some(&n) = self.ctx.opts.forced_blanks.get(&(i.0 as usize))
@@ -654,19 +668,25 @@ impl<'c, 'a> Printer<'c, 'a> {
             Some(col) if !leading.is_empty() && self.line_empty && !self.pending_eol => col,
             _ => indent,
         };
+        // The comment lines; the token keeps `indent`.
+        let comment_indent = if deeper {
+            indent + self.ctx.opts.indent as usize
+        } else {
+            indent
+        };
         let overrides = &self.ctx.opts.comment_overrides;
         let width = self.ctx.opts.width as usize;
         let use_overrides = !overrides.is_empty()
             && leading.iter().all(|l| match overrides.get(&l.trivia) {
                 Some(new) => {
                     let n = new.chars().count();
-                    indent + n <= width || n <= self.comment_text(l.trivia).chars().count()
+                    comment_indent + n <= width || n <= self.comment_text(l.trivia).chars().count()
                 }
                 None => true,
             });
-        for l in leading {
+        for (n, l) in leading.iter().enumerate() {
             if !self.line_empty || self.pending_eol {
-                self.newline(indent);
+                self.newline(comment_indent);
             }
             if blank && l.blank_before {
                 self.blank_line();
@@ -685,8 +705,16 @@ impl<'c, 'a> Printer<'c, 'a> {
             ) {
                 self.pending_indent = Some(0);
             }
-            self.write(&text, indent);
-            self.newline(indent);
+            if deeper {
+                self.pending_indent = Some(comment_indent);
+            }
+            self.write(&text, comment_indent);
+            // The token (or the next comment) after the last comment line.
+            self.newline(if n + 1 < leading.len() {
+                comment_indent
+            } else {
+                indent
+            });
         }
         let keep = blank
             || (!leading.is_empty()
@@ -811,7 +839,7 @@ impl<'c, 'a> Printer<'c, 'a> {
             if k > first.0 as usize && !(kind == RawKind::Unknown && glued_gap(ctx, k)) {
                 let gap = &src[toks[k - 1].end as usize..toks[k].start as usize];
                 if gap.contains('\n') {
-                    self.raw_gap(gap, shift, min_indent, indent);
+                    self.raw_gap(toks[k - 1].end as usize, gap, shift, min_indent, indent);
                 } else if !gap.is_empty() {
                     // Same line: shrink blanks (unknown) or keep (verbatim).
                     if kind == RawKind::Unknown {
@@ -830,10 +858,27 @@ impl<'c, 'a> Printer<'c, 'a> {
     /// A gap with line breaks inside a raw unit: comments and line breaks are
     /// kept, every new line is shifted (`*` comments stay in column 1), and
     /// code continuation lines never land below `min_indent`.
-    fn raw_gap(&mut self, gap: &str, shift: isize, min_indent: usize, indent: usize) {
+    fn raw_gap(&mut self, from: usize, gap: &str, shift: isize, min_indent: usize, indent: usize) {
         // A block comment spanning lines keeps every byte: write the gap as
         // it is (INVARIANTS 3: only the first line of a block comment moves).
-        if gap.contains("/*") {
+        // A one-line block comment, or `/*` in the text of a line comment, is
+        // no reason to keep the gap.
+        let trivia = &self.ctx.tokens.trivia;
+        let at = trivia.partition_point(|t| (t.start as usize) < from);
+        let to = from + gap.len();
+        if trivia[at..]
+            .iter()
+            .take_while(|t| (t.start as usize) < to)
+            .any(|t| {
+                matches!(
+                    t.kind,
+                    TriviaKind::Comment {
+                        syntax: CommentSyntax::CdsBlock,
+                        ..
+                    }
+                ) && t.text(self.ctx.src).contains('\n')
+            })
+        {
             self.pending_eol = false;
             self.write(gap, indent);
             return;
@@ -915,6 +960,9 @@ impl<'c, 'a> Printer<'c, 'a> {
                 Inner::HardLine => return true,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
+                | Inner::IndentBy(_, ds)
+                | Inner::LeadIndent(ds)
+                | Inner::IndentCols(_, ds)
                 | Inner::Cont(ds)
                 | Inner::Hang(ds)
                 | Inner::Concat(ds) => {
@@ -997,6 +1045,28 @@ impl<'c, 'a> Printer<'c, 'a> {
                 Inner::Indent(ds) => {
                     stack.extend(ds.iter().rev().map(|d| Cmd {
                         indent: indent + step,
+                        mode,
+                        doc: d,
+                    }));
+                }
+                Inner::IndentBy(n, ds) => {
+                    stack.extend(ds.iter().rev().map(|d| Cmd {
+                        indent: indent + step * *n as usize,
+                        mode,
+                        doc: d,
+                    }));
+                }
+                Inner::IndentCols(n, ds) => {
+                    stack.extend(ds.iter().rev().map(|d| Cmd {
+                        indent: indent + *n as usize,
+                        mode,
+                        doc: d,
+                    }));
+                }
+                Inner::LeadIndent(ds) => {
+                    self.lead_deeper = true;
+                    stack.extend(ds.iter().rev().map(|d| Cmd {
+                        indent,
                         mode,
                         doc: d,
                     }));
@@ -1178,6 +1248,7 @@ impl<'c, 'a> Printer<'c, 'a> {
             pending_eol: self.pending_eol,
             line_empty: self.line_empty,
             prev_blank: self.prev_blank,
+            lead_deeper: false,
         };
         trial.run(vec![Cmd { indent, mode, doc }]);
         if trial.overflow {
@@ -1476,6 +1547,9 @@ fn last_token(doc: &Doc) -> Option<TokenIndex> {
         }
         Inner::Group(ds)
         | Inner::Indent(ds)
+        | Inner::IndentBy(_, ds)
+        | Inner::LeadIndent(ds)
+        | Inner::IndentCols(_, ds)
         | Inner::Cont(ds)
         | Inner::Hang(ds)
         | Inner::Concat(ds) => ds.iter().rev().find_map(last_token),

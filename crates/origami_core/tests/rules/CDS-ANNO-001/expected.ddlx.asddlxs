@@ -12,5 +12,9 @@ annotate entity ZC_X with
       position: 20
     }
   ]
+  @UI.lineItem: [
+    { position: 10 }
+    // before the closing bracket
+  ]
   a;
 }
