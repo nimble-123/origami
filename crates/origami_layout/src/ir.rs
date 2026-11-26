@@ -36,6 +36,9 @@ pub(crate) enum Inner {
     SoftLine,
     /// A line break if the enclosing group is broken, nothing otherwise.
     SoftBreak,
+    /// `n` spaces if the enclosing group is broken, nothing otherwise
+    /// (padding of a layout that exists only when broken).
+    BreakPad(u32),
     /// Always a line break.
     HardLine,
     /// Flat if it fits, broken otherwise.

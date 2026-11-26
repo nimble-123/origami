@@ -4614,7 +4614,10 @@ fn method_item_inner(p: &mut P, name: usize, sections_kw: &[&str]) -> Option<Met
     // ABAP-METHODS-001, aligned style: the signature is a table (FORM keeps
     // the compact form in both styles).
     if p.c.style == Style::Aligned && sections_kw == SECTIONS && i < p.end {
-        let sections = method_table(p, i)?;
+        // ABAP-ALIGN-005: a test method (`FOR TESTING RAISING …`) stays on
+        // one line if it fits.
+        let below = key != Some(AlignKey::ForTesting);
+        let sections = method_table(p, i, below)?;
         return Some(MethodParts {
             name: name_docs,
             header,
@@ -4736,8 +4739,9 @@ fn param_name(p: &mut P, a: usize, ne: usize) -> Vec<Doc> {
 /// The sections of a method signature from `i` to `p.end` as an aligned
 /// table below the method name at the continuation indent: the keywords
 /// padded to the longest, the names, `TYPE`, and `OPTIONAL` / `DEFAULT` in
-/// columns. A one-line table stays behind the name if it fits.
-fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
+/// columns. With `below` false (a test method), a one-line table stays
+/// behind the name if it fits.
+fn method_table(p: &mut P, mut i: usize, below: bool) -> Option<Doc> {
     let first_kw = i;
     let mut rows: Vec<SigRow> = Vec::new();
     while i < p.end {
@@ -4763,27 +4767,59 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
             }
             // RAP handler parameters: `keys FOR ACTION Travel~accept RESULT
             // result`, `REQUEST requested FOR Travel RESULT result`.
+            let mut marked = Vec::new();
             if p.is(i, "IMPORTING") && j < section_end {
                 let from = if p.is(j, "REQUEST") && p.is(j + 2, "FOR") {
                     j
                 } else {
                     name_end(p, j, section_end)
                 };
+                let before = p.c.keywords.len();
                 mark_phrase_keywords(p, from, section_end, RAP_PARAM_WORDS, RAP_PARAM_OPERAND);
+                marked = p.c.keywords[before..].to_vec();
             }
-            let mut name = Vec::new();
-            for k in j..section_end {
-                if k > j {
-                    name.push(p.sp(k));
+            // A RAP handler signature has a row for each `name FOR …` part,
+            // and `RESULT` and `LINK` start rows as section keywords.
+            let rap = marked.iter().any(|&k| p.is(k, "FOR"));
+            let mut starts: Vec<(usize, bool)> = vec![(j, true)];
+            if rap {
+                for k in j + 1..section_end {
+                    let is_kw = marked.contains(&k);
+                    if is_kw && (p.is(k, "RESULT") || p.is(k, "LINK")) {
+                        starts.push((k, false));
+                    } else if !is_kw
+                        && p.kind(k) == WORD
+                        && !p.glued(k)
+                        && p.is(k + 1, "FOR")
+                        && marked.contains(&(k + 1))
+                        && !p.is(k - 1, "REQUEST")
+                    {
+                        starts.push((k, true));
+                    }
                 }
-                name.push(p.t(k));
             }
-            rows.push(SigRow {
-                kw: Some(kw),
-                name,
-                ty: Vec::new(),
-                opt: None,
-            });
+            let mut kw = Some(kw);
+            for (n, &(a, in_section)) in starts.iter().enumerate() {
+                let e = starts.get(n + 1).map_or(section_end, |s| s.0);
+                let (row_kw, from) = if in_section {
+                    (kw.take(), a)
+                } else {
+                    (Some(p.t(a)), a + 1)
+                };
+                let mut name = Vec::new();
+                for k in from..e {
+                    if k > from {
+                        name.push(p.sp(k));
+                    }
+                    name.push(p.t(k));
+                }
+                rows.push(SigRow {
+                    kw: row_kw,
+                    name,
+                    ty: Vec::new(),
+                    opt: None,
+                });
+            }
             i = section_end;
             continue;
         }
@@ -4861,8 +4897,8 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
         };
         items.push(b::row_cols(vec![kw_cell, r.name], head, tail));
     }
-    if items.len() > 1 {
-        // A table of two or more lines always starts below the method name.
+    if items.len() > 1 || below {
+        // The table always starts below the method name.
         p.c.multi_line = true;
         return Some(b::cont(vec![p.hl(first_kw), b::align_broken(items)]));
     }

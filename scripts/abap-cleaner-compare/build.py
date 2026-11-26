@@ -114,7 +114,7 @@ MAP = {
     "ALIGN_ABAP_DOC": ("yes", ["ABAP-DOC-001"],
         "Only the blanks after the tag and before | change; not aligned if a line would exceed the width."),
     "ALIGN_METHODS_DECLARATION": ("yes", ["ABAP-METHODS-001"],
-        "The table always starts below the method name, as ABAP Cleaner keeps it when the input breaks there."),
+        "Every signature with a section is a table below the method name, whatever the input; RAP handler parts and RESULT / LINK get a row each."),
     "ALIGN_METHODS_FOR_TESTING": ("yes", ["ABAP-ALIGN-005"],
         "Not aligned if a line would exceed the width."),
     "ALIGN_METHODS_REDEFINITION": ("yes", ["ABAP-ALIGN-006"],

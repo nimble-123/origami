@@ -336,8 +336,9 @@ CLASS zcl_rates DEFINITION PUBLIC.
     METHODS reset.
     METHODS calculate_all.
 
-    METHODS calculate IMPORTING iv_amount   TYPE p
-                                iv_currency TYPE waers.
+    METHODS calculate
+      IMPORTING iv_amount   TYPE p
+                iv_currency TYPE waers.
 
   PRIVATE SECTION.
     DATA mv_rate TYPE p.
@@ -717,8 +718,9 @@ Approved by the maintainer, Nils Lutz, on 2026-11-23, as ABAP Cleaner's
 "Align METHODS … FOR TESTING" with its default options. Consecutive
 `METHODS name [ABSTRACT] FOR TESTING [RAISING …].` declarations are padded
 after the method name, so that the words after it start in one column. A
-declaration that fits stays on one line (ABAP-METHODS-001), so
-`METHODS name` and `FOR TESTING` on two lines are joined. Blank lines and
+declaration that fits stays on one line, also with `RAISING` (unlike other
+signatures, ABAP-METHODS-001), so `METHODS name` and `FOR TESTING` on two
+lines are joined. Blank lines and
 comment lines do not end a group; any other statement does, including a
 chain. A `METHODS:` chain with two or more test methods always has one item
 per line, aligned after the colon, and its test methods are aligned
@@ -959,14 +961,40 @@ below the method name, as ABAP Cleaner keeps it when the input breaks after
 the name. Until then the first keyword stayed behind the name when the table
 fit there.
 
+Approved by the maintainer, Nils Lutz, on 2026-11-26: every declaration with
+a section is a table, also one with a single parameter. The line breaks after
+the method name and its own additions (`ABSTRACT`, `FINAL`, `DEFAULT IGNORE`,
+`FOR EVENT e OF c`, `FOR PRECHECK`, `FOR DETERMINE ON MODIFY`,
+`FOR GLOBAL AUTHORIZATION`, …). A declaration without sections stays on one
+line (`METHODS reset.`, `METHODS m ABSTRACT.`), and a test method
+(`FOR TESTING [RAISING …]`) stays on one line if it fits (ABAP-ALIGN-005).
+In a RAP handler signature, each `name FOR …` part of `IMPORTING` (with its
+`REQUEST …` and `FULL …`) is a row of its own, and `RESULT` and `LINK` start a
+row as section keywords. Until then a declaration with at most one parameter
+in one section stayed on one line if it fit.
+
 ```abap
 METHODS calculate
   IMPORTING iv_amount        TYPE p
             iv_currency      TYPE waers OPTIONAL
   RETURNING VALUE(rv_result) TYPE p
   RAISING   zcx_calc_error zcx_rate_error.
-METHODS reset IMPORTING iv_hard TYPE abap_bool.
+METHODS reset
+  IMPORTING iv_hard TYPE abap_bool.
+METHODS run.
+METHODS precheck_create FOR PRECHECK
+  IMPORTING entities FOR CREATE statuscommand.
+METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+  IMPORTING REQUEST requested_authorizations FOR UserOrg
+  RESULT    result.
+METHODS modify FOR MODIFY
+  IMPORTING entities_c FOR CREATE travel
+            entities_u FOR UPDATE travel.
 ```
+
+Deviations from ABAP Cleaner: it keeps a signature on one line, and the first
+keyword behind the name, when the input has them there, and it does not align
+the parts of a RAP handler signature.
 
 **Compact:** a declaration that fits is printed on one line. Otherwise each
 section keyword goes on its own line at the continuation indent, and each
