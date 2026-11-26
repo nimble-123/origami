@@ -1084,6 +1084,55 @@ fn mcp_rejects_bad_line_ranges() {
 }
 
 #[test]
+fn mcp_rejects_wrongly_typed_arguments() {
+    let d = dir();
+    write(d.path(), "a.prog.abap", "lv_a   =   1.\n");
+    let bad = [
+        (
+            "format_files",
+            serde_json::json!({"paths": "a.prog.abap", "write": true}),
+        ),
+        (
+            "format_files",
+            serde_json::json!({"paths": [1], "write": true}),
+        ),
+        (
+            "format_files",
+            serde_json::json!({"changed": 5, "write": true}),
+        ),
+        ("format_files", serde_json::json!({"write": "true"})),
+        ("format_files", serde_json::json!({"write": 1})),
+        ("format_files", serde_json::json!("write")),
+        ("format", serde_json::json!({"source": 5})),
+        (
+            "format",
+            serde_json::json!({"source": "x = 1.", "filename": 3}),
+        ),
+        (
+            "format",
+            serde_json::json!({"source": "x = 1.", "language": ["abap"]}),
+        ),
+        (
+            "format",
+            serde_json::json!({"source": "x = 1.", "lines": "1:2"}),
+        ),
+    ];
+    let messages: Vec<String> = bad
+        .iter()
+        .enumerate()
+        .map(|(i, (tool, args))| tool_call(i as u32 + 1, tool, args.clone()))
+        .collect();
+    let replies = mcp_session(d.path(), &[], &messages);
+    for ((tool, args), r) in bad.iter().zip(&replies) {
+        assert_eq!(r["error"]["code"], -32602, "{tool} {args}: {r}");
+    }
+    assert_eq!(
+        fs::read_to_string(d.path().join("a.prog.abap")).unwrap(),
+        "lv_a   =   1.\n"
+    );
+}
+
+#[test]
 fn mcp_rejects_too_long_messages_and_keeps_serving() {
     let d = dir();
     let big = tool_call(

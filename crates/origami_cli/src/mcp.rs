@@ -354,7 +354,7 @@ fn handle(msg: &Value, cancel: &AtomicBool) -> Option<Value> {
             let a = &params["arguments"];
             let result = match name {
                 "format" => format_tool(a),
-                "format_files" => Ok(files_tool(a, cancel)),
+                "format_files" => files_tool(a, cancel),
                 _ => Err(format!("Unknown tool: {name}")),
             };
             match result {
@@ -425,6 +425,32 @@ fn tool_error(text: String, structured: Value) -> Value {
     json!({"content": [{"type": "text", "text": text}], "structuredContent": structured, "isError": true})
 }
 
+/// The optional argument `key` of the tool call `a`, as a value of the type
+/// the tool schema declares. A wrong type is an error: silently using the
+/// default would, for `paths` with `write`, rewrite the whole working directory.
+fn optional<'a, T>(
+    a: &'a Value,
+    key: &str,
+    expected: &str,
+    get: impl Fn(&'a Value) -> Option<T>,
+) -> Result<Option<T>, String> {
+    match &a[key] {
+        Value::Null => Ok(None),
+        v => get(v)
+            .map(Some)
+            .ok_or_else(|| format!("`{key}` must be {expected}; got {v}")),
+    }
+}
+
+/// The tool arguments must be an object (or absent).
+fn check_object(a: &Value) -> Result<(), String> {
+    if a.is_null() || a.is_object() {
+        Ok(())
+    } else {
+        Err(format!("`arguments` must be an object; got {a}"))
+    }
+}
+
 /// The `lines` argument: `[[start, end], …]`, 1 <= start <= end < 2^32.
 fn line_ranges(v: &Value) -> Result<Vec<(u32, u32)>, String> {
     if v.is_null() {
@@ -455,11 +481,15 @@ fn line_ranges(v: &Value) -> Result<Vec<(u32, u32)>, String> {
 }
 
 fn format_tool(a: &Value) -> Result<Value, String> {
-    let Some(source) = a["source"].as_str() else {
+    check_object(a)?;
+    let source = optional(a, "source", "a string", Value::as_str)?;
+    let filename = optional(a, "filename", "a string", Value::as_str)?;
+    let language = optional(a, "language", "a string", Value::as_str)?;
+    let lines = line_ranges(&a["lines"])?;
+    let Some(source) = source else {
         return Ok(tool_error("`source` is required".into(), json!({})));
     };
-    let filename = a["filename"].as_str();
-    let hint = match a["language"].as_str() {
+    let hint = match language {
         Some("cds") => LanguageHint::CdsFamily,
         Some(l) => match Language::parse(l) {
             Some(lang) => LanguageHint::Explicit(lang),
@@ -470,7 +500,6 @@ fn format_tool(a: &Value) -> Result<Value, String> {
             None => LanguageHint::None,
         },
     };
-    let lines = line_ranges(&a["lines"])?;
     let dir = filename
         .and_then(|n| Path::new(n).parent().map(Path::to_path_buf))
         .filter(|d| !d.as_os_str().is_empty() && d.is_dir())
@@ -545,16 +574,21 @@ fn outside_cwd<'a>(paths: impl Iterator<Item = &'a PathBuf>) -> Vec<String> {
         .collect()
 }
 
-fn files_tool(a: &Value, cancel: &AtomicBool) -> Value {
-    let paths: Vec<PathBuf> = a["paths"]
-        .as_array()
-        .map(|v| {
-            v.iter()
-                .filter_map(|p| p.as_str().map(PathBuf::from))
-                .collect()
-        })
-        .unwrap_or_default();
-    let write = a["write"].as_bool().unwrap_or(false);
+fn files_tool(a: &Value, cancel: &AtomicBool) -> Result<Value, String> {
+    check_object(a)?;
+    let paths: Vec<PathBuf> = optional(a, "paths", "an array of strings", |v| {
+        v.as_array()?
+            .iter()
+            .map(|p| p.as_str().map(PathBuf::from))
+            .collect()
+    })?
+    .unwrap_or_default();
+    let write = optional(a, "write", "a boolean", Value::as_bool)?.unwrap_or(false);
+    let changed = optional(a, "changed", "a string", Value::as_str)?;
+    Ok(files_run(&paths, write, changed, cancel))
+}
+
+fn files_run(paths: &[PathBuf], write: bool, changed: Option<&str>, cancel: &AtomicBool) -> Value {
     // The tool works only below the server's working directory.
     let outside = outside_cwd(paths.iter());
     if !outside.is_empty() {
@@ -566,8 +600,8 @@ fn files_tool(a: &Value, cancel: &AtomicBool) -> Value {
             json!({"outside": outside}),
         );
     }
-    let selected: Vec<(PathBuf, crate::changed::Ranges)> = match a["changed"].as_str() {
-        Some(rev) => match crate::changed::files(rev, &paths) {
+    let selected: Vec<(PathBuf, crate::changed::Ranges)> = match changed {
+        Some(rev) => match crate::changed::files(rev, paths) {
             Ok(f) => f,
             Err(m) => return tool_error(m, json!({})),
         },
@@ -575,7 +609,7 @@ fn files_tool(a: &Value, cancel: &AtomicBool) -> Value {
             let roots = if paths.is_empty() {
                 vec![PathBuf::from(".")]
             } else {
-                paths
+                paths.to_vec()
             };
             crate::walk::files(&roots)
                 .into_iter()

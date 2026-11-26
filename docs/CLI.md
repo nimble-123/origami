@@ -98,6 +98,8 @@ Limits:
   JSON-RPC error -32600 and the server reads on.
 * `lines` must be pairs `[start, end]` with 1 <= start <= end <= 2^32 - 1;
   anything else is the JSON-RPC error -32602 (invalid params).
+* An argument of the wrong type (`"paths": "a.abap"`, `"write": "true"`,
+  `"changed": 5`) is the same error; nothing is read or written.
 * Tool calls run one at a time, each with a deadline of 30 s
   (`ORIGAMI_MCP_TIMEOUT` sets it in seconds). A call that misses it gets the
   JSON-RPC error -32001 and is cancelled; with `"write": true`, files
