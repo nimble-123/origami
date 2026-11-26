@@ -175,7 +175,12 @@ pub fn layout(
         explain,
         rule_spans: Vec::new(),
         multi_line: false,
+        end_gap: None,
     };
+    // Aligned style, ABAP-DECL-002: for each structure opened by one
+    // declaration and closed by a later one, the width in front of its
+    // `BEGIN` (`DATA: `).
+    let mut open_structs: Vec<usize> = Vec::new();
     let mut entries: Vec<Entry> = Vec::with_capacity(statements.len());
     let mut parsed_ranges = Vec::new();
     let mut diagnostics = Vec::new();
@@ -187,6 +192,27 @@ pub fn layout(
     let mut multi = Vec::with_capacity(statements.len());
     for (id, st) in statements.iter().enumerate() {
         ctx.multi_line = false;
+        ctx.end_gap = None;
+        let mut include_gap = 0;
+        if style == Style::Aligned {
+            let s = cross_structure(text, stream, st);
+            if s.include {
+                include_gap = open_structs.last().copied().unwrap_or(0);
+            }
+            if s.delta < 0 {
+                if s.starts_with_end
+                    && let Some(&begin) = open_structs.last()
+                {
+                    ctx.end_gap = Some(begin.saturating_sub(s.prefix) + 1);
+                }
+                for _ in 0..-s.delta {
+                    open_structs.pop();
+                }
+            }
+            for _ in 0..s.delta.max(0) {
+                open_structs.push(s.prefix);
+            }
+        }
         let id = id as UnitId;
         let first = TokenIndex(st.tokens.start as u32);
         let last = TokenIndex(st.tokens.end as u32 - 1);
@@ -276,6 +302,14 @@ pub fn layout(
         } else {
             b::hard(stream, first)
         };
+        // An `INCLUDE TYPE` inside such a structure starts in the column of
+        // its components (one with a comment line in front stays one level
+        // in: the comment would not move with it).
+        let body = if include_gap > 0 && !glued && !commented[first.0 as usize] {
+            Stmt::Doc(b::concat(vec![b::spaces(include_gap), body.into_doc()]))
+        } else {
+            body
+        };
         entries.push(Entry {
             depth: st.depth.min(MAX_NESTING),
             start,
@@ -301,6 +335,61 @@ pub fn layout(
         blank_after_comments,
         forced_blanks,
     }
+}
+
+/// A declaration's part in structures that span statements
+/// (ABAP-DECL-002).
+struct CrossStructure {
+    /// Structures opened (positive) or closed.
+    delta: i32,
+    /// Width in front of the first item: the keyword, a colon, a space.
+    prefix: usize,
+    /// The first item is `END OF`.
+    starts_with_end: bool,
+    /// `INCLUDE TYPE` or `INCLUDE STRUCTURE`.
+    include: bool,
+}
+
+fn cross_structure(text: &str, stream: &TokenStream, st: &Statement) -> CrossStructure {
+    let toks = &stream.tokens[st.tokens.clone()];
+    let word = |k: usize| {
+        toks.get(k)
+            .filter(|t| t.kind == WORD)
+            .map(|t| t.text(text).to_ascii_uppercase())
+            .unwrap_or_default()
+    };
+    let w0 = word(0);
+    let include = w0 == "INCLUDE" && matches!(word(1).as_str(), "TYPE" | "STRUCTURE");
+    let mut out = CrossStructure {
+        delta: 0,
+        prefix: 0,
+        starts_with_end: false,
+        include,
+    };
+    if !matches!(
+        w0.as_str(),
+        "DATA" | "TYPES" | "CONSTANTS" | "STATICS" | "CLASS-DATA"
+    ) || toks.len() < 2
+    {
+        return out;
+    }
+    let colon = toks[1].kind == COLON;
+    let first = if colon { 2 } else { 1 };
+    out.prefix = toks[0].text(text).chars().count() + usize::from(colon) + 1;
+    out.starts_with_end = word(first) == "END" && word(first + 1) == "OF";
+    // As the structural pass counts them (`structure::struct_delta`).
+    let words: Vec<String> = (0..toks.len())
+        .filter(|&k| toks[k].kind == WORD)
+        .map(|k| toks[k].text(text).to_ascii_uppercase())
+        .collect();
+    for w in words.windows(2) {
+        match (w[0].as_str(), w[1].as_str()) {
+            ("BEGIN", "OF") => out.delta += 1,
+            ("END", "OF") => out.delta -= 1,
+            _ => {}
+        }
+    }
+    out
 }
 
 /// Declaration keywords of class definitions and interfaces

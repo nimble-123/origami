@@ -28,6 +28,9 @@ pub struct Ctx<'a> {
     /// The statement being parsed always spans several lines (a signature
     /// table, a broken chain); read by ABAP-BLANK-002.
     pub multi_line: bool,
+    /// Aligned style, ABAP-DECL-002: spaces in front of the `END OF` that
+    /// starts the statement being parsed, so `END` stands under `BEGIN`.
+    pub end_gap: Option<usize>,
 }
 
 /// State of a [`Ctx`] before a parse attempt, to roll back a failed one.
@@ -1800,6 +1803,7 @@ mod tests {
             explain: true,
             rule_spans: Vec::new(),
             multi_line: false,
+            end_gap: None,
         };
         c.span(0, 3, "ABAP-STMT-001");
         let m = c.mark();
