@@ -33,6 +33,7 @@
   --text: #c0caf5;
   --text-2: #a9b1d6;
   --text-3: #8b92b8;
+  --line-no: #7c84ac;
   --head: #ffffff;
   --button: #e6e9f7;
   --blue: #7aa2f7;
@@ -266,7 +267,7 @@ main > .hero { width: 100%; }
 .pane-title { margin: 0; padding: 0 20px 8px; font: 500 var(--t-xs) var(--sans); color: var(--text-3); }
 .code { font-size: 12.5px; line-height: 1.8; color: var(--text); }
 .rows .ln { display: grid; grid-template-columns: 2.6ch minmax(0, 1fr); column-gap: 1.6ch; padding: 0 20px 0 14px; white-space: pre; }
-.rows .gut { color: #565f89; text-align: right; font-variant-numeric: tabular-nums; user-select: none; }
+.rows .gut { color: var(--line-no); text-align: right; font-variant-numeric: tabular-nums; user-select: none; }
 .rows .src { min-width: 0; }
 .rows .ln.del { background: rgba(247, 118, 142, 0.1); box-shadow: inset 2px 0 0 var(--red); }
 .rows .ln.add { background: rgba(122, 162, 247, 0.1); box-shadow: inset 2px 0 0 var(--blue); }
@@ -489,7 +490,7 @@ textarea.code-area:focus-visible { outline-offset: -2px; border-radius: 0; }
 .editor.drop::after { content: "Drop to open the file"; position: absolute; inset: 8px; display: grid; place-items: center; border-radius: 10px; border: 1.5px dashed var(--blue); background: rgba(122, 162, 247, 0.1); color: var(--head); font: 600 var(--t-s) var(--sans); pointer-events: none; }
 .output { padding: 14px 0; }
 .output .ln { display: grid; grid-template-columns: 3.2ch 1fr; column-gap: 1.4ch; padding-inline: 8px 20px; white-space: pre; min-width: max-content; }
-.output .ln::before { content: attr(data-n); color: #565f89; text-align: right; font-variant-numeric: tabular-nums; }
+.output .ln::before { content: attr(data-n); color: var(--line-no); text-align: right; font-variant-numeric: tabular-nums; }
 .output .ln.broken { background: rgba(122, 162, 247, 0.08); box-shadow: inset 2px 0 0 var(--blue); }
 .output .ln-note { padding: 1px 20px 5px calc(8px + 4.6ch); white-space: normal; min-width: 0; color: var(--cyan); font: 400 12px / 1.6 var(--mono); }
 .output .ln-note a { color: var(--cyan); }
