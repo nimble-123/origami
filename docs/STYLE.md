@@ -174,18 +174,6 @@ with a numeric ID (`TEXT-001`), and in ABAP SQL the aggregate functions
 )`. Other SQL functions (`length( )`, `substring( )`) are built-in functions
 and keep their case.
 
-Approved by the maintainer, Nils Lutz, on 2026-11-23: a keyword is
-upper-cased wherever it stands in a recognized statement, as ABAP Cleaner
-does. This includes the words of RAP derived types (`TYPE TABLE FOR READ
-RESULT`, `TYPE RESPONSE FOR MAPPED LATE`), inline `FIELD-SYMBOL( )`,
-`OTHERS` in `WHEN OTHERS` and `EXCEPTIONS`, logical expressions inside
-function arguments and constructor bodies, table keys (`[ KEY k COMPONENTS …
-]`), format options of string templates (`{ d DATE = ISO }`), text symbols
-with a numeric ID (`TEXT-001`), and in ABAP SQL the aggregate functions
-(`COUNT( )`, `SUM( )`, `MIN( )`, `MAX( )`, `AVG( )`) and `CAST( … AS CHAR( n )
-)`. Other SQL functions (`length( )`, `substring( )`) are built-in functions
-and keep their case.
-
 ```abap
 before: data(lv_count) = lines( mt_items ).
 after:  DATA(lv_count) = lines( mt_items ).
