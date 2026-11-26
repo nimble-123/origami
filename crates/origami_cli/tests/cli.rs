@@ -250,6 +250,28 @@ fn config_discovery_and_flag_precedence() {
 }
 
 #[test]
+fn discovery_walks_above_a_relative_working_directory() {
+    let d = dir();
+    write(d.path(), "origami.toml", "line_width = 300\n");
+    write(d.path(), "src/a.clas.abap", CLASS);
+    // From the project root and from below it, the same file is found.
+    for (cwd, file) in [(".", "src/a.clas.abap"), ("src", "a.clas.abap")] {
+        origami()
+            .current_dir(d.path().join(cwd))
+            .arg(file)
+            .assert()
+            .code(3);
+    }
+    // Also through `..`.
+    write(d.path(), "other/b.clas.abap", CLASS);
+    origami()
+        .current_dir(d.path().join("src"))
+        .arg("../other/b.clas.abap")
+        .assert()
+        .code(3);
+}
+
+#[test]
 fn discovery_stops_at_git_root() {
     let outer = tempfile::tempdir().unwrap();
     write(outer.path(), "origami.toml", "line_width = 300\n");
@@ -411,6 +433,167 @@ fn sarif_output_is_json() {
     let doc = json_of(&out.stderr);
     assert_eq!(doc["version"], "2.1.0");
     assert_eq!(doc["runs"][0]["results"][0]["ruleId"], "E004");
+}
+
+#[cfg(unix)]
+#[test]
+fn writing_through_a_symlink_keeps_the_link_and_formats_the_target() {
+    let d = dir();
+    write(d.path(), "real/a.prog.abap", "lv_a   =   1.\n");
+    let link = d.path().join("link.prog.abap");
+    std::os::unix::fs::symlink("real/a.prog.abap", &link).unwrap();
+    origami()
+        .current_dir(d.path())
+        .arg("link.prog.abap")
+        .assert()
+        .code(0);
+    assert!(
+        fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(
+        fs::read_to_string(d.path().join("real/a.prog.abap")).unwrap(),
+        "lv_a = 1.\n"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_read_only_file_is_not_replaced_and_reports_e031() {
+    use std::os::unix::fs::PermissionsExt;
+    let d = dir();
+    write(d.path(), "a.prog.abap", "lv_a   =   1.\n");
+    let file = d.path().join("a.prog.abap");
+    fs::set_permissions(&file, fs::Permissions::from_mode(0o444)).unwrap();
+    // Root can write a 0444 file, so there is nothing to test as root.
+    if fs::OpenOptions::new().write(true).open(&file).is_ok() {
+        return;
+    }
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--diagnostics", "json", "a.prog.abap"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(
+        json_of(&out.stderr)["files"][0]["diagnostics"][0]["code"],
+        "E031"
+    );
+    assert_eq!(fs::read_to_string(&file).unwrap(), "lv_a   =   1.\n");
+    assert_eq!(
+        fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+        0o444
+    );
+}
+
+/// Runs origami with stdout closed before it writes (like `| head -c1`) and
+/// returns its exit code and stderr.
+#[cfg(unix)]
+fn run_with_closed_stdout(args: &[&str], stdin: &str) -> (Option<i32>, String) {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let mut child = Command::new(env!("CARGO_BIN_EXE_origami"))
+        .args(args)
+        .env_remove("CLAUDECODE")
+        .env_remove("ORIGAMI_DIAGNOSTICS")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take());
+    let mut input = child.stdin.take().unwrap();
+    let _ = input.write_all(stdin.as_bytes());
+    drop(input);
+    let out = child.wait_with_output().unwrap();
+    (out.status.code(), String::from_utf8(out.stderr).unwrap())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_closed_stdout_is_not_an_internal_error() {
+    let (code, err) = run_with_closed_stdout(&["--version"], "");
+    assert_eq!((code, err.as_str()), (Some(0), ""));
+    let (code, err) = run_with_closed_stdout(&["--version", "--json"], "");
+    assert_eq!((code, err.as_str()), (Some(0), ""));
+    // The diff of a changed source goes to stdout, the verdict is exit 1.
+    let (code, err) = run_with_closed_stdout(
+        &["--check", "--diff", "--stdin", "--language", "abap"],
+        "lv_a   =   1.\n",
+    );
+    assert_eq!(code, Some(1), "{err}");
+    assert!(!err.contains("X002"), "{err}");
+    let (code, err) = run_with_closed_stdout(
+        &["--review", "--stdin", "--language", "abap"],
+        "lv_a   =   1.\n",
+    );
+    assert_eq!(code, Some(1), "{err}");
+    assert!(!err.contains("X002"), "{err}");
+}
+
+#[test]
+fn sarif_uris_are_percent_encoded_and_pseudo_paths_have_no_location() {
+    let d = dir();
+    write(d.path(), "my dir/bad#1.prog.abap", "ENDIF.\n");
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--diagnostics", "sarif"])
+        .output()
+        .unwrap();
+    let doc = json_of(&out.stderr);
+    let loc = &doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"];
+    assert_eq!(loc["artifactLocation"]["uri"], "my%20dir/bad%231.prog.abap");
+    // A usage error belongs to no file.
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--diagnostics", "sarif", "--lines", "x", "my dir"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    let result = &json_of(&out.stderr)["runs"][0]["results"][0];
+    assert_eq!(result["ruleId"], "E021");
+    assert!(result.get("locations").is_none(), "{result}");
+}
+
+// Unix quoting; on Windows the paths have backslashes and double quotes.
+#[cfg(unix)]
+#[test]
+fn agent_next_command_quotes_paths() {
+    let d = dir();
+    write(d.path(), "my dir/a.prog.abap", "lv_a   =   1.\n");
+    write(d.path(), "b.prog.abap", "lv_b   =   2.\n");
+    write(d.path(), "it's.prog.abap", "lv_c   =   3.\n");
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--check", "--diagnostics", "agent"])
+        .output()
+        .unwrap();
+    let err = String::from_utf8(out.stderr).unwrap();
+    let next = err.lines().last().unwrap();
+    // Sorted by path, so the order is fixed.
+    assert_eq!(
+        next,
+        "NEXT: run `origami b.prog.abap 'it'\\''s.prog.abap' 'my dir/a.prog.abap'` to apply the formatting."
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn file_names_with_control_characters_are_escaped_in_text_output() {
+    let d = dir();
+    write(d.path(), "a\x1b[31m.prog.abap", "lv_a   =   1.\n");
+    for format in ["human", "agent"] {
+        let out = origami()
+            .current_dir(d.path())
+            .args(["--check", "--diagnostics", format])
+            .output()
+            .unwrap();
+        let err = String::from_utf8(out.stderr).unwrap();
+        assert!(!err.contains('\x1b'), "{format}: {err:?}");
+        assert!(err.contains("a\\x1b[31m.prog.abap"), "{format}: {err:?}");
+    }
 }
 
 #[test]
