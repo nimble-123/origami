@@ -170,7 +170,7 @@ third stays empty for a headline. No text, props or hands in the picture.
 
 | File | Use |
 | --- | --- |
-| `photos/crane-light.webp`, `photos/crane-dark.webp` | the photo band on the website (light and dark), 1920px |
+| `photos/crane-light.webp`, `photos/crane-dark.webp` | the photo band near the end of the website, before Install (light and dark), 1920px |
 | `photos/crane-detail.webp` | a square close-up, next to "Every fold has a reason" on the website |
 | `social-preview.png` | `crane-dark` with the headline, from `site/og/og.html` |
 
@@ -179,13 +179,68 @@ The photos are generated with Nano Banana Pro (Gemini 3 Pro Image) from
 facets and the ground. Keep the source PNGs out of the repository; commit
 WebP at about 80 quality (under 50 KB each).
 
+### Paper texture
+
+`paper-fibre.webp` (512px, greyscale, about 40 KB) is the grain of plain
+matte paper: fine fibres, no folds, no light. The 3D crane uses it as a bump
+map and as a faint grain in the facet colors, mirrored when it repeats, so
+the tile shows no seam. Generated with Nano Banana Pro from a text prompt
+(no reference image), then scaled, turned grey and raised in contrast. It is
+not a decoration for flat surfaces: the sheets and the paper stay plain.
+
+## 3D crane
+
+The website's hero shows the logo as a crane of real paper (`site/crane.js`,
+three.js r170 under `site/vendor/`).
+
+* **Geometry:** the seven facets of `logo.svg`, each a thin, rigid sheet
+  (about 1% of the crane's width thick) with the logo's gaps between them.
+  Every facet hangs from a neighbour and turns about the edge they share: the
+  two halves of the body about the middle, the wings, the neck and the tail
+  about the body, the head about the neck. Facets never bend.
+* **Fold:** a single number from 0 (flat: the logo laid out, with dashed
+  `--valley` creases on the hinges) to 1 (folded). The facets fold in stages:
+  body, wings, neck and tail, head. On the page the margin of the hero sheet
+  sets it: one line is almost flat, more line breaks fold it further.
+* **Materials:** matte paper (no gloss, no metal), in the logo's three roles
+  `--ink`, `--valley` and `--crease`, read from the page's tokens, so the
+  crane changes with the color scheme.
+* **Light:** as in the photos: a soft key light from the upper left, a light
+  close to the crane so the light falls off across each facet, a sky light,
+  and one soft shadow on the paper ground. No glow, bloom, particles,
+  gradients or glassy materials.
+* **Motion:** a slow sway; it turns a little toward the pointer, and a
+  sideways drag (mouse or one finger) turns it within limits and lets it ease
+  back. Vertical swipes scroll the page. It stays on the ground.
+* **Limits:** loaded after the first paint, rendered only while on screen and
+  the tab is visible, at most 2 device pixels per CSS pixel. The canvas is
+  decorative (`aria-hidden`); its box is reserved, so nothing moves when it
+  appears. Without WebGL 2, with Save-Data, on devices that report less than
+  2 GB of memory, or when the module fails to load, the page shows
+  `logo.svg` / `logo-dark.svg` instead, smaller than the headline.
+
 ## Motion
 
-One orchestrated moment: the hero. A single overlong ABAP statement appears
-on the sheet; dashed blue creases appear at the break points (staggered, 80ms
-each); then the line folds down into its formatted shape and the notes
-(`↳ ABAP-CALL-001: …`) fade in under it. About 1.6 seconds, once per load.
-With `prefers-reduced-motion`, the formatted result is shown directly.
+One orchestrated moment: the hero, about 1.6 seconds, once per load. A
+single overlong ABAP statement appears on the sheet with the margin at width
+72 cutting through it; dashed blue creases appear at the break points
+(staggered, 80ms each); the paper crane next to it shows its crease pattern;
+then the line folds into its formatted shape (640ms, lines staggered 70ms)
+while the crane folds up, stage by stage; the note (`↳ ABAP-CALL-001: …`)
+fades in, and the margin nudges once to show that it can be dragged.
+
+**The draggable margin.** The right margin of the hero sheet is a slider
+(40 to 120; arrow keys ±1, Page Up/Down ±10, Home/End). Dragging it formats
+the call again with origami itself (the WebAssembly build, at most once per
+frame) and moves each token from its old place to its new one (220ms,
+interruptible); the note says why the line broke at that width, and the
+crane folds further for more line breaks and lies almost flat when the line
+fits. Before origami.wasm is ready the margin is shown in grey and does not
+move.
+
+With `prefers-reduced-motion`, the formatted result and the folded crane are
+shown directly; the margin still works, without transitions, and the crane
+does not sway.
 
 Motion that answers an action (the playground formatting, copying a command,
 switching tabs) is short (150–200ms, ease-out) and shows what changed. No
@@ -201,8 +256,11 @@ Numbers are measured and linked to their source. No exclamation marks.
 
 * **README:** logo, one sentence, badges, the animated terminal (light and
   dark), diagrams in light and dark SVG.
-* **Website (`site/`):** a single page on GitHub Pages: hero with the fold
-  animation, the playground (origami in WebAssembly), how the self-check
-  works, line-break notes, speed, install.
+* **Website (`site/`):** a single page on GitHub Pages: the hero with the
+  fold, the draggable margin and the 3D crane; the playground (origami in
+  WebAssembly); how the self-check works; line-break notes; speed; the photo
+  band as a closing image; install, as tabs. A sticky header on `--paper`
+  that gets a crease once the page scrolls. The comparison page
+  (`abap-cleaner.html`) shares the header and the styles.
 * **Diagrams:** pipeline and the benchmark charts in the palette above (light and dark
   SVG), crease-line frames, Schibsted Grotesk labels, Martian Mono for code.
