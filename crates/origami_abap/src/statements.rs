@@ -3678,7 +3678,12 @@ fn declaration(p: &mut P) -> Option<Stmt> {
         } else {
             None
         };
-        let mut docs = vec![lead, p.sp(start + 1)];
+        // ABAP-DECL-002: `TYPES  END OF` puts `END` under `BEGIN`.
+        let gap = match p.c.end_gap {
+            Some(n) if structure && p.is(start + 1, "END") => b::spaces(n),
+            _ => p.sp(start + 1),
+        };
+        let mut docs = vec![lead, gap];
         for i in start + 1..ne {
             if i > start + 1 {
                 docs.push(p.sp(i));
@@ -3807,20 +3812,87 @@ fn declaration(p: &mut P) -> Option<Stmt> {
             level += 1;
         }
     }
-    // Group consecutive rows of the same level into alignment groups.
+    let docs = group_decl_lines(p, &mut lines, 0, forced, aligned);
+    p.pos = p.end;
+    let body = b::hang(docs);
+    let gap = match p.c.end_gap {
+        Some(n) if p.is(colon + 1, "END") && p.is(colon + 2, "OF") => b::spaces(n),
+        _ => p.sp(colon + 1),
+    };
+    Some(Stmt::Doc(b::group(vec![
+        lead,
+        p.sp(colon),
+        p.t(colon),
+        gap,
+        body,
+        p.period(),
+    ])))
+}
+
+/// The lines of a declaration chain, from level `base` on: consecutive rows
+/// of the same level form an alignment group, each line indented by its
+/// level above `base`. Aligned style (ABAP-ALIGN-003): a nested
+/// `BEGIN OF … END OF` between rows of one level is a line of that group, so
+/// the rows before and after it align together.
+fn group_decl_lines(
+    p: &mut P,
+    lines: &mut [(u32, Line, usize)],
+    base: u32,
+    forced: bool,
+    aligned: bool,
+) -> Vec<Doc> {
+    // The line closing the structure that opens at `k` (same level, `END OF`),
+    // if only deeper lines come between.
+    let nested_end = |p: &P, lines: &[(u32, Line, usize)], k: usize| -> Option<usize> {
+        let (lvl, _, first) = lines[k];
+        if !(p.is(first, "BEGIN") && p.is(first + 1, "OF")) || p.c.commented[first] {
+            return None;
+        }
+        let m = (k + 1..lines.len()).find(|&m| lines[m].0 <= lvl)?;
+        (lines[m].0 == lvl && p.is(lines[m].2, "END") && p.is(lines[m].2 + 1, "OF")).then_some(m)
+    };
     let mut docs: Vec<Doc> = Vec::new();
     let mut k = 0;
     while k < lines.len() {
         let (lvl, _, first_tok) = lines[k];
         let mut content: Vec<Doc>;
         if matches!(lines[k].1, Line::Cols(..)) {
-            let from = k;
-            while k < lines.len() && lines[k].0 == lvl && matches!(lines[k].1, Line::Cols(..)) {
-                k += 1;
+            // Rows of this level, and with `aligned` nested structures
+            // between them: (index range, nested structure).
+            let mut parts: Vec<(usize, usize, bool)> = Vec::new();
+            let mut j = k;
+            loop {
+                let from = j;
+                while j < lines.len() && lines[j].0 == lvl && matches!(lines[j].1, Line::Cols(..)) {
+                    j += 1;
+                }
+                if j > from {
+                    parts.push((from, j, false));
+                }
+                let next = if aligned && j < lines.len() && lines[j].0 == lvl {
+                    nested_end(p, lines, j)
+                } else {
+                    None
+                };
+                // Only a structure followed by more rows of this level joins.
+                match next {
+                    Some(m)
+                        if m + 1 < lines.len()
+                            && lines[m + 1].0 == lvl
+                            && matches!(lines[m + 1].1, Line::Cols(..))
+                            && !p.c.commented[lines[m + 1].2] =>
+                    {
+                        parts.push((j, m + 1, true));
+                        j = m + 1;
+                    }
+                    _ => break,
+                }
             }
             let (value_col, ro_col) = {
-                let cols: Vec<&DeclCols> = lines[from..k]
+                let cols: Vec<&DeclCols> = parts
                     .iter()
+                    .filter(|x| !x.2)
+                    .flat_map(|&(f, t, _)| lines[f..t].iter())
                     .filter_map(|l| match &l.1 {
                         Line::Cols(d, _) => Some(d),
                         _ => None,
@@ -3829,16 +3901,24 @@ fn declaration(p: &mut P) -> Option<Stmt> {
                 decl_columns(&cols)
             };
             let mut items: Vec<AlignItem> = Vec::new();
-            for l in &mut lines[from..k] {
-                let Line::Cols(d, brk) = std::mem::replace(&mut l.1, Line::Plain(b::empty()))
-                else {
-                    unreachable!()
-                };
-                if brk {
-                    items.push(AlignItem::Break);
+            for (f, t, nested) in parts {
+                if nested {
+                    let inner = group_decl_lines(p, &mut lines[f..t], lvl, forced, aligned);
+                    items.push(b::line(vec![b::concat(inner)]));
+                    continue;
                 }
-                items.push(d.row(value_col, ro_col));
+                for l in &mut lines[f..t] {
+                    let Line::Cols(d, brk) = std::mem::replace(&mut l.1, Line::Plain(b::empty()))
+                    else {
+                        unreachable!()
+                    };
+                    if brk {
+                        items.push(AlignItem::Break);
+                    }
+                    items.push(d.row(value_col, ro_col));
+                }
             }
+            k = j;
             content = vec![if forced {
                 b::align_broken(items)
             } else {
@@ -3874,18 +3954,9 @@ fn declaration(p: &mut P) -> Option<Stmt> {
             };
             content.insert(0, sep);
         }
-        docs.push((0..lvl).fold(b::concat(content), |d, _| b::indent(vec![d])));
+        docs.push((base..lvl).fold(b::concat(content), |d, _| b::indent(vec![d])));
     }
-    p.pos = p.end;
-    let body = b::hang(docs);
-    Some(Stmt::Doc(b::group(vec![
-        lead,
-        p.sp(colon),
-        p.t(colon),
-        p.sp(colon + 1),
-        body,
-        p.period(),
-    ])))
+    docs
 }
 
 // ---- aliases -----------------------------------------------------------------

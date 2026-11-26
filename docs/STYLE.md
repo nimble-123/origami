@@ -848,7 +848,8 @@ statements between them are indented one level.
 Approved by the maintainer, Nils Lutz, on 2026-11-26, as ABAP Cleaner's
 "Align declarations" does: an `INCLUDE TYPE` or `INCLUDE STRUCTURE` there
 starts in the column of the structure's components, that is the column of
-`BEGIN` plus one level. The statement with `END OF` puts `END` in the column
+`BEGIN` plus one level (one with a comment line in front stays one level
+in, with its comment). The statement with `END OF` puts `END` in the column
 of `BEGIN`: it pads the space after its keyword (`TYPES  END OF` after
 `TYPES: BEGIN OF`), and keeps a single space where `END` would otherwise
 have to move left.
