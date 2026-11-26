@@ -98,6 +98,17 @@ on `main`. It must be a [Conventional Commit](https://www.conventionalcommits.or
 a check enforces it. [release-please](https://github.com/googleapis/release-please)
 turns these commits into the version number and the changelog.
 
+The commit on `main` is the title only; the description stays on the pull
+request. The repository is set up that way (squash commit message: blank)
+because release-please drops a commit whose body it cannot parse, and a line
+of a diff block such as `+lo_log->add( iv_text = lv_text` is enough for
+that: 0.4.1 and 0.4.2 each lost a changelog entry this way.
+
+A pull request that changes only documentation skips the jobs that build and
+test the code (`changes` in `.github/workflows/ci.yml` decides). Documentation
+is `site/`, `docs/` except `docs/STYLE.md` (tests read it), Markdown files
+outside the code folders, and `scripts/abap-cleaner-compare/`.
+
 ```text
 <type>(<optional scope>): <what changes, in the imperative>
 ```
@@ -123,8 +134,9 @@ fix(vscode): keep edits made after Preview Changes was opened
 ```
 
 A change that breaks configuration, the command line, exit codes or the JSON
-diagnostics schema gets a `!` after the type (`feat(cli)!: …`) and a
-`BREAKING CHANGE:` paragraph in the description. Within a style edition,
+diagnostics schema gets a `!` after the type (`feat(cli)!: …`); say what
+breaks in the title, because only the title reaches the changelog. Within a
+style edition,
 formatted output changes only to fix bugs; every such change is a `style`
 commit with its rule ID.
 
