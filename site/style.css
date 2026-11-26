@@ -776,3 +776,5 @@ textarea.code:focus-visible { outline-offset: 0; }
 .table-note { margin: var(--s-3) 0 0; color: var(--ink-soft); font-size: var(--t-0); max-width: var(--measure); }
 .live-only { display: none; }
 .journey.live .live-only { display: inline; }
+/* With the stage, its foot line shows the live values; the steps keep them for screen readers. */
+.journey.live .step-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
