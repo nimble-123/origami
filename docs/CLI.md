@@ -72,7 +72,9 @@ write `--changed=REF path…` or put the paths first (`origami src/
   only as one `NOTE` count; last line `NEXT: …` says what to do. Stable
   within a major version.
 * **json**: the schema in `schemas/diagnostics.v1.json` (frozen).
-* **sarif**: SARIF 2.1.0.
+* **sarif**: SARIF 2.1.0. `artifactLocation.uri` is the path as a
+  percent-encoded URI reference with forward slashes; a diagnostic that
+  belongs to no file (`<args>`, `<stdin>`, `<internal>`) has no location.
 
 ## MCP server
 

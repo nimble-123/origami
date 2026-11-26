@@ -534,6 +534,30 @@ fn a_closed_stdout_is_not_an_internal_error() {
 }
 
 #[test]
+fn sarif_uris_are_percent_encoded_and_pseudo_paths_have_no_location() {
+    let d = dir();
+    write(d.path(), "my dir/bad#1.prog.abap", "ENDIF.\n");
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--diagnostics", "sarif"])
+        .output()
+        .unwrap();
+    let doc = json_of(&out.stderr);
+    let loc = &doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"];
+    assert_eq!(loc["artifactLocation"]["uri"], "my%20dir/bad%231.prog.abap");
+    // A usage error belongs to no file.
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--diagnostics", "sarif", "--lines", "x", "my dir"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    let result = &json_of(&out.stderr)["runs"][0]["results"][0];
+    assert_eq!(result["ruleId"], "E021");
+    assert!(result.get("locations").is_none(), "{result}");
+}
+
+#[test]
 fn check_diff_prints_a_unified_diff_to_stdout() {
     let d = dir();
     write(d.path(), "z.prog.abap", "lv_a   =   1.\n");
