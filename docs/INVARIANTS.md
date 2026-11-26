@@ -132,7 +132,7 @@ token-equivalent and stable from one run to the next:
 
 | Limit | Effect | Test |
 |---|---|---|
-| A unit nested deeper than 100 levels of blocks and brackets combined (`origami_syntax::MAX_NESTING`) | the unit is printed byte for byte; its indent is capped at 100 levels | `crates/origami_core/tests/limits.rs` |
+| A unit nested deeper than 100 levels of blocks, brackets and CDS `case` expressions combined (`origami_syntax::MAX_NESTING`) | the unit is printed byte for byte; its indent is capped at 100 levels | `crates/origami_core/tests/limits.rs` |
 | An input larger than 8 MiB (`origami_core::MAX_INPUT_LEN`) | the file is not formatted (status `unchanged`) | `limits.rs` |
 | An output larger than 16 times the input plus 1 MiB (`origami_syntax::max_output_len`) | the printer stops, and the file stays as written | `limits.rs` |
 
