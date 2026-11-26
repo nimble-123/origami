@@ -8,9 +8,13 @@
 use origami_core::{Code, LanguageHint, Options, Style, format};
 
 fn check(cases: &[(&str, &str)]) {
-    let hint = LanguageHint::Path("t.prog.abap".into());
+    check_style(Style::Compact, "t.prog.abap", cases);
+}
+
+fn check_style(style: Style, path: &str, cases: &[(&str, &str)]) {
+    let hint = LanguageHint::Path(path.into());
     let mut opts = Options::default();
-    opts.lang.style = Style::Compact;
+    opts.lang.style = style;
     for (input, expected) in cases {
         for src in [input, expected] {
             let r = format(src.as_bytes(), &hint, &opts);
@@ -103,6 +107,33 @@ fn rap_derived_types() {
 "#,
         ),
     ]);
+}
+
+/// RAP handler parameters in both styles; the aligned signature table once
+/// left them in lower case.
+#[test]
+fn rap_handler_parameters() {
+    let input = r#"class lhc definition inheriting from cl_abap_behavior_handler.
+  private section.
+    methods auth for instance authorization
+      importing keys request requested for measure result result.
+    methods glob for global authorization
+      importing request requested for measure result result.
+    methods accept for modify importing keys for action measure~accept result result.
+    methods cba for read importing keys_rba for read measure\_items full requested result result link links.
+endclass.
+"#;
+    let expected = r#"CLASS lhc DEFINITION INHERITING FROM cl_abap_behavior_handler.
+  PRIVATE SECTION.
+    METHODS auth FOR INSTANCE AUTHORIZATION IMPORTING keys REQUEST requested FOR measure RESULT result.
+    METHODS glob FOR GLOBAL AUTHORIZATION IMPORTING REQUEST requested FOR measure RESULT result.
+    METHODS accept FOR MODIFY IMPORTING keys FOR ACTION measure~accept RESULT result.
+    METHODS cba FOR READ IMPORTING keys_rba FOR READ measure\_items FULL requested RESULT result LINK links.
+ENDCLASS.
+"#;
+    for style in [Style::Aligned, Style::Compact] {
+        check_style(style, "lhc.clas.abap", &[(input, expected)]);
+    }
 }
 
 #[test]
