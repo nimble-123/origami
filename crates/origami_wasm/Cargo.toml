@@ -12,6 +12,10 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 origami_core.workspace = true
+# The lexers, for `lex`: the tokens the self-check compares.
+origami_syntax.workspace = true
+origami_abap.workspace = true
+origami_cds.workspace = true
 serde_json.workspace = true
 
 # The C ABI for JavaScript needs `no_mangle` and raw pointers; everything else

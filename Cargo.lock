@@ -823,7 +823,10 @@ dependencies = [
 name = "origami_wasm"
 version = "0.4.4"
 dependencies = [
+ "origami_abap",
+ "origami_cds",
  "origami_core",
+ "origami_syntax",
  "serde_json",
 ]
 

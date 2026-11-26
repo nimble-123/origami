@@ -1,6 +1,6 @@
 name: Website
 
-# Builds site/ (static page, diagrams, origami as WebAssembly) and deploys it
+# Builds site/ (static pages, origami as WebAssembly, the formatted views filled in from it) and deploys it
 # to GitHub Pages: https://nimble-123.github.io/origami/
 
 on:

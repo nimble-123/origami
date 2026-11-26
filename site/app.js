@@ -1,143 +1,30 @@
-// origami website: the fold animation in the hero, copy buttons and the
-// playground (origami compiled to WebAssembly, see crates/origami_wasm).
+// origami website, the entry module: entrances, the light on the tiles, copy
+// buttons, tabs, the playground, the install tabs, the live speed
+// measurement and the closing crane; the hero (hero.js) and the chapters
+// (chapters.js). One worker formats for all of them (format.js, worker.js).
 
-const REPO = "https://github.com/nimble-123/origami";
+import {
+  $,
+  REPO,
+  RUN_TIMEOUT_MS,
+  announce,
+  cancelAnnounce,
+  formatMs,
+  formatter,
+  paint,
+  reduceMotion,
+  request,
+  startWorker,
+  submit,
+} from "./format.js";
+import { hero } from "./hero.js";
+import { chapters } from "./chapters.js";
 
 for (const a of document.querySelectorAll("[data-repo-path]")) {
   a.href = `${REPO}/blob/main/${a.dataset.repoPath}`;
 }
 
-const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-// ---- hero: a long line folds into shape ---------------------------------
-
-const HERO_BEFORE =
-  "DATA(ls_rule) = zcl_flight_rules=>get( iv_carrier = is_flight-carrid iv_date = sy-datum iv_mode = 'A' ).";
-const HERO_AFTER = [
-  "DATA(ls_rule) = zcl_flight_rules=>get( iv_carrier = is_flight-carrid",
-  "                                       iv_date    = sy-datum",
-  "                                       iv_mode    = 'A' ).",
-].join("\n");
-
-/** Tokyo Night syntax colors for ABAP or CDS: comments, strings, numbers
- * and keywords. Groups: 1 comment, 2 string, 3 number, 4 word. */
-const ABAP_SYNTAX =
-  /(^\*.*|".*)|('(?:[^'\n]|'')*'?|`(?:[^`\n]|``)*`?|\|(?:[^|\\\n]|\\.)*\|?)|\b(\d+)\b|(?<![-~>\w/%$])([A-Za-z_/%$][\w/%$]*(?:-[A-Za-z_][\w]*)*)/gm;
-const CDS_SYNTAX =
-  /(\/\/.*|--.*|\/\*[\s\S]*?(?:\*\/|$(?![\s\S])))|('(?:[^'\n]|'')*'?)|\b(\d+)\b|(?<![.@#$\w])([A-Za-z_][\w$#]*)/gm;
-
-// Keywords, in upper case: the words origami's parsers know (keywords.js,
-// written by site/build.sh), and for CDS the words its grammar matches by
-// token kind.
-const KEYWORDS = {
-  abap: new Set((self.KEYWORDS?.abap ?? "").split(" ").filter(Boolean)),
-  cds: new Set(
-    [
-      ...(self.KEYWORDS?.cds ?? "").split(" "),
-      ..."abstract action all annotate annotation aspect between cast child custom default delete determination distinct entity enum exists expose false field from function in is like managed mandatory not null of parent readonly redirected returns role root service strict table then to true type unmanaged update use validation view virtual".split(
-        " ",
-      ),
-    ]
-      .filter(Boolean)
-      .map((w) => w.toUpperCase()),
-  ),
-};
-
-/** Text nodes and spans for `text`. `upper`: in ABAP, a word is a keyword
- * when it is in upper case (origami's output with keywords in upper case);
- * otherwise it is a keyword when it is in the keyword list. */
-function paint(text, { cds = false, upper = false } = {}) {
-  const out = [];
-  let pos = 0;
-  const words = cds ? KEYWORDS.cds : KEYWORDS.abap;
-  for (const m of text.matchAll(cds ? CDS_SYNTAX : ABAP_SYNTAX)) {
-    let cls = m[1] ? "com" : m[2] ? "str" : m[3] ? "num-lit" : null;
-    if (!cls) {
-      const w = m[4];
-      const kw =
-        upper && !cds ? /^[A-Z][A-Z-]*[A-Z]$/.test(w) : words.has(w.toUpperCase());
-      if (!kw) continue;
-      cls = "kw";
-    }
-    if (m.index > pos) out.push(text.slice(pos, m.index));
-    const s = document.createElement("span");
-    s.className = cls;
-    s.textContent = m[0];
-    out.push(s);
-    pos = m.index + m[0].length;
-  }
-  if (pos < text.length) out.push(text.slice(pos));
-  return out;
-}
-
-/** Tokens with line and column. origami changes layout only, so the two
- * texts have the same tokens in the same order. */
-function tokens(text) {
-  const out = [];
-  text.split("\n").forEach((line, y) => {
-    for (const m of line.matchAll(/\S+/g)) out.push({ text: m[0], x: m.index, y });
-  });
-  return out;
-}
-
-function hero() {
-  const box = document.getElementById("hero-code");
-  const note = document.getElementById("hero-note");
-  if (!box) return;
-  const before = tokens(HERO_BEFORE);
-  const after = tokens(HERO_AFTER);
-  const spans = before.map((t, i) => {
-    const s = document.createElement("span");
-    s.className = "tok";
-    s.append(...paint(t.text, { upper: true }));
-    s.style.setProperty("--x", t.x);
-    s.style.setProperty("--y", t.y);
-    box.append(s);
-    return s;
-  });
-  // A crease before every token that starts a new line after the fold.
-  let k = 0;
-  after.forEach((t, i) => {
-    if (t.y > 0 && (i === 0 || after[i - 1].y !== t.y)) {
-      const c = document.createElement("span");
-      c.className = "crease";
-      c.style.setProperty("--x", before[i].x);
-      c.style.setProperty("--i", k++);
-      box.append(c);
-    }
-  });
-  const fold = () => {
-    after.forEach((t, i) => {
-      spans[i].style.setProperty("--x", t.x);
-      spans[i].style.setProperty("--y", t.y);
-    });
-    box.classList.add("folded");
-  };
-  if (reduceMotion) {
-    for (const s of spans) s.style.transition = "none";
-    fold();
-    note.classList.add("show");
-    return;
-  }
-  setTimeout(() => box.classList.add("creased"), 500);
-  setTimeout(fold, 1300);
-  setTimeout(() => note.classList.add("show"), 2100);
-}
-
 // ---- copy buttons ---------------------------------------------------------
-
-// A visually hidden live region: the page says what changed, but only for
-// state changes the visitor asked for (a copy, an error, a finished run).
-const announcer = document.getElementById("announce");
-let announceTimer = 0;
-function announce(message, delay = 0) {
-  clearTimeout(announceTimer);
-  // Emptied first, so the same message twice is announced twice.
-  if (announcer) announcer.textContent = "";
-  announceTimer = setTimeout(() => {
-    if (announcer) announcer.textContent = message;
-  }, delay);
-}
 
 for (const b of document.querySelectorAll("[data-copy]")) {
   const label = b.getAttribute("aria-label");
@@ -166,6 +53,23 @@ for (const b of document.querySelectorAll("[data-copy]")) {
         b.setAttribute("aria-label", label);
       }
     }, 1600);
+  });
+}
+
+// ---- tabs (playground panes, install) -----------------------------------------
+
+/** Arrow keys, Home and End move between the tabs and select them. */
+function tabKeys(tabs, select) {
+  tabs.forEach((tab, i) => {
+    tab.addEventListener("click", () => select(i));
+    tab.addEventListener("keydown", (e) => {
+      const n = tabs.length;
+      const j = { ArrowRight: (i + 1) % n, ArrowLeft: (i - 1 + n) % n, Home: 0, End: n - 1 }[e.key];
+      if (j == null) return;
+      e.preventDefault();
+      select(j);
+      tabs[j].focus();
+    });
   });
 }
 
@@ -212,7 +116,6 @@ _Carrier
   },
 };
 
-const $ = (id) => document.getElementById(id);
 const input = $("pg-input");
 const highlight = $("pg-highlight");
 const output = $("pg-output");
@@ -220,19 +123,13 @@ const outputText = $("pg-output-text");
 const status = $("pg-status");
 const copyButton = $("pg-copy");
 
-// origami runs in a Web Worker (worker.js). A run that takes longer than
-// RUN_TIMEOUT_MS terminates the worker and starts a new one.
-const RUN_TIMEOUT_MS = 5000;
 // A finished run is announced to screen readers only after this pause, so
 // typing is not interrupted by a message per keystroke.
 const ANNOUNCE_PAUSE_MS = 1500;
 const LOAD_ERROR = "The playground could not load origami.wasm. Install origami to try it locally.";
+// Files larger than this are not opened: the playground is for trying origami.
+const FILE_MAX = 5_000_000;
 
-let worker = null;
-let ready = false;
-let nextId = 0;
-let inflight = null; // { id, timer, opts }: the options the request was sent with
-let queued = null; // the newest request made while a run was in flight
 let timedOut = null; // the request that hit the timeout; not run again until it changes
 
 function ruleLink(text, rule) {
@@ -274,6 +171,7 @@ function render(r, opts) {
       ? `${d.code} at line ${d.line}, column ${d.column}: ${d.message}`
       : "origami could not format this code.";
     announce(status.textContent);
+    panes.changed();
     return;
   }
   status.classList.remove("error");
@@ -281,17 +179,16 @@ function render(r, opts) {
   copyButton.disabled = false;
   const warnings = r.diagnostics.filter((d) => d.code !== "W003").length;
   const num = (n) => `<span class="num">${n}</span>`;
-  const parts = [];
-  parts.push(r.changed ? "Formatted" : "Already formatted");
-  parts.push(`${num(r.notes.length)} ${r.notes.length === 1 ? "note" : "notes"} on line breaks`);
+  const parts = [`${r.changed ? "Formatted" : "Already formatted, checked"} in ${num(formatMs(r.ms))} ms`];
+  parts.push(`${num(r.notes.length)} line ${r.notes.length === 1 ? "break" : "breaks"} with a note`);
   if (warnings) parts.push(`${num(warnings)} ${warnings === 1 ? "warning" : "warnings"}`);
-  const tail = `Took ${num(r.ms)} ms in your browser.`;
   // A row and highlight spans per line would freeze the tab on a huge paste.
   if (r.output.length > HIGHLIGHT_MAX) {
     output.classList.add("plain");
     output.textContent = r.output;
-    status.innerHTML = `${parts.join(", ")}. ${tail} Shown as plain text because the output is large.`;
+    status.innerHTML = `${parts.join(", ")}. Shown as plain text because the output is large.`;
     announce(status.textContent, ANNOUNCE_PAUSE_MS);
+    panes.changed();
     return;
   }
   const lines = r.output.replace(/\n$/, "").split("\n");
@@ -324,8 +221,9 @@ function render(r, opts) {
     }
   });
   output.append(frag);
-  status.innerHTML = `${parts.join(", ")}. ${tail}`;
+  status.innerHTML = `${parts.join(", ")}.`;
   announce(status.textContent, ANNOUNCE_PAUSE_MS);
+  panes.changed();
 }
 
 // Inputs and outputs larger than this are shown without colors, so typing
@@ -348,19 +246,25 @@ function syncScroll() {
   highlight.scrollLeft = input.scrollLeft;
 }
 
+const radio = (name) => document.querySelector(`input[name="${name}"]:checked`)?.value;
+function setRadio(name, value) {
+  const r = document.querySelector(`input[name="${name}"][value="${value}"]`);
+  if (r) r.checked = true;
+}
+
 function options() {
   return {
-    cds: $("pg-lang").value === "cds",
-    width: Number($("pg-width").value),
-    lower: $("pg-case").value === "lower",
-    compact: $("pg-style").value === "compact",
+    cds: radio("pg-lang") === "cds",
+    width: Number(radio("pg-width")),
+    lower: radio("pg-case") === "lower",
+    compact: radio("pg-style") === "compact",
   };
 }
 
 let timer = 0;
 function schedule() {
   clearTimeout(timer);
-  clearTimeout(announceTimer);
+  cancelAnnounce();
   timer = setTimeout(run, 120);
 }
 
@@ -371,73 +275,131 @@ function showError(message) {
   announce(message);
 }
 
-function startWorker() {
-  ready = false;
-  const mine = new Worker("worker.js");
-  worker = mine;
-  mine.onmessage = ({ data }) => {
-    if (mine !== worker) return;
-    if (data.type === "ready") {
-      ready = true;
-      if (queued) dispatch();
-      else run();
-    } else if (data.type === "load-error") {
-      showError(LOAD_ERROR);
-    } else if (inflight && data.id === inflight.id) {
-      clearTimeout(inflight.timer);
-      const { opts } = inflight;
-      inflight = null;
-      if (data.type === "panic") {
-        showError("origami stopped on this input (internal error). Please report it with the code.");
-      } else {
-        render(data.result, opts);
-      }
-      if (queued) dispatch();
-    }
-  };
-  mine.onerror = () => showError(LOAD_ERROR);
-}
-
-function dispatch() {
-  const job = queued;
-  queued = null;
-  const id = nextId++;
-  const timer = setTimeout(() => {
-    // The worker is stuck in a long run: stop it and start a new one.
-    worker.terminate();
-    inflight = null;
-    timedOut = job;
-    showError(
-      `origami took longer than ${RUN_TIMEOUT_MS / 1000} seconds on this input and was stopped. Try a smaller input.`,
-    );
-    startWorker();
-  }, RUN_TIMEOUT_MS);
-  inflight = { id, timer, opts: job.opts };
-  worker.postMessage({ id, ...job });
-}
-
 function run() {
   paintInput();
-  if (!ready) return;
+  if (!formatter.ready) return;
   const job = { source: input.value, opts: options() };
   // The restarted worker would hang on the same request again.
   if (timedOut && timedOut.source === job.source && JSON.stringify(timedOut.opts) === JSON.stringify(job.opts)) return;
-  queued = job;
-  if (!inflight) dispatch();
+  submit("pg", {
+    ...job,
+    latestOnly: true,
+    onResult: (data) => {
+      if (data.type === "panic") {
+        showError("origami stopped on this input (internal error). Please report it with the code.");
+      } else {
+        render(data.result, job.opts);
+      }
+    },
+    onTimeout: () => {
+      timedOut = job;
+      showError(
+        `origami took longer than ${RUN_TIMEOUT_MS / 1000} seconds on this input and was stopped. Try a smaller input.`,
+      );
+    },
+  });
 }
 
 function loadExample(key) {
   const ex = EXAMPLES[key];
   input.value = ex.text;
-  $("pg-lang").value = ex.lang;
+  setRadio("pg-lang", ex.lang);
   run();
 }
 
-async function playground() {
+/** The language a file name says: ABAP for `.abap`, the CDS family for the
+ * CDS, DDLX, DCL, BDEF and SRVD extensions; `null` when it says nothing. */
+function langOf(name) {
+  const n = name.toLowerCase();
+  if (n.endsWith(".abap")) return "abap";
+  if ([".asddls", ".asddlxs", ".asdcls", ".asbdef", ".srvdsrv", ".acds"].some((e) => n.endsWith(e))) return "cds";
+  return null;
+}
+
+/** Reads a file in the browser; nothing is uploaded. */
+async function openFile(file) {
+  if (!file) return;
+  if (file.size > FILE_MAX) {
+    showError(`${file.name} is larger than 5 MB. Open a smaller file, or run origami on it locally.`);
+    return;
+  }
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    showError(`${file.name} could not be read. Try again, or paste its contents.`);
+    return;
+  }
+  input.value = text;
+  const lang = langOf(file.name);
+  if (lang) setRadio("pg-lang", lang);
+  panes.select(0);
+  announce(`Opened ${file.name}.`);
+  run();
+}
+
+/** Below 56rem the panes are tabs: "Your code" and "Formatted". The tab of
+ * the output gets a dot when a result arrives while the input is shown. */
+const panes = {
+  narrow: matchMedia("(max-width: 55.99rem)"),
+  index: 0,
+  seen: null,
+  tabs: [],
+  setup() {
+    const list = $("pg-tabs");
+    this.tabs = [$("pg-tab-in"), $("pg-tab-out")];
+    this.panels = [$("pg-pane-in"), $("pg-pane-out")];
+    tabKeys(this.tabs, (i) => this.select(i));
+    const apply = () => {
+      const on = this.narrow.matches;
+      list.hidden = !on;
+      $("pg").classList.toggle("tabbed", on);
+      this.panels.forEach((p, i) => {
+        if (on) {
+          p.setAttribute("role", "tabpanel");
+          p.setAttribute("aria-labelledby", this.tabs[i].id);
+          p.hidden = i !== this.index;
+        } else {
+          p.removeAttribute("role");
+          p.removeAttribute("aria-labelledby");
+          p.hidden = false;
+        }
+      });
+    };
+    this.narrow.addEventListener("change", apply);
+    apply();
+  },
+  select(i) {
+    this.index = i;
+    this.tabs.forEach((t, j) => {
+      t.setAttribute("aria-selected", String(i === j));
+      t.tabIndex = i === j ? 0 : -1;
+    });
+    if (this.narrow.matches) this.panels.forEach((p, j) => (p.hidden = i !== j));
+    if (i === 1) {
+      this.seen = outputText.textContent;
+      this.badge(false);
+    }
+  },
+  changed() {
+    const now = outputText.textContent;
+    // The first result (the example) is not news.
+    if (this.seen === null) this.seen = now;
+    if (this.narrow.matches && this.index === 0 && now !== this.seen) this.badge(true);
+    if (this.index === 1 || !this.narrow.matches) this.seen = now;
+  },
+  badge(on) {
+    $("pg-badge").classList.toggle("on", on);
+    $("pg-badge-text").hidden = !on;
+  },
+};
+
+function playground() {
   if (!input) return;
   input.value = EXAMPLES.call.text;
+  panes.setup();
   $("pg-example").addEventListener("change", (e) => loadExample(e.target.value));
-  for (const id of ["pg-lang", "pg-width", "pg-case", "pg-style"]) $(id).addEventListener("change", run);
+  for (const r of document.querySelectorAll(".pg-controls input[type=radio]")) r.addEventListener("change", run);
   // Tab indents, which would trap keyboard users: Escape releases the trap
   // until the next input or focus.
   let tabIndents = true;
@@ -464,12 +426,255 @@ async function playground() {
       }
     }
   });
-  try {
-    startWorker();
-  } catch {
-    showError(LOAD_ERROR);
-  }
+
+  // Files: "Open file" or dropped on the editor, read locally.
+  const file = $("pg-file");
+  $("pg-open").addEventListener("click", () => file.click());
+  file.addEventListener("change", () => {
+    openFile(file.files[0]);
+    file.value = "";
+  });
+  const editor = $("pg-editor");
+  let depth = 0;
+  const hasFile = (e) => [...(e.dataTransfer?.types ?? [])].includes("Files");
+  editor.addEventListener("dragenter", (e) => {
+    if (!hasFile(e)) return;
+    e.preventDefault();
+    depth++;
+    editor.classList.add("drop");
+  });
+  editor.addEventListener("dragover", (e) => {
+    if (!hasFile(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  });
+  editor.addEventListener("dragleave", () => {
+    if (--depth <= 0) {
+      depth = 0;
+      editor.classList.remove("drop");
+    }
+  });
+  editor.addEventListener("drop", (e) => {
+    if (!hasFile(e)) return;
+    e.preventDefault();
+    depth = 0;
+    editor.classList.remove("drop");
+    openFile(e.dataTransfer.files[0]);
+  });
+
+  formatter.readyHandlers.push(run);
+  formatter.failHandlers.push(() => showError(LOAD_ERROR));
+  paintInput();
 }
 
+// ---- install tabs -------------------------------------------------------------
+
+/** One panel at a time, chosen by tabs that are built from the panel titles;
+ * without scripting every panel is shown. Preselected: Homebrew on macOS and
+ * Linux, Cargo elsewhere. */
+function installTabs() {
+  const box = $("inst");
+  if (!box) return;
+  const panels = [...box.querySelectorAll(".inst-panel")];
+  const list = document.createElement("div");
+  list.className = "inst-tabs";
+  list.setAttribute("role", "tablist");
+  list.setAttribute("aria-label", "Ways to install origami");
+  const tabs = panels.map((p) => {
+    const t = document.createElement("button");
+    t.type = "button";
+    t.id = `${p.id}-tab`;
+    t.setAttribute("role", "tab");
+    t.setAttribute("aria-controls", p.id);
+    t.textContent = p.querySelector("h3").textContent;
+    p.setAttribute("role", "tabpanel");
+    p.setAttribute("aria-labelledby", t.id);
+    list.append(t);
+    return t;
+  });
+  const select = (i) => {
+    tabs.forEach((t, j) => {
+      t.setAttribute("aria-selected", String(i === j));
+      t.tabIndex = i === j ? 0 : -1;
+    });
+    panels.forEach((p, j) => (p.hidden = i !== j));
+  };
+  tabKeys(tabs, select);
+  const platform = (navigator.userAgentData?.platform || navigator.platform || "").toLowerCase();
+  const ua = navigator.userAgent.toLowerCase();
+  const unix = /mac|linux/.test(platform) && !/android|iphone|ipad/.test(ua);
+  select(unix ? 0 : 1);
+  box.prepend(list);
+  box.classList.add("tabbed");
+}
+
+// ---- diagrams that scroll sideways get a tab stop -------------------------
+
+function scrollers() {
+  const ro = new ResizeObserver((entries) => {
+    for (const { target } of entries) {
+      const scrolls = target.scrollWidth > target.clientWidth + 1;
+      if (scrolls) {
+        target.tabIndex = 0;
+        target.setAttribute("role", "region");
+        target.setAttribute("aria-label", "Diagram");
+      } else {
+        target.removeAttribute("tabindex");
+        target.removeAttribute("role");
+        target.removeAttribute("aria-label");
+      }
+    }
+  });
+  for (const el of document.querySelectorAll("[data-scroll]")) ro.observe(el);
+}
+
+// ---- speed: measured here ------------------------------------------------------
+
+/** Formats the playground's code 200 times in the worker and reports the
+ * median of one call, next to the published numbers. */
+function speed() {
+  const box = $("measure");
+  if (!box) return;
+  const button = $("measure-button");
+  const out = $("measure-out");
+  box.hidden = false;
+  button.disabled = true;
+  formatter.readyHandlers.push(() => (button.disabled = false));
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    const source = input.value;
+    const lines = source.split("\n").length;
+    out.textContent = "Measuring…";
+    try {
+      const r = await request("bench", { op: "bench", source, opts: options(), runs: 200, timeout: 30000 });
+      const sorted = [...r.perCall].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      out.innerHTML = "";
+      const strong = document.createElement("strong");
+      strong.textContent = `${formatMs(median)} ms`;
+      out.append(
+        "In this browser: ",
+        strong,
+        ` per call, the median of ${r.calls} calls on the playground's ${lines} lines, in WebAssembly.`,
+      );
+      mineRow(median);
+      announce(out.textContent);
+    } catch {
+      out.textContent = "The measurement did not finish. Try again, or with less code in the playground.";
+    }
+    button.disabled = false;
+  });
+}
+
+/** A row for this browser in the published table, on the same scale. */
+function mineRow(ms) {
+  const body = document.querySelector(".bars tbody");
+  let row = body.querySelector(".mine");
+  if (!row) {
+    row = document.createElement("tr");
+    row.className = "mine";
+    row.innerHTML = '<th scope="row">This browser, playground code</th><td class="num"></td><td class="num">–</td><td class="bar" aria-hidden="true"><span class="b"></span></td>';
+    body.insertBefore(row, body.querySelector(".other"));
+  }
+  row.querySelector(".num").textContent = formatMs(ms);
+  // The scale of the published bars: log10 from 0.063 ms (0) to 315 ms (100%).
+  const pct = Math.max(1, Math.min(100, ((Math.log10(Math.max(ms, 0.01)) + 1.2) / 3.7) * 100));
+  row.querySelector(".b").style.width = `${pct}%`;
+}
+
+// ---- entrances: once, as a group comes into view --------------------------
+
+function entrances() {
+  if (reduceMotion || !("IntersectionObserver" in window)) return;
+  const items = [...document.querySelectorAll("[data-rise]")];
+  // Siblings in a group follow each other by 70 ms.
+  for (const el of items) {
+    const group = [...el.parentElement.children].filter((c) => c.hasAttribute("data-rise"));
+    el.style.setProperty("--d", `${Math.min(5, group.indexOf(el)) * 70}ms`);
+  }
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        e.target.classList.add("in");
+        io.unobserve(e.target);
+      }
+    },
+    { rootMargin: "0px 0px -8% 0px" },
+  );
+  // Whatever is already on screen comes in at once.
+  document.documentElement.classList.add("rise");
+  for (const el of items) io.observe(el);
+}
+
+// ---- a light that follows the pointer over a tile ---------------------------
+
+function tileLight() {
+  if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  let raf = 0;
+  let last = null;
+  addEventListener(
+    "pointermove",
+    (e) => {
+      last = e;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const tile = last.target.closest?.(".tile");
+        if (!tile) return;
+        const r = tile.getBoundingClientRect();
+        tile.style.setProperty("--mx", `${Math.round(last.clientX - r.left)}px`);
+        tile.style.setProperty("--my", `${Math.round(last.clientY - r.top)}px`);
+      });
+    },
+    { passive: true },
+  );
+}
+
+// ---- the version in the badge: from the release-please line ----------------
+
+function version() {
+  const m = $("inst-actions-code")?.textContent.match(/origami@v(\d+\.\d+\.\d+)/);
+  const tag = $("version");
+  if (!m || !tag) return;
+  tag.textContent = m[1];
+  tag.hidden = false;
+}
+
+// ---- the closing crane: loaded as its section comes near --------------------
+
+function closingCrane() {
+  const box = $("crane-box");
+  if (!box) return;
+  const still = () => box.classList.add("still");
+  const conn = navigator.connection;
+  if (conn?.saveData || (navigator.deviceMemory && navigator.deviceMemory < 2)) return still();
+  const probe = document.createElement("canvas");
+  // three.js r170 needs WebGL 2.
+  const gl = probe.getContext("webgl2");
+  if (!gl) return still();
+  gl.getExtension("WEBGL_lose_context")?.loseContext();
+  const io = new IntersectionObserver(
+    ([e]) => {
+      if (!e.isIntersecting) return;
+      io.disconnect();
+      import("./crane.js")
+        .then((m) => m.mount(box, { reduceMotion, onFail: still }))
+        .catch(still);
+    },
+    { rootMargin: "600px 0px" },
+  );
+  io.observe(box);
+}
+
+version();
+entrances();
+tileLight();
 hero();
+chapters();
 playground();
+installTabs();
+scrollers();
+speed();
+closingCrane();
+startWorker();
