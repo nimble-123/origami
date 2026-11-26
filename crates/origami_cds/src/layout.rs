@@ -601,6 +601,12 @@ pub fn layout(
         } else {
             u.depth + u.extra
         };
+        // Comment lines before a closing brace belong to the block's content.
+        let body = if u.kind == Kind::Close {
+            b::lead_indent(vec![body])
+        } else {
+            body
+        };
         docs.push((0..level).fold(b::concat(vec![start, body]), |d, _| b::indent(vec![d])));
     }
     let forced_blanks = if view {

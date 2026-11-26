@@ -5,4 +5,5 @@ define behavior for ZI_Travel alias Travel
 {
   create;
   association _Booking { create; }
+  // last
 }

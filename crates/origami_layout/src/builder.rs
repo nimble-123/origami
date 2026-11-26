@@ -95,6 +95,12 @@ pub fn indent_by(n: u32, docs: Vec<Doc>) -> Doc {
     Doc(Inner::IndentBy(n, docs))
 }
 
+/// `docs` start with a token whose leading comment lines are indented one
+/// level deeper than the token: the closing bracket of a block.
+pub fn lead_indent(docs: Vec<Doc>) -> Doc {
+    Doc(Inner::LeadIndent(docs))
+}
+
 /// Continuation indent: two levels.
 /// The continuation indent of ABAP-INDENT-001.
 pub fn cont(docs: Vec<Doc>) -> Doc {

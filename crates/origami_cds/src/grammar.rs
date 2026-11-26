@@ -248,7 +248,7 @@ impl G<'_> {
             self.t(open),
             b::indent(items),
             self.ln(close),
-            self.t(close),
+            b::lead_indent(vec![self.t(close)]),
         ]);
         Some((doc, close + 1))
     }

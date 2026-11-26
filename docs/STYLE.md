@@ -1376,6 +1376,8 @@ Milestone: M2
 
 Units are indented one level per enclosing `{ }` block. `{` and `}` are at the
 level of the header they belong to.
+A comment line in front of a closing `}` or `]` stays at the level of the
+content it follows, one level deeper than the bracket.
 
 ```cds
 define behavior for ZI_Travel alias Travel
