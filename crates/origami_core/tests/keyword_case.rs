@@ -5,7 +5,7 @@
 //! (scripts/abap-cleaner-compare/keywords.py). The cases are written in the
 //! compact style, so their line breaks do not depend on the style rules.
 
-use origami_core::{Code, LanguageHint, Options, Style, format};
+use origami_core::{Case, Code, LanguageHint, Options, Style, format};
 
 fn check(cases: &[(&str, &str)]) {
     check_style(Style::Compact, "t.prog.abap", cases);
@@ -825,6 +825,76 @@ ENDLOOP.
 "#,
         ),
     ]);
+}
+
+/// ABAP SQL aggregate functions are keywords where a bracket follows; a column
+/// that is only named like one is a name.
+#[test]
+fn sql_aggregate_functions() {
+    check(&[
+        (
+            "select string_agg( name, ',' ) from t into @data(agg).\n",
+            "SELECT STRING_AGG( name, ',' ) FROM t INTO @DATA(agg).\n",
+        ),
+        (
+            "select median( x ) from t into @lv.\n",
+            "SELECT MEDIAN( x ) FROM t INTO @lv.\n",
+        ),
+        (
+            "select stddev( a ) as s, var( a ) as v, corr( a, b ) as c, corr_spearman( a, b ) as r from t into @ls.\n",
+            "SELECT STDDEV( a )           AS s,\n       VAR( a )              AS v,\n       CORR( a, b )          AS c,\n       CORR_SPEARMAN( a, b ) AS r\n    FROM t\n    INTO @ls.\n",
+        ),
+        (
+            "select a, string_agg( name, ',' order by name ) as s from t group by a into table @lt.\n",
+            "SELECT a,\n       STRING_AGG( name, ',' ORDER BY name ) AS s\n    FROM t\n    GROUP BY a\n    INTO TABLE @lt.\n",
+        ),
+        (
+            "select var, median from t into table @lt.\n",
+            "SELECT var, median FROM t INTO TABLE @lt.\n",
+        ),
+        (
+            "select var as stddev, corr from t where var = 1 into table @lt.\n",
+            "SELECT var  AS stddev,\n       corr\n    FROM t\n    WHERE var = 1\n    INTO TABLE @lt.\n",
+        ),
+        (
+            "select max( var ) from t into @lv.\n",
+            "SELECT MAX( var ) FROM t INTO @lv.\n",
+        ),
+    ]);
+}
+
+/// The aggregate functions follow `abap.keyword_case`. A word with a
+/// lower-case letter keeps its case unless it is a keyword, so the mixed case
+/// tells a function from a name.
+#[test]
+fn sql_aggregate_functions_follow_the_keyword_case_option() {
+    let hint = LanguageHint::Path("t.prog.abap".into());
+    let mut opts = Options::default();
+    opts.lang.style = Style::Compact;
+    opts.lang.abap_keyword_case = Case::Lower;
+    for (input, expected) in [
+        (
+            "Select String_Agg( name, ',' ) From t Into @Data(agg).\n",
+            "select string_agg( name, ',' ) from t into @data(agg).\n",
+        ),
+        (
+            "Select Median( x ) From t Into @lv.\n",
+            "select median( x ) from t into @lv.\n",
+        ),
+        (
+            "Select Max( x ) From t Into @lv.\n",
+            "select max( x ) from t into @lv.\n",
+        ),
+        (
+            "Select Var, Median From t Into Table @lt.\n",
+            "select Var, Median from t into table @lt.\n",
+        ),
+    ] {
+        let r = format(input.as_bytes(), &hint, &opts);
+        assert!(!r.has(Code::W003), "not recognized: {input}");
+        let out = String::from_utf8(r.output.expect("output")).unwrap();
+        assert_eq!(out, expected, "input: {input}");
+    }
 }
 
 /// A name in an operand position stays a name, even when it is spelled like

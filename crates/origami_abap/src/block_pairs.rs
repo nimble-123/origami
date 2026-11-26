@@ -106,7 +106,7 @@ pub fn classify(words: &[String], depth0: &[String]) -> Option<Role> {
     }
 }
 
-const AGGREGATES: &[&str] = &[
+pub(crate) const AGGREGATES: &[&str] = &[
     "COUNT",
     "SUM",
     "MIN",
