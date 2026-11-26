@@ -373,8 +373,8 @@ Milestone: M1
 
 Continuation lines of a statement are indented one level (default 2 spaces)
 relative to the start of the statement, unless a rule aligns them to a column
-(ABAP-CALL-001, ABAP-VALUE-001, ABAP-DECL-001), as ABAP Cleaner indents SQL
-clauses and `CALL FUNCTION` groups.
+(ABAP-CALL-001, ABAP-VALUE-001, ABAP-DECL-001, ABAP-COND-001), as ABAP
+Cleaner indents SQL clauses and `CALL FUNCTION` groups.
 
 ```abap
 SELECT carrid, connid
@@ -1019,6 +1019,75 @@ A condition that does not fit breaks before `AND` and `OR` at the outermost
 level, at the continuation indent. Parenthesized sub-conditions stay flat when
 they fit.
 
+Approved by the maintainer, Nils Lutz, on 2026-11-26, as ABAP Cleaner's
+"Align logical expressions" with its default options, in the aligned style:
+
+* **When:** a logical expression is printed one condition per line when it
+  has three or more conditions at its outermost level (two or more `AND`,
+  `OR` or `EQUIV` outside brackets), or when it does not fit on the line.
+  With one or two conditions that fit it stays on one line. This holds after
+  `IF`, `ELSEIF`, `WHILE`, `CHECK`, `ASSERT`, `WAIT … UNTIL`, the `WHERE`
+  of internal-table statements (`LOOP AT`, `DELETE`, `MODIFY`) and `WHEN` in
+  `COND` (ABAP-COND-002).
+* **Layout:** `AND`, `OR` and `EQUIV` start the lines in a column after the
+  statement keyword, and the first condition is indented so that all
+  conditions start in one column. After `WHEN` the operators end in front of
+  that column instead. Mixed operators are nested as they bind (`AND` before
+  `OR` before `EQUIV`): an `AND` group inside `OR` gets its own column. In a
+  run of consecutive comparisons, the first operands are padded to the
+  longest and the operators (also `IS`, `IN`, `BETWEEN`; `NOT` of `NOT IN`
+  belongs to the first operand) are right-aligned, except where that would
+  need more than 20 spaces in front of an operator; a run of consecutive
+  simple conditions gets a column for a leading `NOT`.
+* **Brackets:** a condition in brackets stays on one line if it fits, else
+  it gets the same layout inside its bracket.
+* **`LOOP AT … WHERE`:** when the condition does not fit behind the other
+  clauses, and always when it is printed one condition per line, `WHERE`
+  starts its own line, five columns in (under `AT`).
+* **Width:** if a line of this layout would not fit, the operators are not
+  aligned; if it still does not fit, the condition breaks as before this
+  rule, at the continuation indent.
+
+Comments between conditions stay where they are, and a condition with a
+comment is not padded. ABAP SQL (`WHERE`, `HAVING`, `ON`, ABAP-SQL-001)
+keeps the layout before this rule, and so does the compact style.
+
+```abap
+IF     lv_a   = 1
+   AND lv_bb  = 2
+   AND lv_c  <> 3.
+IF a = 1 AND b = 2.
+IF        lv_a  = 1
+      AND lv_bb = 2
+   OR lv_c <> 3.
+IF     NOT lv_a           = 1
+   AND     lv_bb    BETWEEN 1 AND 10
+   AND     lv_c NOT      IN lt_range.
+IF     lv_flag = abap_true
+   AND (    lv_value_number_one = lv_comparison_value_one
+         OR lv_value_number_two = lv_comparison_value_two
+         OR lv_value_three      = lv_comparison_value_three ).
+LOOP AT lt_all INTO DATA(ls_other)
+     WHERE     user_name   = ls_self-user_name
+           AND plant       = ls_self-plant
+           AND valid_from <> ls_self-valid_from.
+lv_x = COND #( WHEN a  = 1
+                AND bb = 2
+                AND c  = 3
+               THEN 1
+               ELSE 2 ).
+```
+
+Deviations from ABAP Cleaner: it aligns a condition only where the input
+breaks it, and keeps a condition in brackets broken if it was written so;
+`EQUIV` after `WHEN` and mixed operators after `WHEN` start in the
+condition column; a `COND` branch with three or more conditions uses the
+complex layout of ABAP-COND-002, with `THEN` at the end of the last
+condition line; comment lines are indented to the operator column.
+
+**Compact:** a condition that does not fit breaks before `AND` and `OR` at
+the outermost level, at the continuation indent.
+
 ### ABAP-COND-002: COND and SWITCH expressions
 Milestone: M4
 Explanation: each WHEN branch on its own line
@@ -1040,8 +1109,10 @@ expression breaks, the `WHEN` lines follow below them, aligned.
   `WHEN` line and each value goes on its own line, one level deeper than
   `WHEN`; `ELSE` gets its own line too.
 
-A condition that breaks follows ABAP-COND-001 at the continuation indent of
-its `WHEN`. `THROW` is a value like any other. A body the parser does not
+A condition follows ABAP-COND-001: from three conditions on it is broken,
+and that branch rules out the tabular layout. Approved by the maintainer,
+Nils Lutz, on 2026-11-26; until then a condition that broke did so at the
+continuation indent of its `WHEN`. `THROW` is a value like any other. A body the parser does not
 understand keeps its line breaks.
 
 ```abap

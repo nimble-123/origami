@@ -12,7 +12,7 @@
 //! statement falls back to the generic layout.
 
 use crate::kinds::*;
-use crate::stmt::{AlignKey, DeclCols, P, Row, Stmt, decl_columns};
+use crate::stmt::{AlignKey, CondAt, DeclCols, P, Row, Stmt, decl_columns};
 use origami_layout::{AlignItem, Doc, builder as b};
 use origami_syntax::Style;
 
@@ -2725,6 +2725,14 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
     let mut list_next = select && p.pos > 0 && p.is(p.pos - 1, "SELECT");
     let mut order_by = false;
     let mut into_next = false;
+    // ABAP-COND-001, aligned style: conditions outside ABAP SQL in ABAP
+    // Cleaner's layout. `LOOP AT … WHERE` with the condition on several
+    // lines starts `WHERE` on its own line, under `AT`: the WHERE clause's
+    // keyword token and number of conditions.
+    let cond_at = (p.c.style == Style::Aligned && !spec.all_clauses).then_some(CondAt::Keyword);
+    let loop_at = cond_at.is_some() && spec.lead.starts_with(&["LOOP", "AT"]);
+    let mut loop_where: Option<(usize, usize, usize)> = None;
+    let mut clause_at = None;
     while !p.at_end() {
         let i = p.pos;
         // `EXCEPTIONS … OTHERS = n`; `EVENTS e EXPORTING VALUE(p) …`
@@ -2806,6 +2814,7 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
             };
             p.pos = i + n_clause;
             prev_kw = Some(p.upper(i + n_clause - 1));
+            clause_at = Some(i);
             continue;
         }
         if n_word > 0 {
@@ -2882,11 +2891,30 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
         }
         let saved_kw = p.c.mark();
         let operand = match mode {
-            Operands::Expr => p.expr(),
-            Operands::Logical => p.logical(),
+            Operands::Expr => p.expr().map(|d| (d, None)),
+            Operands::Logical => p
+                .condition(cond_at)
+                .map(|c| (c.doc, Some((c.count, c.split)))),
         };
+        // The clause keyword in front of a condition (`WHERE`, `UNTIL`).
+        let clause = clause_at.filter(|&w| w + 1 == i);
         match operand {
-            Some(d) => current.push(d),
+            Some((d, Some((n, _)))) if loop_at && clause.is_some_and(|w| p.is(w, "WHERE")) => {
+                loop_where = Some((parts.len(), clause.unwrap_or(i), n));
+                current.push(d);
+            }
+            Some((_, Some((_, Some((aligned, plain)))))) if !loop_at && clause.is_some() => {
+                // One condition per line by rule: the clause stays on its
+                // line if the aligned layout fits there; otherwise the
+                // clause and condition break as without the rule.
+                let w = clause.unwrap_or(i);
+                let words = b::shared(b::concat(current.drain(1..).collect()));
+                let sep = current.pop().unwrap_or_else(b::empty);
+                let inline = b::concat(vec![p.sp(w), words.clone(), aligned]);
+                current.push(b::empty());
+                current.push(b::choice(inline, b::group(vec![sep, words, plain])));
+            }
+            Some((d, _)) => current.push(d),
             None => {
                 // Bracket groups the expression parser does not know
                 // (`( c1, c2 )`, `div( a, b )`, path filters `[ … ]`) stay
@@ -2916,6 +2944,30 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
     let mut docs = vec![b::cont(vec![first])];
     if spec.all_clauses {
         docs.push(b::cont(parts));
+    } else if let Some((k, w, n)) = loop_where.filter(|&(k, ..)| k > 0) {
+        // `LOOP AT … WHERE`: `WHERE` under `AT` when it does not fit, and
+        // always from three conditions on (ABAP-COND-001); the other clauses
+        // at the continuation indent.
+        if n >= 3 {
+            p.c.span(w - 1, p.end - 1, "ABAP-COND-001");
+        }
+        let clauses = parts
+            .into_iter()
+            .map(split_sep)
+            .enumerate()
+            .map(|(c, (sep, content))| {
+                if c + 1 == k {
+                    let sep = if n >= 3 { p.hl(w) } else { sep };
+                    (
+                        b::indent_cols(5, vec![sep]),
+                        b::indent_cols(5, vec![content]),
+                    )
+                } else {
+                    (b::cont(vec![sep]), b::cont(vec![content]))
+                }
+            })
+            .collect();
+        docs.push(b::fill(clauses));
     } else {
         // Each clause: (separator, content). The separator is the first element.
         let clauses: Vec<(Doc, Doc)> = parts.into_iter().map(split_sep).collect();

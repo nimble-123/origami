@@ -8,7 +8,9 @@
 
 use crate::kinds::*;
 use origami_layout::{AlignItem, Doc, builder as b};
-use origami_syntax::{RuleId, RuleSpan, Style, TokenIndex, TokenStream};
+use origami_syntax::{
+    CommentSyntax, RuleId, RuleSpan, Style, TokenIndex, TokenStream, TriviaKind, TriviaPosition,
+};
 use std::collections::HashMap;
 
 pub struct Ctx<'a> {
@@ -37,6 +39,11 @@ pub struct Ctx<'a> {
     /// parses each inner bracket once, not once per attempt (which doubles
     /// at every level).
     pub parens: HashMap<(usize, bool), Parsed>,
+    /// Logical expressions being parsed around the current one (brackets,
+    /// `COND` in a condition); deeper than `MAX_COND_DEPTH`, a condition
+    /// keeps the layout without ABAP-COND-001's alignment, so that the
+    /// layout choices stay linear in the size of the statement.
+    pub cond_depth: u8,
 }
 
 /// A bracket parsed by [`P::parens`]: its closing bracket, its doc, and the
@@ -217,6 +224,122 @@ impl Stmt {
             Stmt::Row(r) => r.alone(),
         }
     }
+}
+
+/// Where a logical expression stands, in the aligned style
+/// (ABAP-COND-001).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CondAt {
+    /// After a statement keyword (`IF`, `WHERE`, …): one condition per line
+    /// from three conditions on; `AND` and `OR` start the lines, the first
+    /// condition is indented to the column of the others.
+    Keyword,
+    /// After the `WHEN` at this token in `COND`: as `Keyword`, but `AND` and
+    /// `OR` end in front of the condition column. The doc of the condition
+    /// starts with the `WHEN`.
+    When(usize),
+    /// Inside brackets: on one line if it fits, else as `Keyword`; the
+    /// width of what follows the closing bracket on its line.
+    Nested(usize),
+}
+
+/// Logical expressions nested in one another (in brackets or in a `COND`)
+/// that get the aligned layout of ABAP-COND-001 ([`Ctx::cond_depth`]).
+const MAX_COND_DEPTH: u8 = 4;
+
+/// A parsed logical expression ([`P::condition`]).
+pub struct Condition {
+    pub doc: Doc,
+    /// Conditions at the outermost level.
+    pub count: usize,
+    /// One condition per line by rule (three or more): the aligned layouts
+    /// alone and the layout without alignment, for a caller that decides
+    /// the line break in front of the condition together with them.
+    pub split: Option<(Doc, Doc)>,
+}
+
+/// A predicate of a logical expression: the leading `NOT`, the first
+/// operand (or the whole predicate) and, for a comparison, the rest from
+/// the space in front of the operator.
+struct Pred {
+    /// First token.
+    from: usize,
+    lead: Doc,
+    term1: Doc,
+    rest: Doc,
+    /// A comparison whose first operand can be aligned.
+    cmp: Option<Cmp>,
+    not: bool,
+    paren: bool,
+    /// A comment inside: never padded.
+    comment: bool,
+}
+
+/// Widths of a comparison's first operand and operator.
+#[derive(Clone, Copy)]
+struct Cmp {
+    t1_w: usize,
+    op_w: usize,
+}
+
+impl Pred {
+    fn doc(&self) -> Doc {
+        b::concat(vec![
+            self.lead.clone(),
+            self.term1.clone(),
+            self.rest.clone(),
+        ])
+    }
+
+    /// With padding `(NOT column, after the first operand, in front of the
+    /// operator)` when broken.
+    fn padded(&self, (not_pad, p1, p2): (usize, usize, usize)) -> Doc {
+        b::concat(vec![
+            b::break_pad(not_pad),
+            self.lead.clone(),
+            self.term1.clone(),
+            b::break_pad(p1 + p2),
+            self.rest.clone(),
+        ])
+    }
+}
+
+/// The operator structure of a logical expression: `EQUIV` binds weakest,
+/// then `OR`, then `AND`. A group holds its operators (token indices, one
+/// in front of each child after the first) and its children.
+enum CondTree {
+    Leaf(usize),
+    Group(Vec<usize>, Vec<CondTree>),
+}
+
+fn cond_level(p: &P, op: usize) -> u8 {
+    if p.is(op, "EQUIV") {
+        0
+    } else if p.is(op, "OR") {
+        1
+    } else {
+        2
+    }
+}
+
+/// The tree of predicates `a..=z`; `ops[k]` stands between predicates `k`
+/// and `k + 1`.
+fn cond_tree(p: &P, ops: &[usize], a: usize, z: usize) -> CondTree {
+    let Some(level) = (a..z).map(|k| cond_level(p, ops[k])).min() else {
+        return CondTree::Leaf(a);
+    };
+    let mut group_ops = Vec::new();
+    let mut children = Vec::new();
+    let mut from = a;
+    for (k, &op) in ops.iter().enumerate().take(z).skip(a) {
+        if cond_level(p, op) == level {
+            children.push(cond_tree(p, ops, from, k));
+            group_ops.push(op);
+            from = k + 1;
+        }
+    }
+    children.push(cond_tree(p, ops, from, z));
+    CondTree::Group(group_ops, children)
 }
 
 pub const PARAM_KEYWORDS: &[&str] = &[
@@ -959,7 +1082,10 @@ impl<'c, 'a> P<'c, 'a> {
         struct Branch {
             when: usize,
             then: usize,
-            cond: Doc,
+            /// `WHEN` and its condition.
+            head: Doc,
+            /// Conditions at the outermost level (ABAP-COND-001).
+            count: usize,
             value: Doc,
         }
         // Parts before the first `WHEN`: (first token, doc).
@@ -977,10 +1103,21 @@ impl<'c, 'a> P<'c, 'a> {
             let when = self.pos;
             self.c.keywords.push(when);
             self.pos += 1;
-            let cond = if switch {
-                self.expr()?
+            let (head, count) = if switch {
+                let cond = self.expr()?;
+                let head = b::concat(vec![self.t(when), self.sp(when + 1), b::cont(vec![cond])]);
+                (head, 1)
             } else {
-                self.logical()?
+                let at = (self.c.style == Style::Aligned).then_some(CondAt::When(when));
+                let Condition {
+                    doc: head, count, ..
+                } = self.condition(at)?;
+                let head = if at.is_some() {
+                    head
+                } else {
+                    b::concat(vec![self.t(when), self.sp(when + 1), b::cont(vec![head])])
+                };
+                (head, count)
             };
             let then = self.pos;
             if !self.is(then, "THEN") {
@@ -992,7 +1129,8 @@ impl<'c, 'a> P<'c, 'a> {
             branches.push(Branch {
                 when,
                 then,
-                cond: b::shared(cond),
+                head: b::shared(head),
+                count,
                 value: b::shared(value),
             });
         }
@@ -1025,9 +1163,7 @@ impl<'c, 'a> P<'c, 'a> {
                 docs.push(brk(self, br.when));
             }
             docs.extend([
-                self.t(br.when),
-                self.sp(br.when + 1),
-                b::cont(vec![br.cond.clone()]),
+                br.head.clone(),
                 brk(self, br.then),
                 self.t(br.then),
                 self.sp(br.then + 1),
@@ -1061,9 +1197,7 @@ impl<'c, 'a> P<'c, 'a> {
                     complex.push(self.hl(br.when));
                 }
                 complex.extend([
-                    self.t(br.when),
-                    self.sp(br.when + 1),
-                    b::cont(vec![br.cond.clone()]),
+                    br.head.clone(),
                     self.sp(br.then),
                     self.t(br.then),
                     b::indent(vec![self.hl(br.then + 1), br.value.clone()]),
@@ -1078,9 +1212,11 @@ impl<'c, 'a> P<'c, 'a> {
             }
             let complex = b::concat(complex);
             // Tabular: `WHEN cond` printed flat, so its width is known; a
-            // comment or a nested COND/SWITCH there rules it out.
+            // comment or a nested COND/SWITCH there rules it out, and so
+            // does a condition on several lines (ABAP-COND-001).
             let tabular_ok = branches.iter().all(|br| {
-                !self.has_comment(br.when, br.then + 1)
+                br.count < 3
+                    && !self.has_comment(br.when, br.then + 1)
                     && !(br.when + 1..br.then).any(|k| self.is(k, "COND") || self.is(k, "SWITCH"))
             });
             let body = if tabular_ok {
@@ -1855,37 +1991,258 @@ impl<'c, 'a> P<'c, 'a> {
     /// A logical expression: predicates joined by `AND`, `OR`, `EQUIV`. A
     /// broken expression breaks before each operator (ABAP-COND-001).
     pub fn logical(&mut self) -> Option<Doc> {
-        let start = self.pos;
-        let first = self.predicate()?;
-        let mut parts = vec![first];
+        self.condition(None).map(|c| c.doc)
+    }
+
+    /// A logical expression and the number of conditions at its outermost
+    /// level. With `at` (aligned style), in ABAP Cleaner's layout "Align
+    /// logical expressions" (ABAP-COND-001): one condition per line from
+    /// three conditions on (not in brackets), or when it does not fit;
+    /// `AND`, `OR` and `EQUIV` in a column, the conditions in another, and
+    /// the operators of consecutive comparisons aligned. If a line of that
+    /// does not fit, the same without the operators aligned, and else the
+    /// layout without `at`: on one line if it fits, otherwise broken before
+    /// each operator at the continuation indent.
+    pub fn condition(&mut self, at: Option<CondAt>) -> Option<Condition> {
+        // After `WHEN`: the condition with the `WHEN` in front, so that the
+        // aligned layout hangs at the `WHEN`.
+        let when = match at {
+            Some(CondAt::When(w)) => Some(w),
+            _ => None,
+        };
+        let at = at.filter(|_| self.c.cond_depth < MAX_COND_DEPTH);
+        self.c.cond_depth += 1;
+        let parsed = self.condition_parts(at);
+        self.c.cond_depth -= 1;
+        let (preds, ops) = parsed?;
+        let start = preds[0].from;
+        let count = preds.len();
+        let with_when = |p: &Self, d: Doc| match when {
+            Some(w) => b::concat(vec![p.t(w), p.sp(w + 1), b::cont(vec![d])]),
+            None => d,
+        };
+        let done = |doc, split| Condition { doc, count, split };
+        if count == 1 {
+            return Some(done(with_when(self, preds[0].doc()), None));
+        }
+        self.c.span(start, self.pos - 1, "ABAP-COND-001");
+        let mut parts = vec![preds[0].doc()];
+        for (n, &op) in ops.iter().enumerate() {
+            parts.push(b::concat(vec![
+                self.ln(op),
+                self.t(op),
+                self.sp(op + 1),
+                preds[n + 1].doc(),
+            ]));
+        }
+        let plain = b::group(parts);
+        let Some(at) = at else {
+            return Some(done(with_when(self, plain), None));
+        };
+        // From three conditions on, always one per line; else only when the
+        // expression does not fit.
+        let forced = !matches!(at, CondAt::Nested(_)) && count >= 3;
+        let tree = cond_tree(self, &ops, 0, count - 1);
+        // The last line must leave room for what follows it: ` THEN` after
+        // `WHEN`, the period (or `)`) at the end.
+        let reserve = if when.is_some() {
+            " THEN".len()
+        } else if self.at_end() {
+            self.tail_width(at)
+        } else {
+            0
+        };
+        let hang = |p: &Self, cmp: bool| {
+            let body = p.cond_node(&tree, &preds, at, forced, cmp, true);
+            match when {
+                Some(w) => b::hang(vec![p.t(w), p.sp(w + 1), body, b::reserve(reserve)]),
+                None => b::hang(vec![body, b::reserve(reserve)]),
+            }
+        };
+        let (with_ops, without) = (b::shared(hang(self, true)), b::shared(hang(self, false)));
+        let aligned = b::choice(with_ops.clone(), without.clone());
+        let plain = b::shared(with_when(self, plain));
+        let doc = b::choice(with_ops, b::choice(without, plain.clone()));
+        Some(if forced {
+            done(doc, Some((aligned, plain)))
+        } else {
+            done(b::group(vec![doc]), None)
+        })
+    }
+
+    /// The predicates of a logical expression and the operators between
+    /// them.
+    fn condition_parts(&mut self, at: Option<CondAt>) -> Option<(Vec<Pred>, Vec<usize>)> {
+        let mut preds = vec![self.predicate_parts(at)?];
+        let mut ops = Vec::new();
         while !self.at_end()
             && !self.glued(self.pos)
             && (self.is(self.pos, "AND") || self.is(self.pos, "OR") || self.is(self.pos, "EQUIV"))
         {
             let op = self.pos;
-            let op_doc = self.kw(op);
+            self.c.keywords.push(op);
             self.pos += 1;
-            let rhs = self.predicate()?;
-            parts.push(b::concat(vec![self.ln(op), op_doc, self.sp(op + 1), rhs]));
+            ops.push(op);
+            preds.push(self.predicate_parts(at)?);
         }
-        Some(if parts.len() == 1 {
-            parts.pop().unwrap()
-        } else {
-            self.c.span(start, self.pos - 1, "ABAP-COND-001");
-            b::group(parts)
-        })
+        Some((preds, ops))
     }
 
-    fn predicate(&mut self) -> Option<Doc> {
+    /// One node of the condition tree (ABAP-COND-001), with the operators of
+    /// comparisons aligned if `cmp`. `top`: the node is the whole
+    /// expression, so `at` decides where its `AND`/`OR` stand; a nested node
+    /// (an `AND` group inside `OR`) has them in a column in front of its
+    /// conditions.
+    fn cond_node(
+        &self,
+        node: &CondTree,
+        preds: &[Pred],
+        at: CondAt,
+        forced: bool,
+        cmp: bool,
+        top: bool,
+    ) -> Doc {
+        let (ops, children) = match node {
+            CondTree::Leaf(k) => return preds[*k].doc(),
+            CondTree::Group(ops, children) => (ops, children),
+        };
+        let width = |op: usize| self.text(op).chars().count();
+        let w = ops.iter().map(|&o| width(o)).max().unwrap_or(0);
+        // After `WHEN`, the operators end in front of the condition column
+        // (ABAP Cleaner); `EQUIV` is wider than `WHEN`.
+        let when_gap = (top && matches!(at, CondAt::When(_)) && w <= 4).then(|| 4 - w);
+        let pads = if cmp {
+            self.cmp_pads(children, preds)
+        } else {
+            vec![None; children.len()]
+        };
         let mut docs = Vec::new();
-        if self.is(self.pos, "NOT") {
-            docs.push(self.kw(self.pos));
-            docs.push(self.sp(self.pos + 1));
+        if when_gap.is_none() {
+            docs.push(b::break_pad(w + 1));
+        }
+        for (n, child) in children.iter().enumerate() {
+            if n > 0 {
+                let op = ops[n - 1];
+                docs.push(if forced { self.hl(op) } else { self.ln(op) });
+                if let Some(g) = when_gap {
+                    docs.push(b::break_pad(g));
+                }
+                docs.push(self.t(op));
+                docs.push(b::break_pad(w - width(op)));
+                docs.push(self.sp(op + 1));
+            }
+            docs.push(match (child, pads[n]) {
+                (CondTree::Leaf(k), Some(pad)) => preds[*k].padded(pad),
+                (CondTree::Leaf(k), None) => preds[*k].doc(),
+                (group, _) => b::hang(vec![self.cond_node(group, preds, at, forced, cmp, false)]),
+            });
+        }
+        b::concat(docs)
+    }
+
+    /// Padding `(NOT column, after the first operand, in front of the
+    /// operator)` of the children that are simple conditions, as ABAP
+    /// Cleaner's "Align logical expressions" with its default options: in
+    /// a run of consecutive simple conditions, a `NOT` column if one of
+    /// them starts with `NOT`; in a run of consecutive comparisons, the
+    /// first operands padded to the longest and the operators right-aligned,
+    /// except in a row that would need more than 20 spaces in front of its
+    /// operator.
+    fn cmp_pads(
+        &self,
+        children: &[CondTree],
+        preds: &[Pred],
+    ) -> Vec<Option<(usize, usize, usize)>> {
+        let simple = |c: &CondTree| match c {
+            CondTree::Leaf(k) if !preds[*k].paren && !preds[*k].comment => Some(&preds[*k]),
+            _ => None,
+        };
+        let mut out = vec![None; children.len()];
+        let mut n = 0;
+        while n < children.len() {
+            let mut e = n;
+            while e < children.len() && simple(&children[e]).is_some() {
+                e += 1;
+            }
+            let run: Vec<&Pred> = children[n..e].iter().filter_map(simple).collect();
+            let not_col = run.len() > 1 && run.iter().any(|p| p.not);
+            for (k, p) in run.iter().enumerate() {
+                out[n + k] = Some((if not_col && !p.not { 4 } else { 0 }, 0, 0));
+            }
+            let mut a = 0;
+            while a < run.len() {
+                let mut z = a;
+                while z < run.len() && run[z].cmp.is_some() {
+                    z += 1;
+                }
+                if z - a >= 2 {
+                    let cmps: Vec<Cmp> = run[a..z].iter().filter_map(|p| p.cmp).collect();
+                    let t1 = cmps.iter().map(|c| c.t1_w).max().unwrap_or(0);
+                    let op = cmps.iter().map(|c| c.op_w).max().unwrap_or(0);
+                    for (k, c) in (a..z).zip(&cmps) {
+                        let (p1, p2) = (t1 - c.t1_w, op - c.op_w);
+                        if p1 + p2 < 20
+                            && let Some(pad) = &mut out[n + k]
+                        {
+                            pad.1 = p1;
+                            pad.2 = p2;
+                        }
+                    }
+                }
+                a = z + 1;
+            }
+            n = e + 1;
+        }
+        out
+    }
+
+    /// Width of what follows a condition that ends at `self.end`: the
+    /// period with its end-of-line comment, or ` )` and what follows that.
+    fn tail_width(&self, at: CondAt) -> usize {
+        let end: usize = (self.end..=self.period_at)
+            .map(|k| self.text(k).chars().count() + usize::from(!self.glued(k)))
+            .sum();
+        match at {
+            CondAt::Nested(after) => end + after,
+            _ => end + self.eol_comment_width(self.period_at),
+        }
+    }
+
+    /// A predicate in parts, for [`Self::condition`]: with `at`, a
+    /// condition in brackets is laid out with [`CondAt::Nested`].
+    fn predicate_parts(&mut self, at: Option<CondAt>) -> Option<Pred> {
+        let from = self.pos;
+        let mut lead = Vec::new();
+        let not = self.is(self.pos, "NOT");
+        if not {
+            lead.push(self.kw(self.pos));
+            lead.push(self.sp(self.pos + 1));
             self.pos += 1;
         }
+        let done = |p: &Self, lead: Vec<Doc>, term1: Vec<Doc>, rest: Vec<Doc>, cmp, paren| Pred {
+            from,
+            lead: b::concat(lead),
+            term1: b::shared(b::concat(term1)),
+            rest: b::shared(b::concat(rest)),
+            cmp,
+            not,
+            paren,
+            comment: p.c.commented[from] || p.has_comment(from, p.pos - 1),
+        };
         if self.kind(self.pos) == LPAREN && !self.glued(self.pos) {
             let lp = self.pos;
             let rp = self.matching(lp)?;
+            // What follows `)` on its line, when the bracket ends the
+            // condition.
+            let nested = at.map(|at| {
+                CondAt::Nested(if rp + 1 == self.end {
+                    self.tail_width(at)
+                } else if matches!(at, CondAt::When(_)) && self.is(rp + 1, "THEN") {
+                    " THEN".len()
+                } else {
+                    0
+                })
+            });
             let mark = self.c.mark();
             let inner = {
                 let mut q = P {
@@ -1897,9 +2254,9 @@ impl<'c, 'a> P<'c, 'a> {
                     last_call: false,
                     period_at: rp,
                 };
-                q.logical().filter(|_| q.at_end())
+                q.condition(nested).filter(|_| q.at_end())
             };
-            docs.push(match inner {
+            let doc = match inner.map(|c| c.doc) {
                 Some(d) => b::group(vec![
                     self.t(lp),
                     self.sp(lp + 1),
@@ -1911,13 +2268,14 @@ impl<'c, 'a> P<'c, 'a> {
                     self.c.reset_spans(mark);
                     self.raw(lp, rp)
                 }
-            });
+            };
             self.pos = rp + 1;
-            return Some(b::concat(docs));
+            return Some(done(self, lead, vec![doc], Vec::new(), None, true));
         }
-        docs.push(self.expr()?);
+        let t1_from = self.pos;
+        let mut term1 = vec![self.expr()?];
         if self.at_end() {
-            return Some(b::concat(docs));
+            return Some(done(self, lead, term1, Vec::new(), None, false));
         }
         let i = self.pos;
         let w = self.upper(i);
@@ -1950,32 +2308,41 @@ impl<'c, 'a> P<'c, 'a> {
                 | "Z"
                 | "M"
         );
+        // The operator at `op` (also `IS`, `BETWEEN`, `IN`) after the first
+        // operand `t1_from..=t1_to`, if that can be aligned.
+        let cmp = |p: &Self, t1_to: usize, op: usize| {
+            p.term_aligns(t1_from, t1_to).then(|| Cmp {
+                t1_w: p.flat_width(t1_from, t1_to),
+                op_w: p.text(op).chars().count(),
+            })
+        };
         if (symbol || named) && self.kind(i) == WORD && !self.glued(i) {
-            docs.push(self.sp(i));
-            docs.push(if named { self.kw(i) } else { self.t(i) });
-            docs.push(self.sp(i + 1));
+            let c = cmp(self, i - 1, i);
+            let mut rest = vec![self.sp(i)];
+            rest.push(if named { self.kw(i) } else { self.t(i) });
+            rest.push(self.sp(i + 1));
             self.pos += 1;
-            docs.push(self.expr()?);
-            return Some(b::concat(docs));
+            rest.push(self.expr()?);
+            return Some(done(self, lead, term1, rest, c, false));
         }
         if w == "IS" {
-            docs.push(self.sp(i));
-            docs.push(self.kw(i));
+            let c = cmp(self, i - 1, i);
+            let mut rest = vec![self.sp(i), self.kw(i)];
             self.pos += 1;
             if self.is(self.pos, "NOT") {
-                docs.push(self.sp(self.pos));
-                docs.push(self.kw(self.pos));
+                rest.push(self.sp(self.pos));
+                rest.push(self.kw(self.pos));
                 self.pos += 1;
             }
             let k = self.pos;
             match self.upper(k).as_str() {
                 "INITIAL" | "BOUND" | "ASSIGNED" | "SUPPLIED" | "REQUESTED" | "NULL" => {
-                    docs.push(self.sp(k));
-                    docs.push(self.kw(k));
+                    rest.push(self.sp(k));
+                    rest.push(self.kw(k));
                     self.pos += 1;
                 }
                 "INSTANCE" if self.is(k + 1, "OF") => {
-                    docs.extend([
+                    rest.extend([
                         self.sp(k),
                         self.kw(k),
                         self.sp(k + 1),
@@ -1983,11 +2350,11 @@ impl<'c, 'a> P<'c, 'a> {
                         self.sp(k + 2),
                     ]);
                     self.pos += 2;
-                    docs.push(self.operand()?);
+                    rest.push(self.operand()?);
                 }
                 _ => return None,
             }
-            return Some(b::concat(docs));
+            return Some(done(self, lead, term1, rest, c, false));
         }
         let mut k = i;
         let negated = w == "NOT";
@@ -1995,24 +2362,84 @@ impl<'c, 'a> P<'c, 'a> {
             k += 1;
         }
         if self.is(k, "BETWEEN") || self.is(k, "IN") {
-            for j in i..=k {
-                docs.push(self.sp(j));
-                docs.push(self.kw(j));
+            // `NOT BETWEEN`, `NOT IN`: the `NOT` ends the first operand's
+            // column, as in ABAP Cleaner.
+            if negated {
+                term1.push(self.sp(i));
+                term1.push(self.kw(i));
             }
+            let c = cmp(self, k - 1, k);
+            let mut rest = vec![self.sp(k), self.kw(k)];
             self.pos = k + 1;
-            docs.push(self.sp(self.pos));
-            docs.push(self.expr()?);
+            rest.push(self.sp(self.pos));
+            rest.push(self.expr()?);
             if self.is(k, "BETWEEN") {
                 if !self.is(self.pos, "AND") {
                     return None;
                 }
                 let a = self.pos;
-                docs.extend([self.sp(a), self.kw(a), self.sp(a + 1)]);
+                rest.extend([self.sp(a), self.kw(a), self.sp(a + 1)]);
                 self.pos += 1;
-                docs.push(self.expr()?);
+                rest.push(self.expr()?);
             }
+            return Some(done(self, lead, term1, rest, c, false));
         }
-        Some(b::concat(docs))
+        Some(done(self, lead, term1, Vec::new(), None, false))
+    }
+
+    /// Width of the end-of-line comment after token `i` as the aligned style
+    /// prints it: the blanks in front of it as written (ABAP-COMMENT-002),
+    /// and a space added after `"` (ABAP-COMMENT-003).
+    fn eol_comment_width(&self, i: usize) -> usize {
+        if !self.c.eol_commented[i] {
+            return 0;
+        }
+        // Trivia are in source order: those after token `i` up to the next.
+        let trivia = &self.c.stream.trivia;
+        let end = self.c.stream.tokens[i].end;
+        let from = trivia.partition_point(|t| t.start < end);
+        trivia[from..]
+            .iter()
+            .take_while(|t| t.anchor.0 as usize <= i + 1)
+            .filter(|t| {
+                t.is_comment() && t.position == TriviaPosition::Trailing && t.anchor.0 as usize == i
+            })
+            .map(|t| {
+                let gap = &self.c.text[end as usize..t.start as usize];
+                let gap = if gap.bytes().all(|b| b == b' ' || b == b'\t') {
+                    gap.len().max(1)
+                } else {
+                    1
+                };
+                let text = t.text(self.c.text);
+                let quote = matches!(
+                    t.kind,
+                    TriviaKind::Comment {
+                        syntax: CommentSyntax::AbapQuote,
+                        ..
+                    }
+                );
+                let spaced = quote
+                    .then(|| origami_syntax::spaced_comment(text))
+                    .flatten();
+                gap + spaced.map_or_else(|| text.chars().count(), |s| s.chars().count())
+            })
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// The first operand `from..=to` of a comparison can be aligned: it has
+    /// no comment and is printed on one line whatever the width (no call
+    /// with two or more parameters and no constructor expression, which
+    /// break by rule).
+    fn term_aligns(&self, from: usize, to: usize) -> bool {
+        !self.has_comment(from, to)
+            && (from..=to).filter(|&k| self.is(k, "=")).count() <= 1
+            && !(from..=to).any(|k| {
+                let w = self.upper(k);
+                self.kind(k) == WORD
+                    && (CONSTRUCTORS.contains(&w.as_str()) || PARAM_KEYWORDS.contains(&w.as_str()))
+            })
     }
 
     // ---- statements ----------------------------------------------------
@@ -2236,6 +2663,7 @@ mod tests {
             multi_line: false,
             end_gap: None,
             parens: Default::default(),
+            cond_depth: 0,
         };
         c.span(0, 3, "ABAP-STMT-001");
         let m = c.mark();

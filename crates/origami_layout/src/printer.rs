@@ -296,7 +296,7 @@ impl<'a> Ctx<'a> {
                     }
                 }
                 Inner::Space => w += 1,
-                Inner::BreakPad(_) => {}
+                Inner::BreakPad(_) | Inner::Reserve(_) => {}
                 Inner::SoftLine | Inner::SoftBreak | Inner::HardLine => return w,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
@@ -381,7 +381,11 @@ impl<'a> Ctx<'a> {
             Inner::Choice(a, _) => self.forced(a, first, end),
             Inner::Shared(d) => self.forced(d, first, end),
             Inner::Fill(items) => items.iter().any(|(_, c)| self.forced(c, first, end)),
-            Inner::Space | Inner::SoftLine | Inner::SoftBreak | Inner::BreakPad(_) => false,
+            Inner::Space
+            | Inner::SoftLine
+            | Inner::SoftBreak
+            | Inner::BreakPad(_)
+            | Inner::Reserve(_) => false,
         }
     }
 
@@ -402,7 +406,7 @@ impl<'a> Ctx<'a> {
             match &d.0 {
                 Inner::Token { index, .. } => w += self.token_text(*index).chars().count(),
                 Inner::Space | Inner::SoftLine => w += 1,
-                Inner::SoftBreak | Inner::BreakPad(_) => {}
+                Inner::SoftBreak | Inner::BreakPad(_) | Inner::Reserve(_) => {}
                 Inner::HardLine => return None,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
@@ -1009,7 +1013,7 @@ impl<'c, 'a> Printer<'c, 'a> {
                 Inner::SoftLine => remaining -= 1,
                 Inner::SoftBreak => {}
                 Inner::BreakPad(n) if mode == Mode::Break => remaining -= *n as isize,
-                Inner::BreakPad(_) => {}
+                Inner::BreakPad(_) | Inner::Reserve(_) => {}
                 Inner::HardLine => return true,
                 Inner::Group(ds)
                 | Inner::Indent(ds)
@@ -1089,6 +1093,10 @@ impl<'c, 'a> Printer<'c, 'a> {
                 Inner::SoftBreak => {}
                 Inner::BreakPad(n) if mode == Mode::Break => self.pad(*n as usize, indent),
                 Inner::BreakPad(_) => {}
+                Inner::Reserve(n) if self.trial.is_some() => {
+                    self.write(&" ".repeat(*n as usize), indent)
+                }
+                Inner::Reserve(_) => {}
                 Inner::HardLine => self.newline(indent),
                 Inner::Concat(ds) => {
                     stack.extend(ds.iter().rev().map(|d| Cmd {
@@ -1595,6 +1603,7 @@ fn first_token(doc: &Doc) -> Option<TokenIndex> {
         | Inner::SoftLine
         | Inner::SoftBreak
         | Inner::BreakPad(_)
+        | Inner::Reserve(_)
         | Inner::HardLine => None,
     }
 }
@@ -1626,6 +1635,7 @@ fn last_token(doc: &Doc) -> Option<TokenIndex> {
         | Inner::SoftLine
         | Inner::SoftBreak
         | Inner::BreakPad(_)
+        | Inner::Reserve(_)
         | Inner::HardLine => None,
     }
 }

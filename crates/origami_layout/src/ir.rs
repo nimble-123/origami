@@ -39,6 +39,9 @@ pub(crate) enum Inner {
     /// `n` spaces if the enclosing group is broken, nothing otherwise
     /// (padding of a layout that exists only when broken).
     BreakPad(u32),
+    /// Room for `n` columns that follow on the last line: written as blanks
+    /// only while a `Choice` tries its first branch, nothing otherwise.
+    Reserve(u32),
     /// Always a line break.
     HardLine,
     /// Flat if it fits, broken otherwise.

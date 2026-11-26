@@ -1,1 +1,25 @@
-1: ABAP-COND-001: condition split before AND, OR, because the condition would end at column 132 (limit 120)
+1: ABAP-COND-001: condition split before AND, OR
+5: ABAP-COND-001: condition split before AND, OR
+11: ABAP-COND-001: condition split before AND, OR
+14: ABAP-COND-001: condition split before AND, OR
+18: ABAP-COND-001: condition split before AND, OR
+22: ABAP-COND-001: condition split before AND, OR
+27: ABAP-COND-001: condition split before AND, OR
+31: ABAP-COND-001: condition split before AND, OR, because the condition would end at column 126 (limit 120)
+34: ABAP-COND-001: condition split before AND, OR
+40: ABAP-COND-001: condition split before AND, OR, because the condition would end at column 128 (limit 120)
+43: ABAP-COND-001: condition split before AND, OR
+47: ABAP-COND-001: condition split before AND, OR
+50: ABAP-COND-001: condition split before AND, OR
+53: ABAP-COND-001: condition split before AND, OR
+54: ABAP-COND-001: condition split before AND, OR
+60: split because the statement would end at column 124 (limit 120)
+63: ABAP-COND-001: condition split before AND, OR
+66: ABAP-COND-001: condition split before AND, OR
+66: ABAP-COND-002: each WHEN branch on its own line
+71: ABAP-COND-001: condition split before AND, OR
+71: ABAP-COND-002: each WHEN branch on its own line
+77: ABAP-SQL-001: each clause on its own line, because the statement would end at column 121 (limit 120)
+81: ABAP-COND-001: condition split before AND, OR, because the condition would end at column 171 (limit 120)
+82: ABAP-COND-001: condition split before AND, OR, because the condition would end at column 169 (limit 120)
+86: ABAP-COND-001: condition split before AND, OR
