@@ -4319,10 +4319,9 @@ fn param_name(p: &mut P, a: usize, ne: usize) -> Vec<Doc> {
 }
 
 /// The sections of a method signature from `i` to `p.end` as an aligned
-/// table: the first keyword behind the method name, the further keywords
-/// below it and padded to the longest, the names, `TYPE`, and `OPTIONAL` /
-/// `DEFAULT` in columns. A table that does not fit behind the name starts on
-/// the next line at the continuation indent.
+/// table below the method name at the continuation indent: the keywords
+/// padded to the longest, the names, `TYPE`, and `OPTIONAL` / `DEFAULT` in
+/// columns. A one-line table stays behind the name if it fits.
 fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
     let first_kw = i;
     let mut rows: Vec<SigRow> = Vec::new();
@@ -4455,13 +4454,15 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
         };
         items.push(b::row_cols(vec![kw_cell, r.name], head, tail));
     }
-    if items
+    let multi = items
         .iter()
         .filter(|i| !matches!(i, AlignItem::Break))
         .count()
-        > 1
-    {
+        > 1;
+    if multi {
+        // A table of two or more lines always starts below the method name.
         p.c.multi_line = true;
+        return Some(b::cont(vec![p.hl(first_kw), b::align_broken(items)]));
     }
     let table = b::shared(b::align_broken(items));
     Some(b::choice(
