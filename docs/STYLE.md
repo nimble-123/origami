@@ -40,8 +40,9 @@ chosen with `style` in `origami.toml` (or `--style`):
 * **`aligned`** (default from 0.4): follows ABAP Cleaner's layout where the
   two differed. Continuation lines are indented one level, parameter
   keywords and declaration types are aligned in columns, method signatures
-  are tables behind the method name, and blank lines are added between
-  sections and groups.
+  are tables below the method name, calls and constructor expressions with
+  two or more parameters or components put each on its own line, and blank
+  lines are added between sections and groups.
 * **`compact`**: the output of origami 0.3.
 
 Each rule describes the `aligned` style. Where `compact` differs, a paragraph
@@ -401,10 +402,22 @@ ENDIF.
 Milestone: M1
 Explanation: one parameter per line
 
-A call is printed flat when it fits. Otherwise the first parameter stays
-behind the opening `(`, every further parameter goes on its own line, aligned
-under the first one, and the closing `)` stays at the end of the last
-parameter, followed by the period (ABAP Cleaner style).
+A call with two or more parameters is always broken; a call with one
+parameter is printed flat when it fits. Approved by the maintainer, Nils
+Lutz, on 2026-11-26, as ABAP Cleaner's "Align parameters and components"
+with its default options (one-liners are not kept). When broken, the first
+parameter stays behind the opening `(`, every further parameter goes on its
+own line, aligned under the first one, and the closing `)` stays at the end
+of the last parameter, followed by the period. This holds for method calls,
+built-in functions (`condense( val = … del = … )`), calls in a condition or
+in a method chain, and for each nested call on its own.
+
+`RAISE EXCEPTION TYPE … EXPORTING`, `RAISE EVENT … EXPORTING` and
+`CALL METHOD` with two or more parameters break before `EXPORTING`, as
+ABAP-CALL-003 does for `CALL FUNCTION`.
+
+A call inside a string template (`|{ lo->m( a = 1 b = 2 ) }|`) is never
+broken, as ABAP-WIDTH-001 says for templates.
 
 Fallback: if a parameter does not fit at the hanging column, the line breaks
 after `(` and the parameters go on their own lines at the continuation indent.
@@ -413,7 +426,17 @@ after `(` and the parameters go on their own lines at the continuation indent.
 DATA(lv_result) = lo_calculator->calculate( iv_amount   = lv_amount
                                             iv_currency = lv_currency
                                             iv_date     = sy-datum ).
+lv_text = condense( val = lv_text
+                    del = ` ` ).
+lo_log->add( iv_text ).
+RAISE EXCEPTION TYPE zcx_flight
+  EXPORTING textid = zcx_flight=>not_found
+            iv_id  = lv_id.
 ```
+
+**Compact:** a call is printed flat when it fits, whatever the number of
+parameters, and `RAISE EXCEPTION … EXPORTING` follows the general keyword
+rule.
 
 ### ABAP-CALL-002: Parameter keywords
 Milestone: M1
@@ -429,7 +452,7 @@ Keywords are never added or removed. The fallback of ABAP-CALL-001 applies.
 Approved by the maintainer, Nils Lutz, on 2026-11-23: a call with two or more
 parameter keywords is always broken this way, even when it would fit on one
 line (as ABAP Cleaner does). A call with one keyword stays on one line if it
-fits.
+fits and, in the aligned style, has only one parameter (ABAP-CALL-001).
 
 ```abap
 lo_service->read( EXPORTING iv_id   = lv_id
@@ -472,16 +495,71 @@ rs_flight = VALUE #( carrier_id    = 'LH'
 Milestone: M1
 Explanation: one row per line
 
-A constructor expression is printed flat when it fits. Otherwise it follows
-ABAP-CALL-001: the first component assignment or table row stays behind `#(`
-(or `type(`), the others are aligned under it, and the closing `)` stays at the
-end of the last line, with the same fallback. Rows `( … )` that fit are
-printed flat.
+Approved by the maintainer, Nils Lutz, on 2026-11-26, as ABAP Cleaner's
+"Align parameters and components" with its default options. A `VALUE` or
+`NEW` expression and a table expression `itab[ … ]` (also with
+`KEY … COMPONENTS`) are always broken when they hold:
+
+* two or more component assignments (`id = 1 name = 'x'`), or
+* two or more table rows of which one has a component assignment, or
+* `BASE …` or `LET … IN` followed by components or rows.
+
+Otherwise they are printed flat when they fit: `VALUE ty_s( id = 1 )`,
+`VALUE #( ( a = 1 b = 2 ) )`, `VALUE #( ( 1 ) ( 2 ) ( 3 ) )`, `lt_tab[ 1 ]`.
+
+A broken expression follows ABAP-CALL-001: the first component assignment or
+table row stays behind `#(` (or `type(`, `[`), the others are aligned under
+it, and the closing `)` or `]` stays at the end of the last line, with the
+same fallback. `BASE …` and `LET … IN` take the first line; the components or
+rows start on the next line, aligned under them. Each row goes on its own
+line; a row that fits keeps its components on one line. Nested expressions
+follow the rule each on their own. `CORRESPONDING`, `CONV`, `CAST`, `REF` and
+`EXACT` are not affected, and nothing inside a string template is broken.
 
 ```abap
+ls_flight = VALUE #( carrier_id = 'LH'
+                     flight_id  = '0400' ).
 mt_items = VALUE #( ( id = 1 name = `Alpha` )
                     ( id = 2 name = `Beta` ) ).
+mt_items = VALUE #( BASE mt_items
+                    ( id = 3 name = `Gamma` ) ).
+DATA(ls_item) = mt_items[ id   = 1
+                          name = `Alpha` ].
+mt_ids = VALUE #( ( 1 ) ( 2 ) ( 3 ) ).
 ```
+
+**Compact:** a constructor expression is printed flat when it fits;
+otherwise the first component or row stays behind `#(` and the others are
+aligned under it. `BASE` and `LET` get no line of their own, and table
+expressions are not broken by this rule.
+
+### ABAP-VALUE-002: Iterations in constructor expressions
+Milestone: M5
+Explanation: iteration and rows on their own lines
+
+Approved by the maintainer, Nils Lutz, on 2026-11-26. In a `VALUE` or `NEW`
+expression with `FOR`, the rows always start on the line after the
+iteration, aligned under `FOR`, one row per line, as ABAP Cleaner's "Align
+parameters and components" does. The iteration stays on one line with its
+`WHERE`, `INDEX INTO`, `GROUP BY`, `LET … IN` and further `FOR`s.
+
+A `REDUCE` expression is always broken (ABAP Cleaner leaves it as
+written): `INIT …`, the iteration and `NEXT …` each start a line, aligned
+under `INIT`. Their assignments stay on that line.
+
+```abap
+lt_ids = VALUE #( FOR ls_item IN lt_items WHERE ( active = abap_true )
+                  ( ls_item-id ) ).
+lt_pairs = VALUE #( FOR ls_a IN lt_a FOR ls_b IN ls_a-items
+                    ( a = ls_a-id b = ls_b-id ) ).
+lv_sum = REDUCE i( INIT sum = 0
+                   FOR ls_item IN lt_items
+                   NEXT sum = sum + ls_item-amount ).
+```
+
+The fallback of ABAP-CALL-001 applies when a line does not fit.
+
+**Compact:** printed flat when it fits; otherwise broken by the width rules.
 
 ### ABAP-DECL-001: Declarations and chains
 Milestone: M1
@@ -512,7 +590,8 @@ Explanation: one item per line
 Approved by the maintainer, Nils Lutz, on 2026-11-21. A chain of any other keyword
 statement (`CLEAR:`, `INTERFACES:`, `EVENTS:`, `SET HANDLER:`, …) follows the
 declaration rule: on one line if it fits, otherwise one item per line,
-aligned after the colon.
+aligned after the colon. `CLEAR:` and `FREE:` chains always put one item
+per line (ABAP-ALIGN-009).
 
 ```abap
 CLEAR: lv_count,
@@ -526,10 +605,25 @@ Milestone: M1
 In a broken `DATA:`, `TYPES:`, `CONSTANTS:` or `CLASS-DATA:` chain, the
 `TYPE`/`LIKE` keyword of consecutive items is aligned (see the example in
 ABAP-DECL-001), and so are `VALUE` and `READ-ONLY` as ABAP-ALIGN-008
-describes. A blank line or comment line ends the group; nested `BEGIN OF`
-levels align separately.
+describes. A blank line or comment line ends the group. A nested
+`BEGIN OF … END OF` aligns its components on its own, and the components of
+the outer structure before and after it align together, as ABAP Cleaner's
+"Align declarations" does (approved by the maintainer, Nils Lutz, on
+2026-11-26):
 
-**Compact:** only `TYPE`/`LIKE` is aligned.
+```abap
+TYPES: BEGIN OF ty_order,
+         id       TYPE i,
+         BEGIN OF address,
+           city TYPE string,
+           zip  TYPE c LENGTH 5,
+         END OF address,
+         customer TYPE string,
+       END OF ty_order.
+```
+
+**Compact:** only `TYPE`/`LIKE` is aligned, and the outer components before
+and after a nested structure align separately.
 
 ### ABAP-ALIGN-008: Align `TYPE` across declaration statements
 Milestone: M4
@@ -688,6 +782,42 @@ after:  ALIASES medium_method_name FOR if_any_interface~medium_method_name.
                  second FOR if_other~second.
 ```
 
+### ABAP-ALIGN-009: One item per line in `CLEAR:`, `FREE:`, `SORT` and `CATCH`
+Milestone: M5
+Explanation: one item per line
+
+Approved by the maintainer, Nils Lutz, on 2026-11-26, as ABAP Cleaner's
+"Align CLEAR:, FREE:, SORT and CATCH" with its default options:
+
+* a `CLEAR:` or `FREE:` chain with two or more items puts each item on its
+  own line, aligned after the colon, even when it fits on one line;
+* a `SORT` with two or more sort fields after `BY` puts each field on its
+  own line, aligned under the first one; `ASCENDING`, `DESCENDING` and
+  `AS TEXT` stay behind their field. A `SORT` with a dynamic field
+  `( name )` stays as one line;
+* a `CATCH` with two or more exception classes puts each class on its own
+  line, aligned under the first one; `BEFORE UNWIND` stays in front of the
+  first class and `INTO …` behind the last.
+
+```abap
+CLEAR: lv_count,
+       lt_items.
+SORT lt_flights BY carrid ASCENDING
+                   connid DESCENDING
+                   fldate AS TEXT.
+SORT lt_flights BY carrid.
+TRY.
+    book( ).
+  CATCH cx_flight_full
+        cx_flight_closed INTO DATA(lx_error).
+ENDTRY.
+```
+
+If a line does not fit, the general width rules apply.
+
+**Compact:** not aligned; `CLEAR:` and `FREE:` follow ABAP-CHAIN-001, `SORT`
+and `CATCH` stay on one line when they fit.
+
 ### ABAP-EVENT-001: Event blocks
 Milestone: M4
 
@@ -715,11 +845,30 @@ Approved by the maintainer, Nils Lutz, on 2026-11-21. When `BEGIN OF` and `END O
 different statements (`DATA: BEGIN OF s.` … `DATA: END OF s.`), the
 statements between them are indented one level.
 
+Approved by the maintainer, Nils Lutz, on 2026-11-26, as ABAP Cleaner's
+"Align declarations" does: an `INCLUDE TYPE` or `INCLUDE STRUCTURE` there
+starts in the column of the structure's components, that is the column of
+`BEGIN` plus one level. The statement with `END OF` puts `END` in the column
+of `BEGIN`: it pads the space after its keyword (`TYPES  END OF` after
+`TYPES: BEGIN OF`), and keeps a single space where `END` would otherwise
+have to move left.
+
 ```abap
 DATA: BEGIN OF status_view.
-  INCLUDE STRUCTURE vimstatus.
+        INCLUDE STRUCTURE vimstatus.
 DATA: END OF status_view.
+TYPES: BEGIN OF ty_order,
+         id TYPE i.
+         INCLUDE TYPE ty_address.
+TYPES  END OF ty_order.
+TYPES BEGIN OF ty_item.
+  TYPES id   TYPE i.
+  TYPES name TYPE string.
+TYPES END OF ty_item.
 ```
+
+**Compact:** every statement between them, `INCLUDE` too, is indented one
+level, and `END OF` keeps a single space after its keyword.
 
 ### ABAP-FORM-001: FORM signatures
 Milestone: M4
@@ -757,21 +906,24 @@ Approved by the maintainer, Nils Lutz, on 2026-11-25. A `METHODS` or
 `CLASS-METHODS` declaration with at most one parameter in one section
 (`IMPORTING`, `EXPORTING`, `CHANGING`, `RETURNING`, `RAISING`, `EXCEPTIONS`)
 is printed on one line if it fits. Any other signature is a table, as in
-ABAP Cleaner: the first section keyword stays behind the method name, the
-further keywords are aligned under it, and each parameter goes on its own
-line. Keywords are padded to the longest one, so all parameter names start in
-one column; the `TYPE`/`LIKE` of all parameters is aligned, and so are
-`OPTIONAL` and `DEFAULT`. The exceptions after `RAISING` or `EXCEPTIONS` stay
-on one line.
+ABAP Cleaner: the line breaks after the method name, the section keywords
+start a line each at the continuation indent, and each parameter goes on its
+own line. Keywords are padded to the longest one, so all parameter names
+start in one column; the `TYPE`/`LIKE` of all parameters is aligned, and so
+are `OPTIONAL` and `DEFAULT`. The exceptions after `RAISING` or `EXCEPTIONS`
+stay on one line.
 
-If the table does not fit behind the method name, the line breaks after the
-name and the keyword column starts at the continuation indent.
+Approved by the maintainer, Nils Lutz, on 2026-11-26: the table always starts
+below the method name, as ABAP Cleaner keeps it when the input breaks after
+the name. Until then the first keyword stayed behind the name when the table
+fit there.
 
 ```abap
-METHODS calculate IMPORTING iv_amount        TYPE p
-                            iv_currency      TYPE waers OPTIONAL
-                  RETURNING VALUE(rv_result) TYPE p
-                  RAISING   zcx_calc_error zcx_rate_error.
+METHODS calculate
+  IMPORTING iv_amount        TYPE p
+            iv_currency      TYPE waers OPTIONAL
+  RETURNING VALUE(rv_result) TYPE p
+  RAISING   zcx_calc_error zcx_rate_error.
 METHODS reset IMPORTING iv_hard TYPE abap_bool.
 ```
 
@@ -1029,20 +1181,51 @@ CALL FUNCTION 'Z_FLIGHT_TRAVEL_CREATE'
 Milestone: M1
 Explanation: each entity and operation on its own line
 
-Approved by the maintainer, Nils Lutz, on 2026-11-21. `READ ENTITIES`, `READ ENTITY`,
-`MODIFY ENTITIES` and `MODIFY ENTITY` statements are printed on one line when
-they fit. Otherwise:
+Approved by the maintainer, Nils Lutz, on 2026-11-21; the aligned form on
+2026-11-26. `READ ENTITIES`, `READ ENTITY`, `MODIFY ENTITIES` and
+`MODIFY ENTITY` statements are printed on one line when they fit. Otherwise:
 
 * each `ENTITY` and each response (`FAILED`, `REPORTED`, `MAPPED`) starts a
-  line at the continuation indent;
-* each operation (`CREATE`, `UPDATE`, `DELETE`, `EXECUTE`, `FIELDS`,
-  `ALL FIELDS`, `BY \_assoc`, `FROM`) and its `RESULT` and `LINK` start a line
-  one level deeper;
-* `WITH …` and `FROM …` stay behind their operation and move to the next line
-  only when they do not fit.
+  line at the continuation indent; a `BY \_assoc` after the entity name of
+  a `READ` stays on the `ENTITY` line;
+* each operation starts a line one level deeper: `FIELDS ( … )` or
+  `ALL FIELDS` of a `READ`, and a `MODIFY` operation with its words up to
+  `WITH` or `FROM` (`UPDATE FIELDS ( … )`, `CREATE BY \_booking FIELDS ( … )`,
+  `DELETE`, `EXECUTE accept`);
+* `WITH …`, `FROM …`, `RESULT …` and `LINK …` each start a line at the same
+  level.
+
+This is not what ABAP Cleaner does: it keeps the line breaks of the input
+and aligns the lines under the second word.
 
 `COMMIT ENTITIES`, `GET PERMISSIONS` and `SET LOCKS` break before their
 clauses when they do not fit.
+
+```abap
+READ ENTITIES OF /DMO/I_Travel_M IN LOCAL MODE
+  ENTITY travel
+    FIELDS ( customer_id )
+    WITH CORRESPONDING #( keys )
+    RESULT DATA(travels)
+  ENTITY travel BY \_booking
+    ALL FIELDS
+    WITH CORRESPONDING #( keys )
+    RESULT DATA(bookings)
+  FAILED DATA(failed).
+MODIFY ENTITIES OF /DMO/I_Travel_M IN LOCAL MODE
+  ENTITY travel
+    UPDATE FIELDS ( overall_status )
+    WITH VALUE #( FOR key IN keys
+                  ( %tky = key-%tky overall_status = 'A' ) )
+    EXECUTE accept
+    FROM CORRESPONDING #( keys )
+    RESULT DATA(accepted)
+  FAILED DATA(failed).
+```
+
+**Compact:** `ENTITY` and the responses at the continuation indent (two
+levels), operations one level deeper, `BY \_assoc` with its operation, and
+`WITH …` and `FROM …` behind their operation as long as they fit:
 
 ```abap
 READ ENTITIES OF /DMO/I_Travel_M IN LOCAL MODE

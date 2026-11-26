@@ -114,6 +114,11 @@ pub const RULE_PHRASES: &[(RuleId, &str, &str)] = &[
         "constructor expression",
     ),
     (
+        "ABAP-VALUE-002",
+        "iteration and rows on their own lines",
+        "constructor expression",
+    ),
+    (
         "ABAP-COND-001",
         "condition split before AND, OR",
         "condition",
@@ -128,6 +133,7 @@ pub const RULE_PHRASES: &[(RuleId, &str, &str)] = &[
     ("ABAP-ALIGN-005", "one test method per line", "chain"),
     ("ABAP-ALIGN-006", "one redefinition per line", "chain"),
     ("ABAP-ALIGN-007", "one alias per line", "chain"),
+    ("ABAP-ALIGN-009", "one item per line", "statement"),
     (
         "ABAP-METHODS-001",
         "each section and parameter on its own line",
@@ -204,6 +210,7 @@ const ALWAYS_BREAKS: &[RuleId] = &[
     "ABAP-ALIGN-005",
     "ABAP-ALIGN-006",
     "ABAP-ALIGN-007",
+    "ABAP-ALIGN-009",
     "ABAP-SQL-002",
     "CDS-UNIT-001",
     "CDS-HEAD-001",
