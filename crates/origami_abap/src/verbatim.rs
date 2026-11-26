@@ -63,6 +63,10 @@ pub fn scan_body(text: &str, from: usize, kind: RegionKind) -> Option<usize> {
         match (kind, c) {
             (RegionKind::Amdp, b'"') => j = skip_quoted(b, j, b'"'),
             (_, b'\'') => j = skip_quoted(b, j, b'\''),
+            // ABAP text only: in SQLScript and native SQL `|` is the
+            // concatenation `||` and a backquote is not a delimiter.
+            (RegionKind::Macro, b'`') => j = skip_quoted(b, j, b'`'),
+            (RegionKind::Macro, b'|') => j = skip_template(b, j),
             (RegionKind::Amdp, b'-') if b.get(j + 1) == Some(&b'-') => j = skip_to_eol(b, j),
             (RegionKind::Amdp, b'/') if b.get(j + 1) == Some(&b'*') => {
                 j = text[j + 2..]
@@ -101,6 +105,45 @@ fn skip_to_eol(b: &[u8], j: usize) -> usize {
         .position(|&c| c == b'\n')
         .map(|p| j + p)
         .unwrap_or(b.len())
+}
+
+/// End of a string template that starts at `|`: `\` escapes the next byte and
+/// `{ … }` embeds an expression, which may hold literals and templates.
+fn skip_template(b: &[u8], j: usize) -> usize {
+    let mut k = j + 1;
+    while k < b.len() {
+        match b[k] {
+            b'\\' => k += 2,
+            b'|' => return k + 1,
+            b'{' => k = skip_embedded(b, k + 1),
+            _ => k += 1,
+        }
+    }
+    b.len()
+}
+
+/// End of an embedded expression, directly after its closing `}`.
+fn skip_embedded(b: &[u8], from: usize) -> usize {
+    let mut depth = 0u32;
+    let mut k = from;
+    while k < b.len() {
+        match b[k] {
+            b'\'' => k = skip_quoted(b, k, b'\''),
+            b'`' => k = skip_quoted(b, k, b'`'),
+            b'|' => k = skip_template(b, k),
+            b'{' => {
+                depth += 1;
+                k += 1;
+            }
+            b'}' if depth == 0 => return k + 1,
+            b'}' => {
+                depth -= 1;
+                k += 1;
+            }
+            _ => k += 1,
+        }
+    }
+    b.len()
 }
 
 fn skip_quoted(b: &[u8], j: usize, q: u8) -> usize {

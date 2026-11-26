@@ -136,6 +136,31 @@ fn string_literals_with_escapes() {
     assert_eq!(shape("x = `a``b`."), ["x", "=", "`a``b`", "~."]);
 }
 
+/// A `'` inside a template or a backquote literal does not open a literal in
+/// a macro body, so `END-OF-DEFINITION.` is still found.
+#[test]
+fn macro_body_skips_templates_and_backquote_literals() {
+    let bodies = [
+        "lv = |it's &1|.",
+        "lv = `it's &1`.",
+        "lv = |a { 'x|' } b|.",
+        "lv = |a { `x|` && |y'| } b|.",
+        "lv = |a \\| it's|.",
+        "lv = |a \\{ it's|.",
+    ];
+    for body in bodies {
+        let src = format!("DEFINE m.\n  {body}\nEND-OF-DEFINITION.\nm x.\n");
+        let (ts, text) = toks(&src);
+        let opaque: Vec<_> = ts.tokens.iter().filter(|t| t.kind == OPAQUE).collect();
+        assert_eq!(opaque.len(), 1, "{body}");
+        assert!(opaque[0].text(&text).contains(body), "{body}");
+        assert!(
+            !opaque[0].text(&text).contains("END-OF-DEFINITION"),
+            "{body}"
+        );
+    }
+}
+
 #[test]
 fn verbatim_regions() {
     let src = "METHOD m BY DATABASE PROCEDURE FOR HDB LANGUAGE SQLSCRIPT.\n  -- endmethod. in comment\n  x = \"ENDMETHOD\";\n  ENDMETHOD.\n";
