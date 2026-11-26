@@ -11,7 +11,13 @@ import { JsonRun, parseRun } from "./diagnosticsModel";
 import { Resolved } from "./binary";
 import { targetFor } from "./uri";
 
-export type Status = "ok" | "error" | "timeout" | "failed";
+/** Logs a line to the Output channel; `verbose` lines only with `origami.trace`. */
+export type Log = (message: string, verbose?: boolean) => void;
+
+/** `cancelled`: the request was cancelled (also by VS Code's own format-on-save
+ * timeout); it says nothing about the document, so status bar and Problems
+ * stay as they are. */
+export type Status = "ok" | "error" | "timeout" | "failed" | "cancelled";
 
 export interface Outcome {
   edits: vscode.TextEdit[];
@@ -46,7 +52,7 @@ export async function formatDocument(
   document: vscode.TextDocument,
   resolved: Resolved,
   token: vscode.CancellationToken,
-  log: (m: string) => void,
+  log: Log,
   ranges: readonly vscode.Range[] = [],
 ): Promise<Outcome> {
   const original = document.getText();
@@ -71,7 +77,7 @@ export function formatText(
   document: vscode.TextDocument,
   resolved: Resolved,
   token: vscode.CancellationToken,
-  log: (m: string) => void,
+  log: Log,
   ranges: readonly vscode.Range[],
   timeoutMs: number,
 ): Promise<TextOutcome> {
@@ -87,7 +93,7 @@ export function formatText(
   }
   const folder = vscode.workspace.getWorkspaceFolder(document.uri);
   const cwd = folder?.uri.scheme === "file" ? folder.uri.fsPath : os.tmpdir();
-  log(`${resolved.binary} ${args.join(" ")}`);
+  log(`${resolved.binary} ${args.join(" ")}`, true);
 
   return new Promise((resolve) => {
     const child = spawn(resolved.binary, args, { cwd });
@@ -98,6 +104,7 @@ export function formatText(
       if (!settled) {
         settled = true;
         clearTimeout(timer);
+        cancellation.dispose();
         resolve(o);
       }
     };
@@ -105,9 +112,9 @@ export function formatText(
       child.kill("SIGKILL");
       finish({ status: "timeout" });
     }, timeoutMs);
-    token.onCancellationRequested(() => {
+    const cancellation = token.onCancellationRequested(() => {
       child.kill("SIGKILL");
-      finish({ status: "failed" });
+      finish({ status: "cancelled" });
     });
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
@@ -118,10 +125,12 @@ export function formatText(
       finish({ status: "failed" });
     });
     child.on("close", (code) => {
-      if (stderr) {
-        log(stderr.trim());
-      }
       const run = parseRun(stderr);
+      if (stderr) {
+        // Routine diagnostics of a finished run only with `origami.trace`;
+        // the stderr of a failed run is the only record of why.
+        log(stderr.trim(), code === 0 || code === 2 || code === 5);
+      }
       if (code === 0 || code === 5) {
         const changed = run?.files[0]?.changed ?? stdout !== text;
         if (!changed || stdout.length === 0) {
@@ -133,6 +142,13 @@ export function formatText(
         finish({ run, status: "error" });
       } else {
         finish({ run, status: "failed" });
+      }
+    });
+    // The binary can exit before it has read all of stdin (an unknown flag, a
+    // crash); the write then fails with EPIPE. 'close' decides the outcome.
+    child.stdin.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code !== "EPIPE") {
+        log(`origami: cannot write to ${resolved.binary}: ${err.message}`);
       }
     });
     child.stdin.end(text, "utf8");
