@@ -577,20 +577,21 @@ jobs:
           path: vsix
           pattern: vsix-*
           merge-multiple: true
-      # makes the job re-runnable after a partial publish.
+      # --skip-duplicate makes the job re-runnable after a partial publish.
       # The Open VSX step runs even when the Marketplace step failed; a failed
       # step still fails the job.
       - name: Publish to VS Code Marketplace (trusted publishing)
         run: |
           failed=0
           for f in vsix/*.vsix; do
-            tools/publish/node_modules/.bin/vsce publish --packagePath "$f" --oidc || failed=1
+            tools/publish/node_modules/.bin/vsce publish --packagePath "$f" --oidc --skip-duplicate || failed=1
           done
           exit $failed
       - name: Publish to Open VSX (trusted publishing)
+        if: ${{ !cancelled() }}
         run: |
           failed=0
           for f in vsix/*.vsix; do
-            tools/publish/node_modules/.bin/ovsx publish "$f" --trusted-publishing || failed=1
+            tools/publish/node_modules/.bin/ovsx publish "$f" --trusted-publishing --skip-duplicate || failed=1
           done
           exit $failed

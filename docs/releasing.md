@@ -189,9 +189,11 @@ environment `vscode-marketplace`, and the job calls
      version, when those secrets are set.
 
 A failed job can be re-run with *Re-run failed jobs*; the release assets are
-uploaded with `--clobber`. crates.io and the Marketplace refuse a version that
-exists already, so after a partial publish continue by hand with the missing
-registry rather than re-running the publishing job.
+uploaded with `--clobber`. The `crates` job skips crates that are in the index
+already, and `vscode-publish` passes `--skip-duplicate` to `vsce` and `ovsx`,
+so both can be re-run after a partial publish. In `vscode-publish` the Open
+VSX step runs even when the Marketplace step failed (and the job is red
+then), so one registry being down does not hold back the other.
 
 ## Verifying a download
 
