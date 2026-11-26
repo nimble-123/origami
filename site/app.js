@@ -202,7 +202,7 @@ const LOAD_ERROR = "The playground could not load origami.wasm. Install origami 
 let worker = null;
 let ready = false;
 let nextId = 0;
-let inflight = null; // { id, timer }
+let inflight = null; // { id, timer, opts }: the options the request was sent with
 let queued = null; // the newest request made while a run was in flight
 let timedOut = null; // the request that hit the timeout; not run again until it changes
 
@@ -233,7 +233,8 @@ function clearOutput(message) {
   output.append(p);
 }
 
-function render(r) {
+/** `opts`: the options the result was made with, not the current ones. */
+function render(r, opts) {
   output.replaceChildren();
   output.classList.remove("plain");
   if (r.status === "error" || r.output == null) {
@@ -277,7 +278,7 @@ function render(r) {
     row.className = broken.has(n) ? "ln broken" : "ln";
     row.dataset.n = n;
     const code = document.createElement("span");
-    code.append(...(text ? paint(text, { cds: options().cds, upper: !options().lower }) : [" "]));
+    code.append(...(text ? paint(text, { cds: opts.cds, upper: !opts.lower }) : [" "]));
     row.append(code);
     frag.append(row);
     for (const note of after.get(n) ?? []) {
@@ -350,11 +351,12 @@ function startWorker() {
       showError(LOAD_ERROR);
     } else if (inflight && data.id === inflight.id) {
       clearTimeout(inflight.timer);
+      const { opts } = inflight;
       inflight = null;
       if (data.type === "panic") {
         showError("origami stopped on this input (internal error). Please report it with the code.");
       } else {
-        render(data.result);
+        render(data.result, opts);
       }
       if (queued) dispatch();
     }
@@ -376,7 +378,7 @@ function dispatch() {
     );
     startWorker();
   }, RUN_TIMEOUT_MS);
-  inflight = { id, timer };
+  inflight = { id, timer, opts: job.opts };
   worker.postMessage({ id, ...job });
 }
 
