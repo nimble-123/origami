@@ -192,6 +192,7 @@ const highlight = $("pg-highlight");
 const output = $("pg-output");
 const outputText = $("pg-output-text");
 const status = $("pg-status");
+const copyButton = $("pg-copy");
 
 // origami runs in a Web Worker (worker.js). A run that takes longer than
 // RUN_TIMEOUT_MS terminates the worker and starts a new one.
@@ -220,16 +221,24 @@ function ruleLink(text, rule) {
   return span;
 }
 
+/** Empties the output, so a stale result is neither visible nor copyable. */
+function clearOutput(message) {
+  output.replaceChildren();
+  output.classList.remove("plain");
+  outputText.textContent = "";
+  copyButton.disabled = true;
+  const p = document.createElement("p");
+  p.className = "empty";
+  p.textContent = message;
+  output.append(p);
+}
+
 function render(r) {
   output.replaceChildren();
   output.classList.remove("plain");
   if (r.status === "error" || r.output == null) {
     const d = r.diagnostics.find((x) => x.severity !== "warning") ?? r.diagnostics[0];
-    const p = document.createElement("p");
-    p.className = "empty";
-    p.textContent = "Nothing formatted: the code has a structural error, so origami leaves it as it is.";
-    output.append(p);
-    outputText.textContent = "";
+    clearOutput("Nothing formatted: the code has a structural error, so origami leaves it as it is.");
     status.classList.add("error");
     status.textContent = d
       ? `${d.code} at line ${d.line}, column ${d.column}: ${d.message}`
@@ -238,6 +247,7 @@ function render(r) {
   }
   status.classList.remove("error");
   outputText.textContent = r.output;
+  copyButton.disabled = false;
   const warnings = r.diagnostics.filter((d) => d.code !== "W003").length;
   const num = (n) => `<span class="num">${n}</span>`;
   const parts = [];
@@ -321,6 +331,7 @@ function schedule() {
 }
 
 function showError(message) {
+  clearOutput("Nothing to show: origami did not format this code.");
   status.classList.add("error");
   status.textContent = message;
 }

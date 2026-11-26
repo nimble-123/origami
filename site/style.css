@@ -194,6 +194,7 @@ p, li, dd { text-wrap: pretty; }
   transition-property: color, background-color, scale; transition-duration: 150ms; transition-timing-function: var(--ease);
 }
 .copy:hover { color: var(--ink); background: var(--valley-wash); }
+.copy:disabled { color: var(--ink-dim); background: transparent; cursor: default; }
 .copy:active { scale: 0.96; }
 .copy .icon {
   grid-area: 1 / 1; width: 18px; height: 18px;
