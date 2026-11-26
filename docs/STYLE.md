@@ -1029,8 +1029,10 @@ Approved by the maintainer, Nils Lutz, on 2026-11-23 (ABAP Cleaner
 ABAP-CALL-001. `LET … IN` and the `SWITCH` operand come first; when the
 expression breaks, the `WHEN` lines follow below them, aligned.
 
-* **One `WHEN`:** on one line if it fits, else `WHEN`, `THEN` and `ELSE`
-  below each other.
+* **One `WHEN`:** with an `ELSE`, `WHEN`, `THEN` and `ELSE` always below
+  each other (approved by the maintainer, Nils Lutz, on 2026-11-26; until then
+  on one line if it fit); without an `ELSE`, on one line if it fits, else
+  `WHEN` and `THEN` below each other.
 * **Several `WHEN` (tabular):** always one `WHEN … THEN …` per line, even if
   the whole expression would fit on one line; `THEN` and the values are
   aligned, and the `ELSE` value lines up with the `THEN` values.
@@ -1043,7 +1045,13 @@ its `WHEN`. `THROW` is a value like any other. A body the parser does not
 understand keeps its line breaks.
 
 ```abap
-lv_sign = COND #( WHEN iv_negative = abap_true THEN -1 ELSE 1 ).
+lv_sign = COND #( WHEN iv_negative = abap_true
+                  THEN -1
+                  ELSE 1 ).
+lv_x = COND #( WHEN a = b THEN 1 ).
+valid_to = COND #( WHEN ls_read-ValidTo IS INITIAL
+                   THEN gc_open_end
+                   ELSE ls_read-ValidTo ).
 lv_currency = COND #( WHEN ls_amounts-betrw <> 0 THEN ls_amounts-waers
                       WHEN ls_amounts-betr2 <> 0 THEN ls_amounts-hwae2
                       ELSE                            gc_default_currency ).
@@ -1062,14 +1070,17 @@ lv_label = COND #( WHEN io_object->get_sub_object( )->get_number( ) <= if_object
 Deviations from ABAP Cleaner, so that the output depends only on the code
 and stays within the line width:
 
-* A `COND` with one `WHEN` that fits is joined onto one line; ABAP Cleaner
-  keeps it on one line only if it was written that way.
+* A `COND` or `SWITCH` with one `WHEN` and an `ELSE` is always broken, and
+  one without an `ELSE` that fits is joined onto one line; ABAP Cleaner
+  keeps either as written.
 * The tabular layout is used only if every line fits, the `ELSE` line
   included; ABAP Cleaner sometimes keeps it with a longer `ELSE` line.
 * A comment or a nested `COND`/`SWITCH` inside a `WHEN` condition rules out
   the tabular layout (ABAP Cleaner aligns around the comment).
 * Values are indented one level (`indent`, default 2 spaces) instead of
   always 2 spaces.
+
+**Compact:** one `WHEN`, with or without `ELSE`, is on one line if it fits.
 
 ### ABAP-SQL-001: ABAP SQL
 Milestone: M1

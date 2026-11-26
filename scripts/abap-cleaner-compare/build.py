@@ -140,7 +140,7 @@ MAP = {
         "Breaks before AND and OR at a fixed indent; operands are not aligned in columns."),
     "LOGICAL_OPERATOR_POSITION": ("yes", ["ABAP-COND-001"], "AND and OR always start the line."),
     "ALIGN_COND_EXPRESSIONS": ("yes", ["ABAP-COND-002"],
-        "A COND with one WHEN is joined onto one line when it fits."),
+        "A COND with one WHEN and an ELSE is always broken; one without ELSE is joined onto one line when it fits."),
     "ALIGN_FORM_DECLARATION": ("own", ["ABAP-FORM-001"],
         "Each section on its own line, parameters one level deeper."),
     "ALIGN_PERFORM": ("own", [], "A long PERFORM breaks before a section keyword that does not fit."),

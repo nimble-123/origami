@@ -951,7 +951,7 @@ impl<'c, 'a> P<'c, 'a> {
 
     /// `COND` / `SWITCH` body between `lp` and `rp` (ABAP-COND-002). One
     /// `WHEN`: on one line if it fits, else `WHEN`, `THEN` and `ELSE` below
-    /// each other. Several: one `WHEN … THEN …` per line with `THEN` and the
+    /// each other (aligned style, with an `ELSE`: always below each other). Several: one `WHEN … THEN …` per line with `THEN` and the
     /// values aligned (tabular), or, if that does not fit, `THEN` at the end
     /// of the `WHEN` line and each value on its own line, one level deeper.
     /// `LET … IN` and the `SWITCH` operand come first.
@@ -1010,29 +1010,32 @@ impl<'c, 'a> P<'c, 'a> {
 
         let content = if branches.len() == 1 {
             // One line if it fits; else every part below the previous one.
+            // Aligned style: with an `ELSE`, always below each other.
+            let below = self.c.style == Style::Aligned && otherwise.is_some();
+            let brk = |p: &Self, i: usize| if below { p.hl(i) } else { p.ln(i) };
             let br = &branches[0];
             let mut docs = Vec::new();
             for (at, d) in &lead {
                 if !docs.is_empty() {
-                    docs.push(self.ln(*at));
+                    docs.push(brk(self, *at));
                 }
                 docs.push(d.clone());
             }
             if !docs.is_empty() {
-                docs.push(self.ln(br.when));
+                docs.push(brk(self, br.when));
             }
             docs.extend([
                 self.t(br.when),
                 self.sp(br.when + 1),
                 b::cont(vec![br.cond.clone()]),
-                self.ln(br.then),
+                brk(self, br.then),
                 self.t(br.then),
                 self.sp(br.then + 1),
                 b::cont(vec![br.value.clone()]),
             ]);
             if let Some((e, v)) = &otherwise {
                 docs.extend([
-                    self.ln(*e),
+                    brk(self, *e),
                     self.t(*e),
                     self.sp(e + 1),
                     b::cont(vec![v.clone()]),
