@@ -3,7 +3,7 @@
 
 import * as vscode from "vscode";
 import * as fs from "node:fs";
-import { BinaryResolver } from "./binary";
+import { BinaryResolver, isUnresolved, Unresolved } from "./binary";
 import { formatDocument, FORMAT_TIMEOUT_MS, TextOutcome } from "./format";
 import { toEditorRange } from "./diagnosticsModel";
 import { PreviewManager } from "./preview";
@@ -17,8 +17,10 @@ const SELECTOR: vscode.DocumentSelector = [
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("origami");
-  const log = (m: string) => {
-    if (vscode.workspace.getConfiguration("origami").get<boolean>("trace")) {
+  // Errors are always logged; lines marked `verbose` (command lines, routine
+  // stderr) only with `origami.trace`.
+  const log = (m: string, verbose = false) => {
+    if (!verbose || vscode.workspace.getConfiguration("origami").get<boolean>("trace")) {
       output.appendLine(m);
     }
   };
@@ -63,6 +65,10 @@ export function activate(context: vscode.ExtensionContext): void {
     outcome: Pick<TextOutcome, "run" | "status">,
     timeoutMs: number,
   ): void {
+    // A cancelled request must not replace the result of the last real run.
+    if (outcome.status === "cancelled") {
+      return;
+    }
     // Diagnostics from every run, including warnings from successful runs.
     const items = (outcome.run?.files[0]?.diagnostics ?? []).map((d) => {
       const r = toEditorRange(d);
@@ -99,10 +105,9 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
-  const mismatch = () =>
-    setStatus("origami: version mismatch", "No origami binary satisfies required_version in origami.toml.");
+  const unresolved = (u: Unresolved) => setStatus(u.status, u.message);
 
-  const previews = new PreviewManager({ resolver, log, report: reportOutcome, mismatch });
+  const previews = new PreviewManager({ resolver, log, report: reportOutcome, unresolved });
   // Enables "Preview Changes" in the command palette.
   const updateFormattable = () => {
     const doc = vscode.window.activeTextEditor?.document;
@@ -118,8 +123,8 @@ export function activate(context: vscode.ExtensionContext): void {
   ): Promise<vscode.TextEdit[]> {
     {
       const resolved = await resolver.resolve(document);
-      if (!resolved) {
-        mismatch();
+      if (isUnresolved(resolved)) {
+        unresolved(resolved);
         return [];
       }
       const outcome = await formatDocument(document, resolved, token, log, ranges);

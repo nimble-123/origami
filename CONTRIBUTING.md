@@ -25,7 +25,7 @@ show the problem are enough.
 
 ## Set up
 
-You need Rust 1.94 or newer (edition 2024). For the VS Code extension, Node 22;
+You need Rust 1.100 or newer (edition 2024). For the VS Code extension, Node 22;
 for the website, the `wasm32-unknown-unknown` target.
 
 ```sh
