@@ -32,6 +32,7 @@
   "activationEvents": [
     "onLanguage:abap",
     "onLanguage:acds",
+    "onStartupFinished",
     "workspaceContains:**/*.abap",
     "workspaceContains:**/*.asddls",
     "workspaceContains:**/*.asddlxs",
