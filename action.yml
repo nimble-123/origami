@@ -26,7 +26,10 @@ inputs:
       Fail if the release binary has no build provenance attestation
       ("true" / "false"). Releases before provenance was added have none; by
       default only a warning is printed for them. A binary that has an
-      attestation must always verify.
+      attestation must always verify. An error while looking the attestation
+      up (rate limit, server error, missing permission) always fails the
+      step; only "there is none" (HTTP 404 or an empty list) counts as no
+      attestation.
     default: "false"
 
 runs:
@@ -95,8 +98,18 @@ runs:
         # workflow of this repository. The sha256 file only guards the
         # download, since it comes from the same release.
         if command -v sha256sum >/dev/null; then digest=$(sha256sum "$bin" | cut -d' ' -f1); else digest=$(shasum -a 256 "$bin" | cut -d' ' -f1); fi
-        attestations=$(gh api "repos/${REPO}/attestations/sha256:${digest}" --jq '.attestations | length' 2>/dev/null || echo 0)
-        if [ "${attestations:-0}" -gt 0 ]; then
+        # "No attestation" (HTTP 404 or an empty list) is not an API error:
+        # a rate limit, a 5xx or an authentication problem must not pass as
+        # "no attestation".
+        if answer=$(gh api "repos/${REPO}/attestations/sha256:${digest}" --jq '.attestations | length' 2>&1); then
+          attestations=$answer
+        elif [[ "$answer" == *"HTTP 404"* ]]; then
+          attestations=0
+        else
+          echo "::error title=origami::Could not look up the build provenance attestation of $bin ($tag): $answer"
+          exit 1
+        fi
+        if [ "$attestations" -gt 0 ]; then
           gh attestation verify "$bin" --repo "$REPO" --signer-workflow "${REPO}/.github/workflows/release.yml"
         elif [ "$REQUIRE_ATTESTATION" = true ]; then
           echo "origami: $bin has no build provenance attestation (require-attestation is set)" >&2

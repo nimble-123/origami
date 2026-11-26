@@ -42,6 +42,14 @@ file for the runner: release-please creates a release when it tags, and the
 binaries are attached some time later, so the action skips a release that has
 none yet. It fails, with a message, if none of the 30 newest releases has one.
 
+The action checks the checksum of the download and its build provenance
+attestation. Releases made before attestations existed have none; for them it
+prints a warning and checks the checksum only, unless `require-attestation:
+"true"` is set, which refuses them. Only "there is no attestation" (HTTP 404 or
+an empty list) counts as none: any other error while looking it up (rate limit,
+server error, a token without access) fails the step, as does a binary whose
+attestation does not verify.
+
 ## GitLab CI
 
 ```yaml
