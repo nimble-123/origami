@@ -140,6 +140,13 @@ export function formatText(
         finish({ run, status: "failed" });
       }
     });
+    // The binary can exit before it has read all of stdin (an unknown flag, a
+    // crash); the write then fails with EPIPE. 'close' decides the outcome.
+    child.stdin.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code !== "EPIPE") {
+        log(`origami: cannot write to ${resolved.binary}: ${err.message}`);
+      }
+    });
     child.stdin.end(text, "utf8");
   });
 }
