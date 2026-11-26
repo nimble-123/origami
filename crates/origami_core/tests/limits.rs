@@ -125,6 +125,25 @@ fn nested_calls_are_not_exponential() {
     run(Language::Abap, &src, &Options::default());
 }
 
+/// Explaining the breaks looks up comments and rule spans once per break,
+/// not by scanning all of them for each.
+#[test]
+fn explaining_many_breaks_is_not_quadratic() {
+    let src = (0..40_000)
+        .map(|k| format!("lv_a = {k}."))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let start = Instant::now();
+    let e = origami_core::explain(
+        src.as_bytes(),
+        &LanguageHint::Explicit(Language::Abap),
+        &Options::default(),
+        &[],
+    );
+    assert!(start.elapsed() < BOUND, "took {:?}", start.elapsed());
+    assert_eq!(e.notes.len(), 39_999, "{:?}", e.result.diagnostics);
+}
+
 #[test]
 fn input_over_the_size_limit_is_left_as_written() {
     let src = "WRITE 'x'.\n".repeat(MAX_INPUT_LEN / 11 + 1);
