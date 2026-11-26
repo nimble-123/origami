@@ -133,12 +133,12 @@ p, li, dd { text-wrap: pretty; }
 .btn:disabled { opacity: 0.55; cursor: progress; }
 
 .badge {
-  display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 10px; height: 38px; padding: 0 14px 0 6px; border-radius: 999px;
   font-size: var(--t-sm); font-weight: 500; color: var(--text);
   background: rgba(26, 27, 38, 0.7); box-shadow: inset 0 0 0 1px var(--line-2);
 }
 .badge:hover { color: var(--head); box-shadow: inset 0 0 0 1px var(--line-3); }
-.badge-tag { padding: 3px 9px; border-radius: 999px; background: rgba(122, 162, 247, 0.18); color: var(--blue-soft); font-weight: 600; font-variant-numeric: tabular-nums; }
+.badge-tag { padding: 0 9px; line-height: 26px; border-radius: 999px; background: rgba(122, 162, 247, 0.18); color: var(--blue-soft); font-weight: 600; font-variant-numeric: tabular-nums; }
 .badge:not(:has(.badge-tag:not([hidden]))) { padding-left: 14px; }
 
 .copy { position: relative; display: inline-grid; place-items: center; min-width: var(--target); min-height: var(--target); padding: 0 12px; border: 0; border-radius: 8px; background: rgba(192, 202, 245, 0.08); color: var(--text); font: 600 var(--t-sm) var(--sans); cursor: pointer; transition-property: background-color, color, scale; transition-duration: 150ms; transition-timing-function: var(--ease); }
@@ -677,3 +677,9 @@ ul.legend { margin: 0 0 20px; }
 .rules td a { color: var(--cyan); font-family: var(--mono); font-size: 11.5px; }
 .table-note { margin: 14px 0 0; color: var(--text-2); font-size: var(--t-sm); max-width: 46rem; }
 .abap-cleaner .foot-in { padding-block: var(--s-7); }
+
+/* Touch: every control at least 44px in both directions. */
+@media (pointer: coarse) {
+  .badge { height: 44px; }
+  .win-tabs button, .btn.small, .link-btn { min-height: 44px; }
+}

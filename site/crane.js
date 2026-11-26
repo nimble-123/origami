@@ -559,7 +559,9 @@ export function mount(box, { reduceMotion = false, onFail = () => {} }) {
   colors();
   size();
   pose(fold);
-  wake();
+  // Shaders compile off the main thread where the browser can
+  // (KHR_parallel_shader_compile), so the first frame does not stall a scroll.
+  renderer.compileAsync(scene, camera).then(wake, wake);
 
   return {
     /** The fold: 0 flat, 1 folded. `immediate` follows the scroll position
