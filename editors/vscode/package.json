@@ -53,7 +53,7 @@
           "type": "string",
           "default": "",
           "scope": "machine",
-          "description": "Path to an origami binary. Empty: use an origami on PATH that satisfies the project's required_version, else the bundled binary."
+          "description": "Path to an origami binary. Empty: in a project with an origami.toml, an origami on PATH that satisfies its required_version, else the bundled binary; without an origami.toml, the bundled binary (an origami on PATH only if the extension ships none for your platform)."
         },
         "origami.trace": {
           "type": "boolean",

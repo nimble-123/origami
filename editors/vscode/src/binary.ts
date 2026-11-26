@@ -2,8 +2,9 @@
 //   1. the machine-scoped setting `origami.path`;
 //   2. for documents inside a folder with origami.toml, the first `origami`
 //      on PATH that reports satisfies_required_version for that file;
-//   3. the bundled binary, checked the same way.
-// In untrusted workspaces, steps 1 and 2 are skipped. The binary evaluates
+//   3. the bundled binary, checked the same way;
+//   4. an `origami` on PATH, if the extension ships no binary for this platform.
+// In untrusted workspaces, steps 1, 2 and 4 are skipped. The binary evaluates
 // required_version itself, so this file needs no TOML or semver code.
 
 import * as vscode from "vscode";
@@ -32,6 +33,18 @@ export function isUnresolved(r: Resolved | Unresolved): r is Unresolved {
 const NO_MATCH: Unresolved = {
   status: "origami: version mismatch",
   message: "No origami binary satisfies required_version in origami.toml.",
+};
+
+const NOT_FOUND: Unresolved = {
+  status: "origami: not found",
+  message:
+    "No origami binary found: this extension ships none for your platform and none is on PATH. Install origami or set origami.path.",
+};
+
+const NOT_FOUND_UNTRUSTED: Unresolved = {
+  status: "origami: not found",
+  message:
+    "No origami binary found: this extension ships none for your platform, and PATH is not used in untrusted workspaces. Trust the workspace, or install a build of the extension with a bundled binary.",
 };
 
 export class BinaryResolver {
@@ -95,29 +108,30 @@ export class BinaryResolver {
   private async compute(
     configPath: string | undefined,
   ): Promise<{ result: Resolved | Unresolved; transient: boolean }> {
-    const candidates: string[] = [];
-    if (vscode.workspace.isTrusted) {
+    const trusted = vscode.workspace.isTrusted;
+    if (trusted) {
       const setting = vscode.workspace.getConfiguration("origami").get<string>("path");
       if (setting) {
         // An explicit setting wins without a version check.
         return { result: { binary: setting, configPath }, transient: false };
       }
-      if (configPath) {
-        // By absolute path: a bare name would let Windows pick an origami.exe
-        // from the workspace folder, which is the working directory.
-        const onPath = findOnPath("origami");
-        if (onPath) {
-          candidates.push(onPath);
-        }
-      }
     }
-    candidates.push(this.bundled());
+    // By absolute path: a bare name would let Windows pick an origami.exe
+    // from the workspace folder, which is the working directory.
+    const onPath = trusted ? findOnPath("origami") : undefined;
+    const bundled = fs.existsSync(this.bundled()) ? this.bundled() : undefined;
+    // With an origami.toml, PATH is tried first for its required_version.
+    // Without one there is nothing to check: the bundled binary, and PATH
+    // only if the extension ships none for this platform.
+    const candidates = (configPath ? [onPath, bundled] : [bundled ?? onPath]).filter(
+      (b): b is string => b !== undefined,
+    );
+    if (candidates.length === 0) {
+      return { result: trusted ? NOT_FOUND : NOT_FOUND_UNTRUSTED, transient: false };
+    }
     let transient = false;
     for (const binary of candidates) {
       if (!configPath) {
-        if (binary === this.bundled() && !fs.existsSync(binary)) {
-          continue;
-        }
         return { result: { binary, configPath }, transient };
       }
       const probe = await this.probe(binary, configPath);

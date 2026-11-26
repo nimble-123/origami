@@ -47,9 +47,11 @@ The extension uses, in this order:
 1. the machine setting `origami.path`;
 2. an `origami` on `PATH` that satisfies `required_version` of the project's
    `origami.toml`;
-3. the bundled binary.
+3. the bundled binary;
+4. an `origami` on `PATH`, if the extension ships no binary for your platform.
 
-In untrusted workspaces only the bundled binary is used.
+Without an `origami.toml` there is no `required_version` to check, so step 2
+does not apply. In untrusted workspaces only the bundled binary is used.
 
 ## Settings
 
