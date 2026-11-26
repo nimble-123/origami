@@ -488,6 +488,51 @@ fn a_read_only_file_is_not_replaced_and_reports_e031() {
     );
 }
 
+/// Runs origami with stdout closed before it writes (like `| head -c1`) and
+/// returns its exit code and stderr.
+#[cfg(unix)]
+fn run_with_closed_stdout(args: &[&str], stdin: &str) -> (Option<i32>, String) {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let mut child = Command::new(env!("CARGO_BIN_EXE_origami"))
+        .args(args)
+        .env_remove("CLAUDECODE")
+        .env_remove("ORIGAMI_DIAGNOSTICS")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take());
+    let mut input = child.stdin.take().unwrap();
+    let _ = input.write_all(stdin.as_bytes());
+    drop(input);
+    let out = child.wait_with_output().unwrap();
+    (out.status.code(), String::from_utf8(out.stderr).unwrap())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_closed_stdout_is_not_an_internal_error() {
+    let (code, err) = run_with_closed_stdout(&["--version"], "");
+    assert_eq!((code, err.as_str()), (Some(0), ""));
+    let (code, err) = run_with_closed_stdout(&["--version", "--json"], "");
+    assert_eq!((code, err.as_str()), (Some(0), ""));
+    // The diff of a changed source goes to stdout, the verdict is exit 1.
+    let (code, err) = run_with_closed_stdout(
+        &["--check", "--diff", "--stdin", "--language", "abap"],
+        "lv_a   =   1.\n",
+    );
+    assert_eq!(code, Some(1), "{err}");
+    assert!(!err.contains("X002"), "{err}");
+    let (code, err) = run_with_closed_stdout(
+        &["--review", "--stdin", "--language", "abap"],
+        "lv_a   =   1.\n",
+    );
+    assert_eq!(code, Some(1), "{err}");
+    assert!(!err.contains("X002"), "{err}");
+}
+
 #[test]
 fn check_diff_prints_a_unified_diff_to_stdout() {
     let d = dir();
