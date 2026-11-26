@@ -431,11 +431,20 @@ fn forced_blanks(
     multi: &[bool],
 ) -> std::collections::BTreeMap<usize, u8> {
     let mut out = std::collections::BTreeMap::new();
+    // Word `k` of a statement, not counting pragmas in front of its keyword
+    // (`##NEEDED DATA x TYPE i.`).
+    let lead = |st: &Statement| -> usize {
+        stream.tokens[st.tokens.clone()]
+            .iter()
+            .take_while(|t| t.kind == crate::kinds::PRAGMA)
+            .count()
+    };
     let word = |st: &Statement, k: usize| -> String {
+        let at = st.tokens.start + lead(st) + k;
         stream
             .tokens
-            .get(st.tokens.start + k)
-            .filter(|_| st.tokens.start + k < st.tokens.end)
+            .get(at)
+            .filter(|_| at < st.tokens.end)
             .map(|t| t.text(text).to_ascii_uppercase())
             .unwrap_or_default()
     };
@@ -443,7 +452,7 @@ fn forced_blanks(
     // declaration (`DATA(x) = …`).
     let decl_kw = |st: &Statement, list: &[&str]| -> Option<String> {
         let w = word(st, 0);
-        let next = stream.tokens.get(st.tokens.start + 1)?;
+        let next = stream.tokens.get(st.tokens.start + lead(st) + 1)?;
         let inline = next.glued && next.kind != crate::kinds::COLON;
         (list.contains(&w.as_str()) && !inline).then_some(w)
     };

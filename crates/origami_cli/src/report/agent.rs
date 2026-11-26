@@ -30,7 +30,7 @@ fn hint(code: Code) -> &'static str {
         Code::E031 => "Check that the file is writable.",
         Code::W001 => "The unit was kept as written; no action needed.",
         Code::W002 => "The unit was kept as written (255-character limit); no action needed.",
-        Code::W004 => "The unit was kept as written (nesting depth); no action needed.",
+        Code::W004 => "Kept as written (nesting-depth or size limit); no action needed.",
         Code::W101 => "Remove or fix the key in origami.toml.",
         Code::X001 | Code::X002 => {
             "Internal error; the file was not changed. Report it with the file."
@@ -42,7 +42,7 @@ fn hint(code: Code) -> &'static str {
 fn line(prefix: &str, f: &FileReport, d: &Reported) -> String {
     let mut s = format!(
         "{prefix} {}:{}:{} {} {}",
-        f.path,
+        super::escape_controls(&f.path),
         d.range.start.line,
         d.range.start.column,
         d.code.as_str(),
@@ -119,7 +119,7 @@ pub fn write(run: &Run, out: &mut dyn Write) -> std::io::Result<()> {
                 out,
                 "{} {}",
                 if run.check { "CHANGE" } else { "FORMATTED" },
-                f.path
+                super::escape_controls(&f.path)
             )?;
         }
     }
@@ -133,11 +133,16 @@ pub fn write(run: &Run, out: &mut dyn Write) -> std::io::Result<()> {
         "NEXT: fix the errors above (those files were not changed), then run origami again."
             .to_string()
     } else if run.check && !changed.is_empty() {
-        let shown: Vec<&str> = changed.iter().take(10).copied().collect();
+        let shown: Vec<String> = changed
+            .iter()
+            .take(10)
+            .map(|p| super::shell_quote(p).into_owned())
+            .collect();
         let more = if changed.len() > 10 { " …" } else { "" };
+        // A name with control characters is shown escaped, not runnable.
         format!(
             "NEXT: run `origami {}{more}` to apply the formatting.",
-            shown.join(" ")
+            super::escape_controls(&shown.join(" "))
         )
     } else {
         "NEXT: nothing to do.".to_string()

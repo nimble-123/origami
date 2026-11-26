@@ -32,6 +32,7 @@
   "activationEvents": [
     "onLanguage:abap",
     "onLanguage:acds",
+    "onStartupFinished",
     "workspaceContains:**/*.abap",
     "workspaceContains:**/*.asddls",
     "workspaceContains:**/*.asddlxs",
@@ -53,12 +54,12 @@
           "type": "string",
           "default": "",
           "scope": "machine",
-          "description": "Path to an origami binary. Empty: use an origami on PATH that satisfies the project's required_version, else the bundled binary."
+          "description": "Path to an origami binary. Empty: in a project with an origami.toml, an origami on PATH that satisfies its required_version, else the bundled binary; without an origami.toml, the bundled binary (an origami on PATH only if the extension ships none for your platform)."
         },
         "origami.trace": {
           "type": "boolean",
           "default": false,
-          "description": "Log every origami command line and its stderr to the 'origami' output channel."
+          "description": "Also log every origami command line and its stderr to the 'origami' output channel. Errors are always logged."
         }
       }
     },
@@ -107,6 +108,11 @@
   },
   "dependencies": {
     "diff": "9.0.0"
+  },
+  "overrides": {
+    "@vscode/vsce": {
+      "minimatch": "11.0.9"
+    }
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

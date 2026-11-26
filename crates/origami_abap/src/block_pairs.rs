@@ -106,7 +106,20 @@ pub fn classify(words: &[String], depth0: &[String]) -> Option<Role> {
     }
 }
 
-const AGGREGATES: &[&str] = &["COUNT", "SUM", "MIN", "MAX", "AVG", "COUNT(*)"];
+const AGGREGATES: &[&str] = &[
+    "COUNT",
+    "SUM",
+    "MIN",
+    "MAX",
+    "AVG",
+    "COUNT(*)",
+    "STRING_AGG",
+    "MEDIAN",
+    "STDDEV",
+    "VAR",
+    "CORR",
+    "CORR_SPEARMAN",
+];
 
 /// True when a `SELECT` (or the main query of a `WITH`) needs `ENDSELECT`.
 /// `depth0` holds the statement's words at bracket depth 0, in upper case.
@@ -207,6 +220,18 @@ mod tests {
             "SELECT FROM t FIELDS COUNT INTO @lv"
         )));
         assert!(!select_is_loop(&words("SELECT COUNT FROM t WHERE x = 1")));
+        for f in [
+            "STRING_AGG",
+            "MEDIAN",
+            "STDDEV",
+            "VAR",
+            "CORR",
+            "CORR_SPEARMAN",
+        ] {
+            assert!(!select_is_loop(&words(&format!(
+                "SELECT {f} FROM t INTO @DATA ( agg )"
+            ))));
+        }
         assert!(!select_is_loop(&words(
             "SELECT * FROM t APPENDING CORRESPONDING FIELDS OF TABLE itab"
         )));

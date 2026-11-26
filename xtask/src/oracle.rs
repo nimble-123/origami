@@ -154,8 +154,20 @@ pub fn run() -> Result<(), String> {
             outputs.push(out_path.to_string_lossy().into_owned());
         }
     }
+    if inputs.is_empty() {
+        return Err("no ABAP corpus files to compare (run `cargo xtask corpus fetch`)".into());
+    }
     let a = lex_all(&inputs)?;
     let b = lex_all(&outputs)?;
+    for (side, lexed) in [("inputs", &a), ("outputs", &b)] {
+        if lexed.len() != inputs.len() {
+            return Err(format!(
+                "abaplint oracle returned {} results for {} {side}",
+                lexed.len(),
+                inputs.len()
+            ));
+        }
+    }
     let mut mismatches = 0;
     for (x, y) in a.iter().zip(b.iter()) {
         let xa = canonical(&x.tokens);

@@ -174,18 +174,6 @@ with a numeric ID (`TEXT-001`), and in ABAP SQL the aggregate functions
 )`. Other SQL functions (`length( )`, `substring( )`) are built-in functions
 and keep their case.
 
-Approved by the maintainer, Nils Lutz, on 2026-11-23: a keyword is
-upper-cased wherever it stands in a recognized statement, as ABAP Cleaner
-does. This includes the words of RAP derived types (`TYPE TABLE FOR READ
-RESULT`, `TYPE RESPONSE FOR MAPPED LATE`), inline `FIELD-SYMBOL( )`,
-`OTHERS` in `WHEN OTHERS` and `EXCEPTIONS`, logical expressions inside
-function arguments and constructor bodies, table keys (`[ KEY k COMPONENTS …
-]`), format options of string templates (`{ d DATE = ISO }`), text symbols
-with a numeric ID (`TEXT-001`), and in ABAP SQL the aggregate functions
-(`COUNT( )`, `SUM( )`, `MIN( )`, `MAX( )`, `AVG( )`) and `CAST( … AS CHAR( n )
-)`. Other SQL functions (`length( )`, `substring( )`) are built-in functions
-and keep their case.
-
 ```abap
 before: data(lv_count) = lines( mt_items ).
 after:  DATA(lv_count) = lines( mt_items ).
@@ -853,6 +841,12 @@ Approved by the maintainer, Nils Lutz, on 2026-11-21. The statements of an event
 `AT LINE-SELECTION`, `AT USER-COMMAND`, `AT PFnn`) are indented one level,
 as in the ADT pretty printer. An event block ends at the next event keyword or
 processing block (`FORM`, `MODULE`, `FUNCTION`, `CLASS`, `INTERFACE`).
+
+Approved by the maintainer, Nils Lutz, on 2026-11-26: the logical database event
+`GET node [LATE] [FIELDS …]` is an event block too. It is one outside a
+processing block, unless the word after `GET` is one of `BADI`, `BIT`,
+`CURSOR`, `DATASET`, `LOCALE`, `PARAMETER`, `PERMISSIONS`, `PF-STATUS`,
+`PROPERTY`, `REFERENCE`, `RUN` or `TIME`, which start other statements.
 
 ```abap
 START-OF-SELECTION.

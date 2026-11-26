@@ -54,18 +54,24 @@ pub fn by_file_name(name: &str) -> FileKind {
 }
 
 pub fn detect(src: &SourceText, hint: &LanguageHint) -> Result<Language, Diagnostic> {
-    let sniffed =
-        || sniff(src).ok_or_else(|| Diagnostic::new(Code::E010, "Language not detected", 0..0));
+    match by_hint(hint)? {
+        Some(l) => Ok(l),
+        None => {
+            sniff(src).ok_or_else(|| Diagnostic::new(Code::E010, "Language not detected", 0..0))
+        }
+    }
+}
+
+/// The language the hint names, or `None` when it must be detected from
+/// the content. Reads no content.
+pub fn by_hint(hint: &LanguageHint) -> Result<Option<Language>, Diagnostic> {
     match hint {
-        LanguageHint::Explicit(l) => Ok(*l),
-        LanguageHint::CdsFamily | LanguageHint::None => sniffed(),
-        LanguageHint::LanguageId(id) => match id.as_str() {
-            "abap" => Ok(Language::Abap),
-            _ => sniffed(),
-        },
+        LanguageHint::Explicit(l) => Ok(Some(*l)),
+        LanguageHint::CdsFamily | LanguageHint::None => Ok(None),
+        LanguageHint::LanguageId(id) => Ok((id == "abap").then_some(Language::Abap)),
         LanguageHint::Path(p) => match by_file_name(p) {
-            FileKind::Lang(l) => Ok(l),
-            FileKind::CdsFamily => sniffed(),
+            FileKind::Lang(l) => Ok(Some(l)),
+            FileKind::CdsFamily => Ok(None),
             FileKind::Unsupported => Err(Diagnostic::new(
                 Code::E011,
                 format!("Unsupported file type: {p}"),
@@ -73,8 +79,8 @@ pub fn detect(src: &SourceText, hint: &LanguageHint) -> Result<Language, Diagnos
             )),
         },
         LanguageHint::StdinPath(p) => match by_file_name(p) {
-            FileKind::Lang(l) => Ok(l),
-            _ => sniffed(),
+            FileKind::Lang(l) => Ok(Some(l)),
+            _ => Ok(None),
         },
     }
 }

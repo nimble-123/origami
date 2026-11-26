@@ -1,0 +1,16 @@
+{
+  "name": "origami-publish-tools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Publishing tools of the release workflow, installed from the lockfile (npm ci --ignore-scripts).",
+  "license": "MIT OR Apache-2.0",
+  "dependencies": {
+    "@vscode/vsce": "4.1.1",
+    "ovsx": "1.4.0"
+  },
+  "overrides": {
+    "@vscode/vsce": {
+      "minimatch": "11.0.9"
+    }
+  }
+}

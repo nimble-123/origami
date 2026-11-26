@@ -3,7 +3,9 @@
 //! current release build, and writes `target/release-diff.patch` for the
 //! release notes. Without a tag it compares with the latest release; if that
 //! has no binary for this machine it reports that there is nothing to
-//! compare. With a tag, a failed download is an error.
+//! compare. With a tag, a failed download is an error. The binary is checked
+//! against its `.sha256` file, and against its build provenance attestation
+//! when it has one, before it is run.
 
 use crate::corpus::{files, manifest};
 use crate::root;
@@ -33,6 +35,81 @@ fn copy_corpus(to: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Checks the downloaded binary against its `.sha256` file and, when `gh` can
+/// find the repository, against its build provenance attestation. A binary
+/// without an attestation (releases before provenance) only gets a notice; a
+/// binary whose attestation does not verify is an error.
+fn verify(bin: &Path) -> Result<(), String> {
+    let dir = bin.parent().ok_or("binary has no directory")?;
+    let name = bin
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or("binary has no name")?;
+    let sum_file = dir.join(format!("{name}.sha256"));
+    let sum = std::fs::read_to_string(&sum_file)
+        .map_err(|e| format!("release has no checksum file for {name}: {e}"))?;
+    let digest = sum
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_string();
+    // The file names the binary relative to its own directory.
+    let checked = ["sha256sum", "shasum"].iter().find_map(|tool| {
+        let mut c = Command::new(tool);
+        if *tool == "shasum" {
+            c.args(["-a", "256"]);
+        }
+        c.arg("-c")
+            .arg(format!("{name}.sha256"))
+            .current_dir(dir)
+            .status()
+            .ok()
+    });
+    match checked {
+        Some(s) if s.success() => {}
+        Some(_) => return Err(format!("checksum of {name} does not match its .sha256")),
+        None => return Err("neither sha256sum nor shasum is available".into()),
+    }
+
+    let repo = std::env::var("GH_REPO")
+        .or_else(|_| std::env::var("GITHUB_REPOSITORY"))
+        .unwrap_or_default();
+    if repo.is_empty() {
+        println!("release-diff: no GH_REPO; build provenance of {name} not checked");
+        return Ok(());
+    }
+    let verified = Command::new("gh")
+        .args(["attestation", "verify"])
+        .arg(bin)
+        .args(["--repo", &repo, "--signer-workflow"])
+        .arg(format!("{repo}/.github/workflows/release.yml"))
+        .status()
+        .map_err(|e| format!("cannot run gh: {e}"))?;
+    if verified.success() {
+        return Ok(());
+    }
+    // Releases before provenance have no attestation. One that has an
+    // attestation which does not verify must not be run.
+    let count = Command::new("gh")
+        .args(["api", &format!("repos/{repo}/attestations/sha256:{digest}")])
+        .args(["--jq", ".attestations | length"])
+        .output()
+        .map_err(|e| format!("cannot run gh: {e}"))?;
+    let none = if count.status.success() {
+        String::from_utf8_lossy(&count.stdout).trim() == "0"
+    } else {
+        String::from_utf8_lossy(&count.stderr).contains("404")
+    };
+    if none {
+        println!(
+            "release-diff: {name} has no build provenance attestation; checksum verified only"
+        );
+        Ok(())
+    } else {
+        Err(format!("build provenance of {name} could not be verified"))
+    }
+}
+
 pub fn run(args: &[&str]) -> Result<(), String> {
     let tag = args.first().copied();
     let work = root().join("target/release-diff");
@@ -44,14 +121,13 @@ pub fn run(args: &[&str]) -> Result<(), String> {
     if let Some(t) = tag {
         gh.arg(t);
     }
-    // Only this machine's binary: the release carries one per target, and a
-    // binary for another platform cannot run here.
-    gh.args([
-        "--pattern",
-        &format!("origami-*-{}", host_triple()?),
-        "--dir",
-    ])
-    .arg(work.join("bin"));
+    // Only this machine's binary and its checksum: the release carries one
+    // per target, and a binary for another platform cannot run here.
+    let name_pattern = format!("origami-*-{}", host_triple()?);
+    gh.args(["--pattern", &name_pattern, "--pattern"])
+        .arg(format!("{name_pattern}.sha256"))
+        .arg("--dir")
+        .arg(work.join("bin"));
     let status = gh.status().map_err(|e| format!("cannot run gh: {e}"))?;
     if !status.success() {
         if let Some(t) = tag {
@@ -66,6 +142,7 @@ pub fn run(args: &[&str]) -> Result<(), String> {
         .map(|e| e.path())
         .find(|p| !p.to_string_lossy().ends_with(".sha256"))
         .ok_or("downloaded release contains no binary")?;
+    verify(&previous)?;
     // Downloaded files are not executable.
     #[cfg(unix)]
     {
@@ -112,4 +189,36 @@ pub fn run(args: &[&str]) -> Result<(), String> {
         out.stdout.len()
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::verify;
+
+    #[test]
+    fn a_wrong_checksum_is_refused() {
+        let dir = std::env::temp_dir().join(format!("origami-verify-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let bin = dir.join("origami-0.0.0-test");
+        std::fs::write(&bin, "binary").unwrap();
+        std::fs::write(
+            dir.join("origami-0.0.0-test.sha256"),
+            format!("{}  origami-0.0.0-test\n", "0".repeat(64)),
+        )
+        .unwrap();
+        let err = verify(&bin).unwrap_err();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(err.contains("does not match"), "{err}");
+    }
+
+    #[test]
+    fn a_missing_checksum_file_is_refused() {
+        let dir = std::env::temp_dir().join(format!("origami-verify-none-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let bin = dir.join("origami-0.0.0-test");
+        std::fs::write(&bin, "binary").unwrap();
+        let err = verify(&bin).unwrap_err();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(err.contains("no checksum file"), "{err}");
+    }
 }

@@ -28,7 +28,8 @@ use origami_syntax::{
     BreakCause, Language, Note, Placement, RuleId, Scope, SourceText, TokenIndex, TokenStream,
     TriviaKind, TriviaPosition, UnitId,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
 /// A formatting result with explanations of its introduced line breaks.
 #[derive(Debug, Clone)]
@@ -321,9 +322,10 @@ fn widest_line(
         .max()
 }
 
-/// The end-of-line comment that trails token `k` in `text`, if any.
-fn trailing_comment(text: &str, stream: &TokenStream, k: usize) -> Option<String> {
-    stream.trivia.iter().find_map(|t| {
+/// For each token: the end-of-line comment that trails it in `text`, if any.
+fn trailing_comments(text: &str, stream: &TokenStream) -> Vec<Option<String>> {
+    let mut comments = vec![None; stream.tokens.len()];
+    for t in &stream.trivia {
         let eol = matches!(
             t.kind,
             TriviaKind::Comment {
@@ -331,9 +333,14 @@ fn trailing_comment(text: &str, stream: &TokenStream, k: usize) -> Option<String
                 ..
             }
         );
-        (eol && t.position == TriviaPosition::Trailing && t.anchor.0 as usize == k)
-            .then(|| text[t.start as usize..t.end as usize].trim().to_string())
-    })
+        if eol
+            && t.position == TriviaPosition::Trailing
+            && let Some(slot @ None) = comments.get_mut(t.anchor.0 as usize)
+        {
+            *slot = Some(text[t.start as usize..t.end as usize].trim().to_string());
+        }
+    }
+    comments
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -387,6 +394,17 @@ fn notes(parts: &Parts, opts: &Options) -> Vec<Located> {
         "element"
     };
 
+    let trailing = trailing_comments(output, &out_stream);
+    let trailing_comment = |k: usize| trailing[k].clone();
+    // Rule spans by first token, and the spans that start before the current
+    // break, innermost first: fewest tokens; for equal ranges the last pushed.
+    // Breaks come in token order, so a span that ends before one ends before
+    // every later one too.
+    let mut by_first: Vec<usize> = (0..r.rule_spans.len()).collect();
+    by_first.sort_by_key(|&i| r.rule_spans[i].first);
+    let mut by_first = by_first.into_iter().peekable();
+    let mut open: BinaryHeap<Reverse<(u32, usize)>> = BinaryHeap::new();
+
     // Introduced breaks, grouped.
     let mut groups: BTreeMap<(Construct, Kind, Option<RuleId>), Vec<TokenIndex>> = BTreeMap::new();
     let mut comments: BTreeMap<TokenIndex, String> = BTreeMap::new();
@@ -403,20 +421,25 @@ fn notes(parts: &Parts, opts: &Options) -> Vec<Located> {
         }
         let kind = if !wide_start[k] {
             Kind::Width
-        } else if let Some(c) = trailing_comment(output, &out_stream, k - 1) {
+        } else if let Some(c) = trailing_comment(k - 1) {
             comments.insert(ti, c);
             Kind::Comment
         } else {
             Kind::Rule
         };
-        // Innermost span: fewest tokens; for equal ranges the last pushed.
-        let span = r
-            .rule_spans
-            .iter()
-            .enumerate()
-            .filter(|(_, s)| s.contains_break(ti))
-            .min_by_key(|(i, s)| (s.len(), usize::MAX - i))
-            .map(|(i, s)| (i, s.rule));
+        // Innermost span that contains the break.
+        while let Some(i) = by_first.next_if(|&i| r.rule_spans[i].first < ti) {
+            open.push(Reverse((r.rule_spans[i].len(), usize::MAX - i)));
+        }
+        while let Some(&Reverse((_, rev))) = open.peek()
+            && !r.rule_spans[usize::MAX - rev].contains_break(ti)
+        {
+            open.pop();
+        }
+        let span = open.peek().map(|&Reverse((_, rev))| {
+            let i = usize::MAX - rev;
+            (i, r.rule_spans[i].rule)
+        });
         let (construct, rule) = match span {
             Some((i, rule)) => (Construct::Span(i), Some(rule)),
             None if unit.tokens.start == ti => (Construct::Unit(unit.id), Some(unit_rule)),
@@ -443,8 +466,7 @@ fn notes(parts: &Parts, opts: &Options) -> Vec<Located> {
             };
             // An end-of-line comment inside the construct (not after its
             // last token) forces the construct onto several lines.
-            let inner_comment =
-                || (first..last).find_map(|j| trailing_comment(output, &out_stream, j));
+            let inner_comment = || (first..last).find_map(trailing_comment);
             let (cause, rule) = match kind {
                 // A rule that breaks only for width cannot cause a break that
                 // survives the wide print; a comment inside does.
