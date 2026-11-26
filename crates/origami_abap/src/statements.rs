@@ -255,6 +255,7 @@ static SPECS: &[Spec] = &[
     spec(&["ENDWHILE"]),
     spec(&["ENDSELECT"]),
     spec(&["ENDAT"]),
+    spec(&["ENDCATCH"]),
     Spec {
         words: &["INTO"],
         ..spec(&["CLEANUP"])
@@ -265,6 +266,12 @@ static SPECS: &[Spec] = &[
     spec(&["PROTECTED", "SECTION"]),
     spec(&["PRIVATE", "SECTION"]),
     // Statements with operands.
+    // Classic `CATCH SYSTEM-EXCEPTIONS exc = n … OTHERS = n.` (before
+    // `CATCH`, which would take SYSTEM-EXCEPTIONS as an exception class).
+    Spec {
+        bare: false,
+        ..spec(&["CATCH", "SYSTEM-EXCEPTIONS"])
+    },
     Spec {
         words: &["INTO", "RESUMING", "BEFORE", "UNWIND"],
         ..spec(&["CATCH"])
@@ -2586,7 +2593,7 @@ fn spec_body(p: &mut P, spec: &Spec, first_gap: bool) -> Option<Doc> {
     let mut current: Vec<Doc> = Vec::new();
     let mut mode = spec.after_lead;
     let mut prev_kw: Option<String> = None;
-    let mut in_exceptions = false;
+    let mut in_exceptions = spec.lead == ["CATCH", "SYSTEM-EXCEPTIONS"];
     // ABAP-SQL-003: a field list follows `SELECT` (after `SINGLE`,
     // `DISTINCT`, …), `FIELDS`, `GROUP BY` and `ORDER BY`; `INTO ( … )`.
     let select = spec.commas && spec.lead.first() == Some(&"SELECT");

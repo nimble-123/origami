@@ -632,6 +632,16 @@ ENDCLASS.
 fn rarer_statements() {
     check(&[
         (
+            r#"catch system-exceptions arithmetic_errors = 4 others = 8.
+  lv_x = 1 / 0.
+endcatch.
+"#,
+            r#"CATCH SYSTEM-EXCEPTIONS arithmetic_errors = 4 OTHERS = 8.
+  lv_x = 1 / 0.
+ENDCATCH.
+"#,
+        ),
+        (
             r#"selection-screen skip.
 "#,
             r#"SELECTION-SCREEN SKIP.
