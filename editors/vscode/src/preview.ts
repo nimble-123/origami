@@ -149,6 +149,7 @@ export class PreviewManager implements vscode.TextDocumentContentProvider, vscod
         return "error";
       case "timeout":
       case "failed":
+      case "cancelled":
         void vscode.window.showErrorMessage("origami: preview failed; see Output.");
         return "failed";
       case "ok":

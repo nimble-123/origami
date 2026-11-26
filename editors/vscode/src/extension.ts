@@ -65,6 +65,10 @@ export function activate(context: vscode.ExtensionContext): void {
     outcome: Pick<TextOutcome, "run" | "status">,
     timeoutMs: number,
   ): void {
+    // A cancelled request must not replace the result of the last real run.
+    if (outcome.status === "cancelled") {
+      return;
+    }
     // Diagnostics from every run, including warnings from successful runs.
     const items = (outcome.run?.files[0]?.diagnostics ?? []).map((d) => {
       const r = toEditorRange(d);

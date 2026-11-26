@@ -14,7 +14,10 @@ import { targetFor } from "./uri";
 /** Logs a line to the Output channel; `verbose` lines only with `origami.trace`. */
 export type Log = (message: string, verbose?: boolean) => void;
 
-export type Status = "ok" | "error" | "timeout" | "failed";
+/** `cancelled`: the request was cancelled (also by VS Code's own format-on-save
+ * timeout); it says nothing about the document, so status bar and Problems
+ * stay as they are. */
+export type Status = "ok" | "error" | "timeout" | "failed" | "cancelled";
 
 export interface Outcome {
   edits: vscode.TextEdit[];
@@ -101,6 +104,7 @@ export function formatText(
       if (!settled) {
         settled = true;
         clearTimeout(timer);
+        cancellation.dispose();
         resolve(o);
       }
     };
@@ -108,9 +112,9 @@ export function formatText(
       child.kill("SIGKILL");
       finish({ status: "timeout" });
     }, timeoutMs);
-    token.onCancellationRequested(() => {
+    const cancellation = token.onCancellationRequested(() => {
       child.kill("SIGKILL");
-      finish({ status: "failed" });
+      finish({ status: "cancelled" });
     });
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
