@@ -42,7 +42,7 @@ fn hint(code: Code) -> &'static str {
 fn line(prefix: &str, f: &FileReport, d: &Reported) -> String {
     let mut s = format!(
         "{prefix} {}:{}:{} {} {}",
-        f.path,
+        super::escape_controls(&f.path),
         d.range.start.line,
         d.range.start.column,
         d.code.as_str(),
@@ -119,7 +119,7 @@ pub fn write(run: &Run, out: &mut dyn Write) -> std::io::Result<()> {
                 out,
                 "{} {}",
                 if run.check { "CHANGE" } else { "FORMATTED" },
-                f.path
+                super::escape_controls(&f.path)
             )?;
         }
     }
@@ -133,11 +133,16 @@ pub fn write(run: &Run, out: &mut dyn Write) -> std::io::Result<()> {
         "NEXT: fix the errors above (those files were not changed), then run origami again."
             .to_string()
     } else if run.check && !changed.is_empty() {
-        let shown: Vec<&str> = changed.iter().take(10).copied().collect();
+        let shown: Vec<String> = changed
+            .iter()
+            .take(10)
+            .map(|p| super::shell_quote(p).into_owned())
+            .collect();
         let more = if changed.len() > 10 { " …" } else { "" };
+        // A name with control characters is shown escaped, not runnable.
         format!(
             "NEXT: run `origami {}{more}` to apply the formatting.",
-            shown.join(" ")
+            super::escape_controls(&shown.join(" "))
         )
     } else {
         "NEXT: nothing to do.".to_string()
