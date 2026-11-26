@@ -1,0 +1,6 @@
+1: ABAP-ALIGN-009: one item per line
+4: ABAP-ALIGN-009: one item per line
+6: ABAP-ALIGN-009: one item per line
+9: ABAP-ALIGN-009: one item per line
+15: ABAP-ALIGN-009: one item per line
+17: ABAP-ALIGN-009: one item per line

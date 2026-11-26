@@ -1,1 +1,3 @@
-4: ABAP-CHAIN-001: one item per line, because the chain would end at column 128 (limit 120)
+3: ABAP-ALIGN-009: one item per line
+6: ABAP-ALIGN-009: one item per line
+16: ABAP-CHAIN-001: one item per line, because the chain would end at column 128 (limit 120)

@@ -783,7 +783,7 @@ after:  ALIASES medium_method_name FOR if_any_interface~medium_method_name.
 ```
 
 ### ABAP-ALIGN-009: One item per line in `CLEAR:`, `FREE:`, `SORT` and `CATCH`
-Milestone: M5
+Milestone: M4
 Explanation: one item per line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-26, as ABAP Cleaner's
