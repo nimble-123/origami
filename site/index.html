@@ -129,8 +129,9 @@
           <label class="pane-label" for="pg-input">Your code</label>
           <div class="editor">
             <pre id="pg-highlight" class="sheet code" aria-hidden="true"></pre>
-            <textarea id="pg-input" class="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+            <textarea id="pg-input" class="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-describedby="pg-input-hint"></textarea>
           </div>
+          <p id="pg-input-hint" class="sr-only">Tab inserts two spaces. Press Escape, then Tab, to move focus out of the editor.</p>
         </div>
         <div class="pg-pane">
           <div class="pane-label">

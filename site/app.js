@@ -381,17 +381,30 @@ async function playground() {
   input.value = EXAMPLES.call.text;
   $("pg-example").addEventListener("change", (e) => loadExample(e.target.value));
   for (const id of ["pg-lang", "pg-width", "pg-case", "pg-style"]) $(id).addEventListener("change", run);
+  // Tab indents, which would trap keyboard users: Escape releases the trap
+  // until the next input or focus.
+  let tabIndents = true;
   input.addEventListener("input", () => {
+    tabIndents = true;
     paintInput();
     schedule();
   });
+  input.addEventListener("focus", () => {
+    tabIndents = true;
+  });
   input.addEventListener("scroll", syncScroll);
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Tab" && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
+    if (e.altKey || e.metaKey || e.ctrlKey) return;
+    if (e.key === "Escape") {
+      tabIndents = false;
+    } else if (e.key === "Tab" && !e.shiftKey && tabIndents) {
       e.preventDefault();
-      input.setRangeText("  ", input.selectionStart, input.selectionEnd, "end");
-      paintInput();
-      schedule();
+      // insertText keeps the browser's undo history; it fires "input" itself.
+      if (!document.execCommand("insertText", false, "  ")) {
+        input.setRangeText("  ", input.selectionStart, input.selectionEnd, "end");
+        paintInput();
+        schedule();
+      }
     }
   });
   try {
