@@ -1196,3 +1196,68 @@ fn mcp_format_files_caps_the_result() {
     );
     assert!(replies[0].to_string().len() < 160 * 1024);
 }
+
+/// A temporary git work tree with one commit of `files`.
+fn git_repo(files: &[(&str, &str)]) -> tempfile::TempDir {
+    let d = tempfile::tempdir().unwrap();
+    git(d.path(), &["init", "-q"]);
+    for (name, text) in files {
+        write(d.path(), name, text);
+    }
+    git(d.path(), &["add", "."]);
+    git(d.path(), &["commit", "-qm", "init", "--allow-empty"]);
+    d
+}
+
+fn git(dir: &Path, args: &[&str]) {
+    let out = std::process::Command::new("git")
+        .args(["-c", "user.email=t@example.com", "-c", "user.name=t"])
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "git {args:?}: {out:?}");
+}
+
+#[test]
+fn changed_rejects_a_revision_that_looks_like_an_option() {
+    let d = git_repo(&[("z.prog.abap", "lv_a = 1.\n")]);
+    let outside = tempfile::tempdir().unwrap();
+    let victim = outside.path().join("victim.txt");
+    origami()
+        .current_dir(d.path())
+        .args([
+            "--no-config",
+            &format!("--changed=--output={}", victim.display()),
+        ])
+        .assert()
+        .code(3);
+    assert!(!victim.exists(), "git wrote {}", victim.display());
+    // An unknown revision is a usage error too, with a short message.
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--changed=nonexistent"])
+        .assert()
+        .code(3);
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert!(err.contains("nonexistent"), "{err}");
+    assert!(err.lines().count() < 10, "{err}");
+}
+
+#[test]
+fn mcp_changed_rejects_a_revision_that_looks_like_an_option() {
+    let d = git_repo(&[("z.prog.abap", "lv_a = 1.\n")]);
+    let outside = tempfile::tempdir().unwrap();
+    let victim = outside.path().join("victim.txt");
+    let replies = mcp_session(
+        d.path(),
+        &[],
+        &[tool_call(
+            1,
+            "format_files",
+            serde_json::json!({"changed": format!("--output={}", victim.display())}),
+        )],
+    );
+    assert_eq!(replies[0]["result"]["isError"], true, "{}", replies[0]);
+    assert!(!victim.exists(), "git wrote {}", victim.display());
+}

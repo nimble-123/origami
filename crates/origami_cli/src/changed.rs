@@ -59,7 +59,30 @@ pub fn parse_diff(diff: &str) -> BTreeMap<String, Vec<(u32, u32)>> {
     out
 }
 
+/// The commit `rev` names, as a full object name. A revision that starts with
+/// `-` would be read by git as an option (`--output=FILE` overwrites FILE),
+/// so it is refused before git sees it, and git is given the resolved name.
+fn resolve(rev: &str) -> Result<String, String> {
+    if rev.starts_with('-') {
+        return Err(format!(
+            "--changed: `{rev}` is not a git revision (it starts with `-`)"
+        ));
+    }
+    let out = Command::new("git")
+        .args(["rev-parse", "--verify", "--quiet"])
+        .arg(format!("{rev}^{{commit}}"))
+        .output()
+        .map_err(|e| format!("--changed needs git: {e}"))?;
+    let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if out.status.success() && !name.is_empty() {
+        Ok(name)
+    } else {
+        Err(format!("--changed: `{rev}` is not a known git revision"))
+    }
+}
+
 pub fn files(rev: &str, paths: &[PathBuf]) -> Result<Vec<(PathBuf, Ranges)>, String> {
+    let rev = resolve(rev)?;
     let specs: Vec<String> = paths.iter().map(|p| p.display().to_string()).collect();
     let mut diff_args = vec![
         "diff",
@@ -67,7 +90,7 @@ pub fn files(rev: &str, paths: &[PathBuf]) -> Result<Vec<(PathBuf, Ranges)>, Str
         "--no-color",
         "--no-ext-diff",
         "--relative",
-        rev,
+        &rev,
         "--",
     ];
     diff_args.extend(specs.iter().map(String::as_str));
