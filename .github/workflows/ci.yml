@@ -24,7 +24,7 @@ jobs:
   # corpus/), LICENSE*, scripts/abap-cleaner-compare/ or .github/ISSUE_TEMPLATE/.
   # Everything else is code. A second output, `wasm`, is also true when a
   # changed file is under site/ or docs/assets/: site/build.sh copies
-  # site/{index.html,abap-cleaner.html,style.css,app.js,worker.js} and files
+  # site/{index.html,abap-cleaner.html,style.css,*.js,vendor/*} and files
   # from docs/assets/, so renaming or deleting one must run the `wasm` job,
   # which builds the site. If this job fails, the
   # jobs below still run (`!= 'false'`), never a silent skip.
