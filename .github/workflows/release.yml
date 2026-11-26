@@ -349,6 +349,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      attestations: read # verifies the previous release binary before it runs
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -378,7 +379,8 @@ jobs:
           cargo xtask corpus fetch
           # The release for this tag exists already (release-please creates
           # it) but has no assets yet, so compare with the newest other
-          # release that has a Linux x86_64 binary.
+          # release that has a Linux x86_64 binary. release-diff checks that
+          # binary against its .sha256 and its attestation before it runs it.
           previous=""
           for tag in $(gh release list --exclude-drafts --exclude-pre-releases --limit 30 --json tagName --jq '.[].tagName'); do
             [ "$tag" = "$GITHUB_REF_NAME" ] && continue

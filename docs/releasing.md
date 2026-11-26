@@ -15,7 +15,7 @@ lists what to create to turn the other steps on.
 | `build` | Binaries for 7 targets (macOS x64/arm64, Windows x64/arm64, Linux gnu x64/arm64, Linux musl x64). Signed and notarized (macOS) or signed (Windows) when the credentials exist. |
 | `smoke` | Starts every binary on a runner of its own platform, prints `--version`, formats a fixture. A binary that does not run stops the release. |
 | `vsix` | One VS Code extension package per target, with the binary inside. |
-| `extras` | Third-party notices, the CycloneDX SBOM (`origami-X.Y.Z.sbom.cdx.json`), and `release-diff.patch` (what the new release formats differently from the previous one, on the test corpus). |
+| `extras` | Third-party notices, the CycloneDX SBOM (`origami-X.Y.Z.sbom.cdx.json`), and `release-diff.patch` (what the new release formats differently from the previous one, on the test corpus; the previous binary is checked against its `.sha256` and its attestation before it runs). |
 | `release` | Attests build provenance for the binaries, the SBOM and the extension packages, then attaches everything to the GitHub release. |
 | `homebrew`, `crates`, `vscode-publish` | Formula in the tap, crates.io, VS Code Marketplace and Open VSX. |
 
