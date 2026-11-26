@@ -1084,6 +1084,55 @@ fn mcp_rejects_bad_line_ranges() {
 }
 
 #[test]
+fn mcp_rejects_wrongly_typed_arguments() {
+    let d = dir();
+    write(d.path(), "a.prog.abap", "lv_a   =   1.\n");
+    let bad = [
+        (
+            "format_files",
+            serde_json::json!({"paths": "a.prog.abap", "write": true}),
+        ),
+        (
+            "format_files",
+            serde_json::json!({"paths": [1], "write": true}),
+        ),
+        (
+            "format_files",
+            serde_json::json!({"changed": 5, "write": true}),
+        ),
+        ("format_files", serde_json::json!({"write": "true"})),
+        ("format_files", serde_json::json!({"write": 1})),
+        ("format_files", serde_json::json!("write")),
+        ("format", serde_json::json!({"source": 5})),
+        (
+            "format",
+            serde_json::json!({"source": "x = 1.", "filename": 3}),
+        ),
+        (
+            "format",
+            serde_json::json!({"source": "x = 1.", "language": ["abap"]}),
+        ),
+        (
+            "format",
+            serde_json::json!({"source": "x = 1.", "lines": "1:2"}),
+        ),
+    ];
+    let messages: Vec<String> = bad
+        .iter()
+        .enumerate()
+        .map(|(i, (tool, args))| tool_call(i as u32 + 1, tool, args.clone()))
+        .collect();
+    let replies = mcp_session(d.path(), &[], &messages);
+    for ((tool, args), r) in bad.iter().zip(&replies) {
+        assert_eq!(r["error"]["code"], -32602, "{tool} {args}: {r}");
+    }
+    assert_eq!(
+        fs::read_to_string(d.path().join("a.prog.abap")).unwrap(),
+        "lv_a   =   1.\n"
+    );
+}
+
+#[test]
 fn mcp_rejects_too_long_messages_and_keeps_serving() {
     let d = dir();
     let big = tool_call(
@@ -1160,6 +1209,107 @@ fn mcp_blocked_calls_can_be_cancelled_and_time_out() {
     assert_eq!(replies[1]["error"]["code"], -32001);
 }
 
+/// A named pipe `z.prog.abap` that blocks whoever reads it.
+#[cfg(unix)]
+fn blocking_fifo(d: &Path) {
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(d.join("z.prog.abap"))
+            .status()
+            .unwrap()
+            .success()
+    );
+}
+
+/// A call that missed its deadline may still be running. No second call
+/// that writes starts before it has stopped: it is refused instead.
+#[cfg(unix)]
+#[test]
+fn mcp_does_not_overlap_writes_with_a_call_that_is_still_running() {
+    let d = dir();
+    blocking_fifo(d.path());
+    write(d.path(), "b.prog.abap", "lv_a   =   1.\n");
+    let call = |id, path: &str| {
+        tool_call(
+            id,
+            "format_files",
+            serde_json::json!({"paths": [path], "write": true}),
+        )
+    };
+    let replies = mcp_session(
+        d.path(),
+        &[("ORIGAMI_MCP_TIMEOUT", "0.3")],
+        &[call(1, "z.prog.abap"), call(2, "b.prog.abap")],
+    );
+    assert_eq!(replies[0]["id"], 1);
+    assert_eq!(replies[0]["error"]["code"], -32001, "{}", replies[0]);
+    assert_eq!(replies[1]["id"], 2);
+    assert_eq!(replies[1]["error"]["code"], -32002, "{}", replies[1]);
+    assert_eq!(
+        fs::read_to_string(d.path().join("b.prog.abap")).unwrap(),
+        "lv_a   =   1.\n"
+    );
+}
+
+/// A read-only call is not held up by a read-only call that is still stuck.
+#[cfg(unix)]
+#[test]
+fn mcp_serves_reads_while_a_stuck_read_lingers() {
+    let d = dir();
+    blocking_fifo(d.path());
+    let replies = mcp_session(
+        d.path(),
+        &[("ORIGAMI_MCP_TIMEOUT", "0.3")],
+        &[
+            tool_call(
+                1,
+                "format_files",
+                serde_json::json!({"paths": ["z.prog.abap"]}),
+            ),
+            tool_call(
+                2,
+                "format",
+                serde_json::json!({"source": "x   =   1.\n", "language": "abap"}),
+            ),
+        ],
+    );
+    assert_eq!(replies[0]["error"]["code"], -32001, "{}", replies[0]);
+    assert_eq!(replies[1]["result"]["content"][0]["text"], "x = 1.\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn mcp_bounds_the_queue_of_waiting_calls() {
+    let d = dir();
+    blocking_fifo(d.path());
+    let mut messages = vec![tool_call(
+        1,
+        "format_files",
+        serde_json::json!({"paths": ["z.prog.abap"]}),
+    )];
+    for id in 2..=30 {
+        messages.push(tool_call(
+            id,
+            "format",
+            serde_json::json!({"source": "x = 1.\n", "language": "abap"}),
+        ));
+    }
+    let replies = mcp_session(d.path(), &[("ORIGAMI_MCP_TIMEOUT", "1")], &messages);
+    assert_eq!(replies.len(), 30);
+    let refused = replies
+        .iter()
+        .filter(|r| r["error"]["code"] == -32002)
+        .count();
+    assert!((1..29).contains(&refused), "{refused} refused");
+    // The refusal comes at once, before the first call's deadline.
+    assert_eq!(replies[0]["error"]["code"], -32002, "{}", replies[0]);
+    assert!(
+        replies
+            .iter()
+            .any(|r| r["id"] == 1 && r["error"]["code"] == -32001)
+    );
+}
+
 #[test]
 fn mcp_format_files_caps_the_result() {
     let d = dir();
@@ -1195,4 +1345,168 @@ fn mcp_format_files_caps_the_result() {
         "{text}"
     );
     assert!(replies[0].to_string().len() < 160 * 1024);
+}
+
+/// A temporary git work tree with one commit of `files`.
+fn git_repo(files: &[(&str, &str)]) -> tempfile::TempDir {
+    let d = tempfile::tempdir().unwrap();
+    git(d.path(), &["init", "-q"]);
+    for (name, text) in files {
+        write(d.path(), name, text);
+    }
+    git(d.path(), &["add", "."]);
+    git(d.path(), &["commit", "-qm", "init", "--allow-empty"]);
+    d
+}
+
+fn git(dir: &Path, args: &[&str]) {
+    let out = std::process::Command::new("git")
+        .args(["-c", "user.email=t@example.com", "-c", "user.name=t"])
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "git {args:?}: {out:?}");
+}
+
+#[test]
+fn changed_rejects_a_revision_that_looks_like_an_option() {
+    let d = git_repo(&[("z.prog.abap", "lv_a = 1.\n")]);
+    let outside = tempfile::tempdir().unwrap();
+    let victim = outside.path().join("victim.txt");
+    origami()
+        .current_dir(d.path())
+        .args([
+            "--no-config",
+            &format!("--changed=--output={}", victim.display()),
+        ])
+        .assert()
+        .code(3);
+    assert!(!victim.exists(), "git wrote {}", victim.display());
+    // An unknown revision is a usage error too, with a short message.
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--changed=nonexistent"])
+        .assert()
+        .code(3);
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert!(err.contains("nonexistent"), "{err}");
+    assert!(err.lines().count() < 10, "{err}");
+}
+
+/// Names git quotes, writes with a trailing tab, or leaves alone.
+#[cfg(unix)]
+const AWKWARD_NAMES: &[&str] = &[
+    "plain.prog.abap",
+    "with space.prog.abap",
+    "quo\"te.prog.abap",
+    "back\\slash.prog.abap",
+    "tab\tname.prog.abap",
+    "umlaut_ä.prog.abap",
+    "sub dir/inner.prog.abap",
+];
+
+/// `--changed` finds every changed and untracked file whatever git's diff
+/// settings and the file names are.
+#[cfg(unix)]
+fn changed_formats_awkward_files(config: &[&str]) {
+    let files: Vec<(&str, &str)> = AWKWARD_NAMES.iter().map(|n| (*n, "lv_a = 1.\n")).collect();
+    let d = git_repo(&files);
+    for kv in config.chunks(2) {
+        git(d.path(), &["config", kv[0], kv[1]]);
+    }
+    for n in AWKWARD_NAMES {
+        write(d.path(), n, "lv_a   =   2.\n");
+    }
+    write(d.path(), "new file \"x\".prog.abap", "lv_b   =   3.\n");
+    origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--changed"])
+        .assert()
+        .code(0);
+    for n in AWKWARD_NAMES {
+        assert_eq!(
+            fs::read_to_string(d.path().join(n)).unwrap(),
+            "lv_a = 2.\n",
+            "{n:?}"
+        );
+    }
+    assert_eq!(
+        fs::read_to_string(d.path().join("new file \"x\".prog.abap")).unwrap(),
+        "lv_b = 3.\n"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn changed_handles_awkward_file_names() {
+    changed_formats_awkward_files(&[]);
+}
+
+#[cfg(unix)]
+#[test]
+fn changed_ignores_the_diff_prefix_settings() {
+    changed_formats_awkward_files(&["diff.noprefix", "true"]);
+    changed_formats_awkward_files(&["diff.mnemonicPrefix", "true"]);
+}
+
+#[test]
+fn changed_honors_the_ignore_rules_of_a_directory_walk() {
+    let d = git_repo(&[
+        (".origamiignore", "generated/\n"),
+        ("generated/a.prog.abap", "lv_a = 1.\n"),
+        ("src/b.prog.abap", "lv_b = 1.\n"),
+        ("src/skip.prog.abap", "lv_c = 1.\n"),
+    ]);
+    write(d.path(), "src/.origamiignore", "skip.prog.abap\n");
+    for f in [
+        "generated/a.prog.abap",
+        "src/b.prog.abap",
+        "src/skip.prog.abap",
+    ] {
+        write(d.path(), f, "lv_a   =   2.\n");
+    }
+    write(d.path(), "generated/new.prog.abap", "lv_a   =   3.\n");
+    origami()
+        .current_dir(d.path())
+        .args(["--no-config", "--changed"])
+        .assert()
+        .code(0);
+    let read = |f: &str| fs::read_to_string(d.path().join(f)).unwrap();
+    assert_eq!(read("src/b.prog.abap"), "lv_a = 2.\n");
+    assert_eq!(read("generated/a.prog.abap"), "lv_a   =   2.\n");
+    assert_eq!(read("generated/new.prog.abap"), "lv_a   =   3.\n");
+    assert_eq!(read("src/skip.prog.abap"), "lv_a   =   2.\n");
+}
+
+#[test]
+fn changed_outside_git_says_so_in_one_line() {
+    let d = tempfile::tempdir().unwrap();
+    let out = origami()
+        .current_dir(d.path())
+        .env("GIT_CEILING_DIRECTORIES", d.path().parent().unwrap())
+        .args(["--no-config", "--changed"])
+        .assert()
+        .code(3);
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert!(err.contains("not inside a git work tree"), "{err}");
+    assert!(err.lines().count() < 10, "{err}");
+}
+
+#[test]
+fn mcp_changed_rejects_a_revision_that_looks_like_an_option() {
+    let d = git_repo(&[("z.prog.abap", "lv_a = 1.\n")]);
+    let outside = tempfile::tempdir().unwrap();
+    let victim = outside.path().join("victim.txt");
+    let replies = mcp_session(
+        d.path(),
+        &[],
+        &[tool_call(
+            1,
+            "format_files",
+            serde_json::json!({"changed": format!("--output={}", victim.display())}),
+        )],
+    );
+    assert_eq!(replies[0]["result"]["isError"], true, "{}", replies[0]);
+    assert!(!victim.exists(), "git wrote {}", victim.display());
 }

@@ -52,7 +52,10 @@ in the range is reformatted completely). The result passes the same
 self-check as a full run; if the selected changes cannot stand on their own,
 the file stays as written and W001 is reported. `--changed` runs
 `git diff -U0 --relative REF` and `git ls-files --others --exclude-standard`
-in the current directory; outside a git repository it is a usage error.
+in the current directory; outside a git repository, or with a REF that is not
+a commit, it is a usage error. `--changed` skips the files a directory walk
+skips (`.gitignore`, `.origamiignore`, hidden files); a file named on the
+command line is always taken.
 `--changed` takes the next argument as the revision unless it starts with
 `-`: `origami --changed main src/` compares against `main`, and
 `origami --changed src/` would read `src/` as a revision. To pass paths,
@@ -95,12 +98,18 @@ Limits:
   JSON-RPC error -32600 and the server reads on.
 * `lines` must be pairs `[start, end]` with 1 <= start <= end <= 2^32 - 1;
   anything else is the JSON-RPC error -32602 (invalid params).
+* An argument of the wrong type (`"paths": "a.abap"`, `"write": "true"`,
+  `"changed": 5`) is the same error; nothing is read or written.
 * Tool calls run one at a time, each with a deadline of 30 s
   (`ORIGAMI_MCP_TIMEOUT` sets it in seconds). A call that misses it gets the
   JSON-RPC error -32001 and is cancelled; with `"write": true`, files
   already rewritten stay rewritten. Other requests (`ping`, `tools/list`)
   are answered while a call runs. `notifications/cancelled` cancels a call;
   it then gets no reply.
+* A cancelled call may take a moment to stop. A call that writes waits for
+  it, and so does any call after one that wrote; if it has not stopped within
+  one deadline, the waiting call gets the JSON-RPC error -32002 and is not
+  started. At most 16 calls wait; further ones get -32002 at once.
 * A `format_files` result carries about 100 KB of file entries and diffs.
   Beyond that, the remaining changed files are listed with
   `diff_omitted: true`, then not at all (`omitted` counts them);
