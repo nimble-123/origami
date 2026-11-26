@@ -431,6 +431,7 @@ p, li, dd { text-wrap: pretty; }
 }
 @media (scripting: none) {
   .hero-scroll { display: none; }
+  .hero-static { padding-top: 1.25rem; }
 }
 
 .note { font: 600 0.78rem / 1.5 var(--mono); color: var(--ink); margin: 0; }
