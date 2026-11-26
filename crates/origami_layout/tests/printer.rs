@@ -453,3 +453,34 @@ fn printing_is_linear_in_size() {
     let large = time(50_000);
     assert!(large / small < 12.0, "50k/10k time ratio {}", large / small);
 }
+
+#[test]
+fn break_pad_pads_only_a_broken_group() {
+    // `aa bb`: two spaces in front of `bb` when the group breaks.
+    let doc = |ts: &TokenStream| {
+        b::group(vec![
+            t(0),
+            b::break_pad(2),
+            b::soft(ts, TokenIndex(1)),
+            b::break_pad(3),
+            t(1),
+        ])
+    };
+    assert_eq!(render("aa bb", 20, doc), "aa bb\n");
+    assert_eq!(render("aa bb", 4, doc), "aa\n   bb\n");
+}
+
+#[test]
+fn reserve_counts_only_when_a_choice_tries_its_first_branch() {
+    // `aaaa b`: the first branch fits in 6 columns, but not with 2 more.
+    let doc = |n: usize| {
+        move |ts: &TokenStream| {
+            let first = b::concat(vec![t(0), b::sep(ts, TokenIndex(1)), t(1), b::reserve(n)]);
+            let second = b::concat(vec![t(0), b::hard(ts, TokenIndex(1)), t(1)]);
+            b::choice(first, second)
+        }
+    };
+    assert_eq!(render("aaaa b", 6, doc(0)), "aaaa b\n");
+    assert_eq!(render("aaaa b", 6, doc(2)), "aaaa\nb\n");
+    assert_eq!(render("aaaa b", 8, doc(2)), "aaaa b\n");
+}

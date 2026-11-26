@@ -1,4 +1,16 @@
 3: ABAP-METHODS-001: each section and parameter on its own line
-12: ABAP-METHODS-001: each section and parameter on its own line
+11: ABAP-METHODS-001: each section and parameter on its own line
 16: ABAP-METHODS-001: each section and parameter on its own line
-22: ABAP-METHODS-001: each section and parameter on its own line
+19: ABAP-METHODS-001: each section and parameter on its own line
+24: ABAP-METHODS-001: each section and parameter on its own line
+27: ABAP-METHODS-001: each section and parameter on its own line
+27: ABAP-CHAIN-001: one item per line
+31: ABAP-METHODS-001: each section and parameter on its own line
+34: ABAP-METHODS-001: each section and parameter on its own line
+37: ABAP-METHODS-001: each section and parameter on its own line
+41: ABAP-METHODS-001: each section and parameter on its own line
+45: ABAP-METHODS-001: each section and parameter on its own line
+49: ABAP-METHODS-001: each section and parameter on its own line
+54: ABAP-METHODS-001: each section and parameter on its own line
+58: ABAP-METHODS-001: each section and parameter on its own line
+64: ABAP-METHODS-001: each section and parameter on its own line

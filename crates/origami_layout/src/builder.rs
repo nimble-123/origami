@@ -53,6 +53,19 @@ pub fn soft_break(tokens: &TokenStream, i: TokenIndex) -> Doc {
     gap(tokens, i, Inner::SoftBreak)
 }
 
+/// `n` spaces when the enclosing group is broken, nothing when it is flat:
+/// padding that only the broken layout has (ABAP-COND-001).
+pub fn break_pad(n: usize) -> Doc {
+    Doc(Inner::BreakPad(n as u32))
+}
+
+/// Room for `n` columns that follow the doc on its last line (the
+/// statement's period): counted when a [`choice`] tries its first branch,
+/// printed as nothing.
+pub fn reserve(n: usize) -> Doc {
+    Doc(Inner::Reserve(n as u32))
+}
+
 /// A line break before token `i`, unless it is glued.
 pub fn hard(tokens: &TokenStream, i: TokenIndex) -> Doc {
     gap(tokens, i, Inner::HardLine)

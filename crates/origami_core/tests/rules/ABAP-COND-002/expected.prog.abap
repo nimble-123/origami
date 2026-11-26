@@ -1,4 +1,6 @@
-lv_sign = COND #( WHEN iv_negative = abap_true THEN -1 ELSE 1 ).
+lv_sign = COND #( WHEN iv_negative = abap_true
+                  THEN -1
+                  ELSE 1 ).
 lv_number = COND #( WHEN io_object->get_sub_object( )->get_number( ) <= if_object_boundaries=>co_maximum_number
                     THEN io_object->get_sub_object( )->get_number( )
                     ELSE if_object_boundaries=>co_maximum_number ).
@@ -11,7 +13,10 @@ lv_text = SWITCH string( sy-index
                          WHEN 1 THEN 'one'
                          WHEN 2 THEN 'two'
                          ELSE        THROW cx_overflow( ) ).
-lv_num = SWITCH #( lv_num WHEN 999 THEN 0 ELSE lv_num + 1 ).
+lv_num = SWITCH #( lv_num
+                   WHEN 999
+                   THEN 0
+                   ELSE lv_num + 1 ).
 display_time_info( COND #( LET t = '120000' IN
                            WHEN sy-timlo < t THEN
                              |{ sy-timlo TIME = ISO } AM|
@@ -19,3 +24,14 @@ display_time_info( COND #( LET t = '120000' IN
                              |{ CONV t( sy-timlo - 12 * 3600 ) TIME = ISO } PM|
                            ELSE
                              THROW cx_cant_be( ) ) ).
+valid_to = COND #( WHEN ls_read-ValidTo IS INITIAL
+                   THEN gc_open_end
+                   ELSE ls_read-ValidTo ).
+lv_x = COND #( WHEN a = b THEN 1 ).
+x = COND #( LET t = 1 IN
+            WHEN a = t
+            THEN 1
+            ELSE 2 ).
+foo( COND #( WHEN a = 1
+             THEN 2
+             ELSE 3 ) ).

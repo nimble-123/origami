@@ -336,8 +336,9 @@ CLASS zcl_rates DEFINITION PUBLIC.
     METHODS reset.
     METHODS calculate_all.
 
-    METHODS calculate IMPORTING iv_amount   TYPE p
-                                iv_currency TYPE waers.
+    METHODS calculate
+      IMPORTING iv_amount   TYPE p
+                iv_currency TYPE waers.
 
   PRIVATE SECTION.
     DATA mv_rate TYPE p.
@@ -372,8 +373,8 @@ Milestone: M1
 
 Continuation lines of a statement are indented one level (default 2 spaces)
 relative to the start of the statement, unless a rule aligns them to a column
-(ABAP-CALL-001, ABAP-VALUE-001, ABAP-DECL-001), as ABAP Cleaner indents SQL
-clauses and `CALL FUNCTION` groups.
+(ABAP-CALL-001, ABAP-VALUE-001, ABAP-DECL-001, ABAP-COND-001), as ABAP
+Cleaner indents SQL clauses and `CALL FUNCTION` groups.
 
 ```abap
 SELECT carrid, connid
@@ -717,8 +718,9 @@ Approved by the maintainer, Nils Lutz, on 2026-11-23, as ABAP Cleaner's
 "Align METHODS … FOR TESTING" with its default options. Consecutive
 `METHODS name [ABSTRACT] FOR TESTING [RAISING …].` declarations are padded
 after the method name, so that the words after it start in one column. A
-declaration that fits stays on one line (ABAP-METHODS-001), so
-`METHODS name` and `FOR TESTING` on two lines are joined. Blank lines and
+declaration that fits stays on one line, also with `RAISING` (unlike other
+signatures, ABAP-METHODS-001), so `METHODS name` and `FOR TESTING` on two
+lines are joined. Blank lines and
 comment lines do not end a group; any other statement does, including a
 chain. A `METHODS:` chain with two or more test methods always has one item
 per line, aligned after the colon, and its test methods are aligned
@@ -959,14 +961,40 @@ below the method name, as ABAP Cleaner keeps it when the input breaks after
 the name. Until then the first keyword stayed behind the name when the table
 fit there.
 
+Approved by the maintainer, Nils Lutz, on 2026-11-26: every declaration with
+a section is a table, also one with a single parameter. The line breaks after
+the method name and its own additions (`ABSTRACT`, `FINAL`, `DEFAULT IGNORE`,
+`FOR EVENT e OF c`, `FOR PRECHECK`, `FOR DETERMINE ON MODIFY`,
+`FOR GLOBAL AUTHORIZATION`, …). A declaration without sections stays on one
+line (`METHODS reset.`, `METHODS m ABSTRACT.`), and a test method
+(`FOR TESTING [RAISING …]`) stays on one line if it fits (ABAP-ALIGN-005).
+In a RAP handler signature, each `name FOR …` part of `IMPORTING` (with its
+`REQUEST …` and `FULL …`) is a row of its own, and `RESULT` and `LINK` start a
+row as section keywords. Until then a declaration with at most one parameter
+in one section stayed on one line if it fit.
+
 ```abap
 METHODS calculate
   IMPORTING iv_amount        TYPE p
             iv_currency      TYPE waers OPTIONAL
   RETURNING VALUE(rv_result) TYPE p
   RAISING   zcx_calc_error zcx_rate_error.
-METHODS reset IMPORTING iv_hard TYPE abap_bool.
+METHODS reset
+  IMPORTING iv_hard TYPE abap_bool.
+METHODS run.
+METHODS precheck_create FOR PRECHECK
+  IMPORTING entities FOR CREATE statuscommand.
+METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+  IMPORTING REQUEST requested_authorizations FOR UserOrg
+  RESULT    result.
+METHODS modify FOR MODIFY
+  IMPORTING entities_c FOR CREATE travel
+            entities_u FOR UPDATE travel.
 ```
+
+Deviations from ABAP Cleaner: it keeps a signature on one line, and the first
+keyword behind the name, when the input has them there, and it does not align
+the parts of a RAP handler signature.
 
 **Compact:** a declaration that fits is printed on one line. Otherwise each
 section keyword goes on its own line at the continuation indent, and each
@@ -991,6 +1019,75 @@ A condition that does not fit breaks before `AND` and `OR` at the outermost
 level, at the continuation indent. Parenthesized sub-conditions stay flat when
 they fit.
 
+Approved by the maintainer, Nils Lutz, on 2026-11-26, as ABAP Cleaner's
+"Align logical expressions" with its default options, in the aligned style:
+
+* **When:** a logical expression is printed one condition per line when it
+  has three or more conditions at its outermost level (two or more `AND`,
+  `OR` or `EQUIV` outside brackets), or when it does not fit on the line.
+  With one or two conditions that fit it stays on one line. This holds after
+  `IF`, `ELSEIF`, `WHILE`, `CHECK`, `ASSERT`, `WAIT … UNTIL`, the `WHERE`
+  of internal-table statements (`LOOP AT`, `DELETE`, `MODIFY`) and `WHEN` in
+  `COND` (ABAP-COND-002).
+* **Layout:** `AND`, `OR` and `EQUIV` start the lines in a column after the
+  statement keyword, and the first condition is indented so that all
+  conditions start in one column. After `WHEN` the operators end in front of
+  that column instead. Mixed operators are nested as they bind (`AND` before
+  `OR` before `EQUIV`): an `AND` group inside `OR` gets its own column. In a
+  run of consecutive comparisons, the first operands are padded to the
+  longest and the operators (also `IS`, `IN`, `BETWEEN`; `NOT` of `NOT IN`
+  belongs to the first operand) are right-aligned, except where that would
+  need more than 20 spaces in front of an operator; a run of consecutive
+  simple conditions gets a column for a leading `NOT`.
+* **Brackets:** a condition in brackets stays on one line if it fits, else
+  it gets the same layout inside its bracket.
+* **`LOOP AT … WHERE`:** when the condition does not fit behind the other
+  clauses, and always when it is printed one condition per line, `WHERE`
+  starts its own line, five columns in (under `AT`).
+* **Width:** if a line of this layout would not fit, the operators are not
+  aligned; if it still does not fit, the condition breaks as before this
+  rule, at the continuation indent.
+
+Comments between conditions stay where they are, and a condition with a
+comment is not padded. ABAP SQL (`WHERE`, `HAVING`, `ON`, ABAP-SQL-001)
+keeps the layout before this rule, and so does the compact style.
+
+```abap
+IF     lv_a   = 1
+   AND lv_bb  = 2
+   AND lv_c  <> 3.
+IF a = 1 AND b = 2.
+IF        lv_a  = 1
+      AND lv_bb = 2
+   OR lv_c <> 3.
+IF     NOT lv_a           = 1
+   AND     lv_bb    BETWEEN 1 AND 10
+   AND     lv_c NOT      IN lt_range.
+IF     lv_flag = abap_true
+   AND (    lv_value_number_one = lv_comparison_value_one
+         OR lv_value_number_two = lv_comparison_value_two
+         OR lv_value_three      = lv_comparison_value_three ).
+LOOP AT lt_all INTO DATA(ls_other)
+     WHERE     user_name   = ls_self-user_name
+           AND plant       = ls_self-plant
+           AND valid_from <> ls_self-valid_from.
+lv_x = COND #( WHEN a  = 1
+                AND bb = 2
+                AND c  = 3
+               THEN 1
+               ELSE 2 ).
+```
+
+Deviations from ABAP Cleaner: it aligns a condition only where the input
+breaks it, and keeps a condition in brackets broken if it was written so;
+`EQUIV` after `WHEN` and mixed operators after `WHEN` start in the
+condition column; a `COND` branch with three or more conditions uses the
+complex layout of ABAP-COND-002, with `THEN` at the end of the last
+condition line; comment lines are indented to the operator column.
+
+**Compact:** a condition that does not fit breaks before `AND` and `OR` at
+the outermost level, at the continuation indent.
+
 ### ABAP-COND-002: COND and SWITCH expressions
 Milestone: M4
 Explanation: each WHEN branch on its own line
@@ -1001,8 +1098,10 @@ Approved by the maintainer, Nils Lutz, on 2026-11-23 (ABAP Cleaner
 ABAP-CALL-001. `LET … IN` and the `SWITCH` operand come first; when the
 expression breaks, the `WHEN` lines follow below them, aligned.
 
-* **One `WHEN`:** on one line if it fits, else `WHEN`, `THEN` and `ELSE`
-  below each other.
+* **One `WHEN`:** with an `ELSE`, `WHEN`, `THEN` and `ELSE` always below
+  each other (approved by the maintainer, Nils Lutz, on 2026-11-26; until then
+  on one line if it fit); without an `ELSE`, on one line if it fits, else
+  `WHEN` and `THEN` below each other.
 * **Several `WHEN` (tabular):** always one `WHEN … THEN …` per line, even if
   the whole expression would fit on one line; `THEN` and the values are
   aligned, and the `ELSE` value lines up with the `THEN` values.
@@ -1010,12 +1109,20 @@ expression breaks, the `WHEN` lines follow below them, aligned.
   `WHEN` line and each value goes on its own line, one level deeper than
   `WHEN`; `ELSE` gets its own line too.
 
-A condition that breaks follows ABAP-COND-001 at the continuation indent of
-its `WHEN`. `THROW` is a value like any other. A body the parser does not
+A condition follows ABAP-COND-001: from three conditions on it is broken,
+and that branch rules out the tabular layout. Approved by the maintainer,
+Nils Lutz, on 2026-11-26; until then a condition that broke did so at the
+continuation indent of its `WHEN`. `THROW` is a value like any other. A body the parser does not
 understand keeps its line breaks.
 
 ```abap
-lv_sign = COND #( WHEN iv_negative = abap_true THEN -1 ELSE 1 ).
+lv_sign = COND #( WHEN iv_negative = abap_true
+                  THEN -1
+                  ELSE 1 ).
+lv_x = COND #( WHEN a = b THEN 1 ).
+valid_to = COND #( WHEN ls_read-ValidTo IS INITIAL
+                   THEN gc_open_end
+                   ELSE ls_read-ValidTo ).
 lv_currency = COND #( WHEN ls_amounts-betrw <> 0 THEN ls_amounts-waers
                       WHEN ls_amounts-betr2 <> 0 THEN ls_amounts-hwae2
                       ELSE                            gc_default_currency ).
@@ -1034,14 +1141,17 @@ lv_label = COND #( WHEN io_object->get_sub_object( )->get_number( ) <= if_object
 Deviations from ABAP Cleaner, so that the output depends only on the code
 and stays within the line width:
 
-* A `COND` with one `WHEN` that fits is joined onto one line; ABAP Cleaner
-  keeps it on one line only if it was written that way.
+* A `COND` or `SWITCH` with one `WHEN` and an `ELSE` is always broken, and
+  one without an `ELSE` that fits is joined onto one line; ABAP Cleaner
+  keeps either as written.
 * The tabular layout is used only if every line fits, the `ELSE` line
   included; ABAP Cleaner sometimes keeps it with a longer `ELSE` line.
 * A comment or a nested `COND`/`SWITCH` inside a `WHEN` condition rules out
   the tabular layout (ABAP Cleaner aligns around the comment).
 * Values are indented one level (`indent`, default 2 spaces) instead of
   always 2 spaces.
+
+**Compact:** one `WHEN`, with or without `ELSE`, is on one line if it fits.
 
 ### ABAP-SQL-001: ABAP SQL
 Milestone: M1

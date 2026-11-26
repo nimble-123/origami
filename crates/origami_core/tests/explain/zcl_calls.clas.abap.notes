@@ -2,4 +2,4 @@
 16: ABAP-STMT-001: each statement on its own line
 18: ABAP-CALL-001: one parameter per line
 25: ABAP-VALUE-001: one row per line
-28: ABAP-COND-001: condition split before AND, OR, because the condition would end at column 121 (limit 120)
+28: ABAP-COND-001: condition split before AND, OR

@@ -131,9 +131,29 @@ endclass.
     METHODS cba FOR READ IMPORTING keys_rba FOR READ measure\_items FULL requested RESULT result LINK links.
 ENDCLASS.
 "#;
-    for style in [Style::Aligned, Style::Compact] {
-        check_style(style, "lhc.clas.abap", &[(input, expected)]);
-    }
+    check_style(Style::Compact, "lhc.clas.abap", &[(input, expected)]);
+    // Aligned: the signature is a table below the name (ABAP-METHODS-001).
+    let aligned = r#"CLASS lhc DEFINITION INHERITING FROM cl_abap_behavior_handler.
+  PRIVATE SECTION.
+    METHODS auth FOR INSTANCE AUTHORIZATION
+      IMPORTING keys REQUEST requested FOR measure
+      RESULT    result.
+
+    METHODS glob FOR GLOBAL AUTHORIZATION
+      IMPORTING REQUEST requested FOR measure
+      RESULT    result.
+
+    METHODS accept FOR MODIFY
+      IMPORTING keys FOR ACTION measure~accept
+      RESULT    result.
+
+    METHODS cba FOR READ
+      IMPORTING keys_rba FOR READ measure\_items FULL requested
+      RESULT    result
+      LINK      links.
+ENDCLASS.
+"#;
+    check_style(Style::Aligned, "lhc.clas.abap", &[(input, aligned)]);
 }
 
 #[test]
