@@ -9,6 +9,8 @@ CLASS zcl_rates DEFINITION PUBLIC.
              rate TYPE p,
            END OF ty_rate.
     DATA mv_count TYPE i.
+    ##NEEDED DATA mv_other TYPE i.
+    METHODS reset_all.
   PRIVATE SECTION.
     DATA mv_rate TYPE p.
 ENDCLASS.
