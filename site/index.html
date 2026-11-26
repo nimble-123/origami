@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
   <title>origami: a formatter for ABAP and CDS</title>
   <meta name="description" content="origami formats ABAP and CDS: line breaks, indentation, spaces and letter case, nothing else. It checks its own output token by token and says why it broke each line.">
   <meta name="color-scheme" content="light dark">
