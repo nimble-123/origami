@@ -47,15 +47,17 @@ The extension uses, in this order:
 1. the machine setting `origami.path`;
 2. an `origami` on `PATH` that satisfies `required_version` of the project's
    `origami.toml`;
-3. the bundled binary.
+3. the bundled binary;
+4. an `origami` on `PATH`, if the extension ships no binary for your platform.
 
-In untrusted workspaces only the bundled binary is used.
+Without an `origami.toml` there is no `required_version` to check, so step 2
+does not apply. In untrusted workspaces only the bundled binary is used.
 
 ## Settings
 
 * `origami.path`: path to an origami binary (machine scope).
-* `origami.trace`: log every command line and its stderr to the output
-  channel `origami`.
+* `origami.trace`: also log every command line and its stderr to the output
+  channel `origami`. Errors are always logged there.
 
 Problems from origami (structural errors, quarantined statements) appear in
 the Problems panel.
