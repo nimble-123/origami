@@ -300,12 +300,21 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     camera.aspect = w / h;
     // Fit the crane (about 2.6 by 1.9 units with its shadow) into the box.
     const t = Math.tan((camera.fov * Math.PI) / 360);
-    const dist = Math.max(0.95 / t, 1.3 / (t * camera.aspect));
-    const pitch = VIEW.pitch;
-    camera.position.set(0, 0.72 + Math.sin(pitch) * dist, Math.cos(pitch) * dist);
-    camera.lookAt(0, 0.7, 0);
+    camDist = Math.max(0.95 / t, 1.3 / (t * camera.aspect));
     camera.updateProjectionMatrix();
+    aim(lieOf(fold));
+    dirty = true;
     wake();
+  }
+  let camDist = 6;
+  /** Flat, the sheet lies on the table and the camera looks down on it;
+   * folding, it stands up. */
+  const lieOf = (f) => 1 - smooth(0, 0.35, f);
+  function aim(lie) {
+    const pitch = VIEW.pitch + lie * 0.32;
+    const look = new Vector3(0, 0.7 * (1 - lie) + 0.05 * lie, -0.72 * lie);
+    camera.position.set(0, look.y + Math.sin(pitch) * camDist, look.z + Math.cos(pitch) * camDist);
+    camera.lookAt(look);
   }
 
   // ---- state and loop --------------------------------------------------------
@@ -315,6 +324,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
   let running = false;
   let onScreen = true;
   let last = 0;
+  let lastDraw = 0;
   let first = true;
   const t0 = moment?.t0 ?? performance.now();
   // Arriving after the load moment: no fold to replay.
@@ -324,6 +334,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     creaseShown = 1;
   }
 
+  let dirty = true;
   function step(now) {
     const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.016);
     last = now;
@@ -359,13 +370,19 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
       view.pitch = approach(view.pitch, pitch, dt, drag ? 0.06 : tau);
       busy ||= Math.abs(view.yaw - yaw) > 0.0005 || Math.abs(view.pitch - pitch) > 0.0005;
     }
+    // Only the slow sway is moving: 20 frames a second are enough.
+    if (!busy && !first && !dirty && now - lastDraw < 50) return !reduceMotion;
+    dirty = false;
+    lastDraw = now;
     const s = now / 1000;
     const sway = reduceMotion ? 0 : 1;
-    crane.rotation.set(view.pitch, BASE_YAW + view.yaw + sway * 0.035 * Math.sin(s * 0.6), 0);
+    const lie = lieOf(fold);
+    aim(lie);
+    crane.rotation.set(view.pitch - lie * Math.PI * 0.49, BASE_YAW * (1 - lie) + view.yaw + sway * 0.035 * Math.sin(s * 0.6), 0);
     renderer.render(scene, camera);
     if (first) {
       first = false;
-      canvas.classList.add("on");
+      box.classList.add("on");
     }
     return busy || !reduceMotion;
   }
@@ -399,6 +416,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
           return;
         }
         drag.on = true;
+        dirty = true;
         canvas.setPointerCapture(e.pointerId);
         canvas.classList.add("grabbing");
       }
@@ -407,7 +425,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
       wake();
       return;
     }
-    if (reduceMotion || !fine.matches || e.pointerType !== "mouse") return;
+    if (reduceMotion || !fine.matches || e.pointerType !== "mouse" || !box.classList.contains("grab")) return;
     const r = canvas.getBoundingClientRect();
     const nx = (e.clientX - (r.left + r.width / 2)) / innerWidth;
     const ny = (e.clientY - (r.top + r.height / 2)) / innerHeight;
@@ -416,13 +434,14 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     wake();
   }
   function onPointerDown(e) {
-    if (reduceMotion || (e.pointerType === "mouse" && e.button !== 0)) return;
+    if (reduceMotion || !box.classList.contains("grab") || (e.pointerType === "mouse" && e.button !== 0)) return;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, on: false };
   }
   function onPointerUp(e) {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
     canvas.classList.remove("grabbing");
+    dirty = true;
     // It eases back to where it was.
     view.dragYaw = 0;
     view.dragPitch = 0;
@@ -483,9 +502,14 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
   wake();
 
   return {
-    /** The fold for the current margin: 0 flat, 1 folded. */
-    setFold(f) {
-      goal = Math.max(0, Math.min(1, f));
+    /** The fold: 0 flat, 1 folded. `immediate` follows the scroll position
+     * directly; otherwise the crane eases there. */
+    setFold(f, { immediate = false } = {}) {
+      const g = Math.max(0, Math.min(1, f));
+      if (g === goal && !immediate) return;
+      goal = g;
+      if (immediate && !(moment && !late && performance.now() - t0 < moment.fold + moment.foldFor * 2.2)) fold = g;
+      dirty = true;
       wake();
     },
     dispose,

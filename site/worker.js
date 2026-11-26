@@ -1,9 +1,16 @@
-// Web Worker for the hero and the playground: runs origami (WebAssembly, see
+// Web Worker for the website: runs origami (WebAssembly, see
 // crates/origami_wasm) off the main thread, so a slow input cannot freeze the
-// page. app.js sends the requests of both, and terminates and restarts this
-// worker when a run takes too long.
+// page. app.js sends the requests of the journey, the playground and the
+// speed measurement, and terminates and restarts this worker when a run takes
+// too long.
 //
-// Messages in:  { id, source, opts: { cds, width, lower, compact } }
+// Messages in:  { id, op, source, opts: { cds, width, lower, compact }, runs }
+//   op "review" (default): format and explain, the playground's request
+//   op "journey": format, then lex the input and the output (the self-check's
+//                 tokens), and time the formatting
+//   op "lex": the tokens of `source`
+//   op "bench": format `source` `runs` times, in batches, and return the time
+//               of one call per batch
 // Messages out: { type: "ready" } | { type: "load-error" }
 //               { type: "result", id, result } | { type: "panic", id }
 
@@ -16,16 +23,61 @@ async function loadWasm() {
   return instance.exports;
 }
 
-function review(source, opts) {
+/** Calls an export that takes a source buffer and returns JSON. */
+function call(fn, source, ...args) {
   const bytes = new TextEncoder().encode(source);
   const ptr = wasm.alloc(bytes.length);
   new Uint8Array(wasm.memory.buffer, ptr, bytes.length).set(bytes);
-  const res = wasm.review(ptr, bytes.length, opts.cds ? 1 : 0, opts.width, 2, opts.lower ? 1 : 0, opts.compact ? 1 : 0);
+  const res = wasm[fn](ptr, bytes.length, ...args);
   const len = wasm.result_len();
   const json = new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, res, len));
   wasm.dealloc(res, len);
   return JSON.parse(json);
 }
+
+function review(source, opts) {
+  return call("review", source, opts.cds ? 1 : 0, opts.width, 2, opts.lower ? 1 : 0, opts.compact ? 1 : 0);
+}
+
+function lex(source, cds) {
+  return call("lex", source, cds ? 1 : 0);
+}
+
+const ops = {
+  review({ source, opts }) {
+    const t0 = performance.now();
+    const result = review(source, opts);
+    result.ms = performance.now() - t0;
+    return result;
+  },
+  journey({ source, opts }) {
+    const t0 = performance.now();
+    const result = review(source, opts);
+    const ms = performance.now() - t0;
+    return {
+      review: result,
+      ms,
+      lexIn: lex(source, opts.cds),
+      lexOut: result.output == null ? null : lex(result.output, opts.cds),
+    };
+  },
+  lex({ source, opts }) {
+    return lex(source, opts?.cds);
+  },
+  bench({ source, opts, runs = 200 }) {
+    // A few runs first, so the timing starts warm; then batches of 10 calls,
+    // because the clock in a worker is coarse (0.1 ms).
+    for (let i = 0; i < 5; i++) review(source, opts);
+    const batch = 10;
+    const perCall = [];
+    for (let b = 0; b < Math.ceil(runs / batch); b++) {
+      const t0 = performance.now();
+      for (let i = 0; i < batch; i++) review(source, opts);
+      perCall.push((performance.now() - t0) / batch);
+    }
+    return { perCall, calls: perCall.length * batch };
+  },
+};
 
 const ready = loadWasm().then(
   (exports) => {
@@ -35,13 +87,12 @@ const ready = loadWasm().then(
   () => postMessage({ type: "load-error" }),
 );
 
-onmessage = async ({ data: { id, source, opts } }) => {
+onmessage = async ({ data }) => {
   await ready;
   if (!wasm) return;
-  const t0 = performance.now();
+  const { id } = data;
   try {
-    const result = review(source, opts);
-    result.ms = performance.now() - t0;
+    const result = (ops[data.op] ?? ops.review)(data);
     postMessage({ type: "result", id, result });
   } catch {
     // A panic aborts the instance; start a fresh one.
