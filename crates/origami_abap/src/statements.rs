@@ -4348,6 +4348,16 @@ fn method_table(p: &mut P, mut i: usize) -> Option<Doc> {
             if (j..section_end).any(|k| k > j && p.c.commented[k]) {
                 return None;
             }
+            // RAP handler parameters: `keys FOR ACTION Travel~accept RESULT
+            // result`, `REQUEST requested FOR Travel RESULT result`.
+            if p.is(i, "IMPORTING") && j < section_end {
+                let from = if p.is(j, "REQUEST") && p.is(j + 2, "FOR") {
+                    j
+                } else {
+                    name_end(p, j, section_end)
+                };
+                mark_phrase_keywords(p, from, section_end, RAP_PARAM_WORDS, RAP_PARAM_OPERAND);
+            }
             let mut name = Vec::new();
             for k in j..section_end {
                 if k > j {
