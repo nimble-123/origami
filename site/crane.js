@@ -346,7 +346,8 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     // The creases show while the sheet is (nearly) flat.
     dash.opacity = creaseShown * (1 - smooth(0.04, 0.3, fold)) * 0.95;
 
-    // Turning: toward the pointer, by dragging, and a slow float.
+    // Turning: toward the pointer, by dragging, and a slow sway. The crane
+    // stays on the ground: paper on a table does not hover.
     const tau = 0.35;
     const yaw = view.pointerYaw + view.dragYaw;
     const pitch = view.pointerPitch + view.dragPitch;
@@ -359,9 +360,8 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
       busy ||= Math.abs(view.yaw - yaw) > 0.0005 || Math.abs(view.pitch - pitch) > 0.0005;
     }
     const s = now / 1000;
-    const float = reduceMotion ? 0 : 1;
-    crane.rotation.set(view.pitch, BASE_YAW + view.yaw + float * 0.035 * Math.sin(s * 0.6), 0);
-    crane.position.y = float * 0.018 * (0.5 + 0.5 * Math.sin(s * 1.1));
+    const sway = reduceMotion ? 0 : 1;
+    crane.rotation.set(view.pitch, BASE_YAW + view.yaw + sway * 0.035 * Math.sin(s * 0.6), 0);
     renderer.render(scene, camera);
     if (first) {
       first = false;

@@ -377,8 +377,8 @@ function heroMargin() {
     const s = scroll.getBoundingClientRect();
     const zone = 36;
     let dx = 0;
-    if (drag.x > s.right - zone) dx = Math.min(1, (drag.x - (s.right - zone)) / zone) * 10;
-    else if (drag.x < s.left + zone) dx = -Math.min(1, (s.left + zone - drag.x) / zone) * 10;
+    if (drag.x > s.right - zone) dx = Math.min(1, (drag.x - (s.right - zone)) / zone) * 6;
+    else if (drag.x < s.left + zone) dx = -Math.min(1, (s.left + zone - drag.x) / zone) * 6;
     if (dx) {
       scroll.scrollLeft += dx;
       fromPointer();
