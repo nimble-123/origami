@@ -1,1 +1,4 @@
 1: ABAP-EML-001: each entity and operation on its own line, because the statement would end at column 154 (limit 120)
+7: ABAP-EML-001: each entity and operation on its own line, because the statement would end at column 121 (limit 120)
+14: ABAP-EML-001: each entity and operation on its own line, because the statement would end at column 136 (limit 120)
+19: ABAP-EML-001: each entity and operation on its own line, because the statement would end at column 129 (limit 120)
