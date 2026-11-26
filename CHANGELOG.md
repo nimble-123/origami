@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.2](https://github.com/nimble-123/origami/compare/v0.4.1...v0.4.2) (2026-11-26)
+
+
+### Fixes
+
+* **abap:** recognize CATCH SYSTEM-EXCEPTIONS and ENDCATCH ([#97](https://github.com/nimble-123/origami/issues/97)) ([3cb63d4](https://github.com/nimble-123/origami/commit/3cb63d4d5b8bcd77417d8c396c3a71ee8b4e7fb9))
+* **abap:** upper-case RAP handler parameter keywords in aligned signatures ([#87](https://github.com/nimble-123/origami/issues/87)) ([9a5493e](https://github.com/nimble-123/origami/commit/9a5493e4efd59aab9c359d96f2a13110bd85057a))
+
+
+### Formatting output
+
+* **abap:** EML clauses on their own lines (ABAP-EML-001) ([#95](https://github.com/nimble-123/origami/issues/95)) ([6b65cfd](https://github.com/nimble-123/origami/commit/6b65cfd1dae9f934f10465baa724db28a34efa63))
+* **abap:** iterations in constructor expressions (ABAP-VALUE-002) ([#94](https://github.com/nimble-123/origami/issues/94)) ([3912b04](https://github.com/nimble-123/origami/commit/3912b0496624fb15d679c5f12be16902682520a8))
+* **abap:** key components after WITH KEY one per line (ABAP-ALIGN-010) ([#99](https://github.com/nimble-123/origami/issues/99)) ([6e2b5f3](https://github.com/nimble-123/origami/commit/6e2b5f31f850f1df79d635c341964501c8d09765))
+* **abap:** method signature tables below the method name (ABAP-METHODS-001) ([#91](https://github.com/nimble-123/origami/issues/91)) ([ba318cf](https://github.com/nimble-123/origami/commit/ba318cfb983e7d145919bdcf238a5370783f9674))
+* **abap:** one item per line in CLEAR:, FREE:, SORT and CATCH (ABAP-ALIGN-009) ([#90](https://github.com/nimble-123/origami/issues/90)) ([33c3156](https://github.com/nimble-123/origami/commit/33c3156f241739641f4fe87c0039a3e50ac7d07a))
+* **abap:** structures align as ABAP Cleaner (ABAP-ALIGN-003, ABAP-DECL-002) ([#92](https://github.com/nimble-123/origami/issues/92)) ([7a52274](https://github.com/nimble-123/origami/commit/7a5227431ce143477f30198d04f97ac3f1c9af66))
+
 ## [0.4.1](https://github.com/nimble-123/origami/compare/v0.4.0...v0.4.1) (2026-11-25)
 
 
