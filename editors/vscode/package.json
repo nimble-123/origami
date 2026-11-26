@@ -58,7 +58,7 @@
         "origami.trace": {
           "type": "boolean",
           "default": false,
-          "description": "Log every origami command line and its stderr to the 'origami' output channel."
+          "description": "Also log every origami command line and its stderr to the 'origami' output channel. Errors are always logged."
         }
       }
     },

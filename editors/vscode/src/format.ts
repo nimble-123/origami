@@ -11,6 +11,9 @@ import { JsonRun, parseRun } from "./diagnosticsModel";
 import { Resolved } from "./binary";
 import { targetFor } from "./uri";
 
+/** Logs a line to the Output channel; `verbose` lines only with `origami.trace`. */
+export type Log = (message: string, verbose?: boolean) => void;
+
 export type Status = "ok" | "error" | "timeout" | "failed";
 
 export interface Outcome {
@@ -46,7 +49,7 @@ export async function formatDocument(
   document: vscode.TextDocument,
   resolved: Resolved,
   token: vscode.CancellationToken,
-  log: (m: string) => void,
+  log: Log,
   ranges: readonly vscode.Range[] = [],
 ): Promise<Outcome> {
   const original = document.getText();
@@ -71,7 +74,7 @@ export function formatText(
   document: vscode.TextDocument,
   resolved: Resolved,
   token: vscode.CancellationToken,
-  log: (m: string) => void,
+  log: Log,
   ranges: readonly vscode.Range[],
   timeoutMs: number,
 ): Promise<TextOutcome> {
@@ -87,7 +90,7 @@ export function formatText(
   }
   const folder = vscode.workspace.getWorkspaceFolder(document.uri);
   const cwd = folder?.uri.scheme === "file" ? folder.uri.fsPath : os.tmpdir();
-  log(`${resolved.binary} ${args.join(" ")}`);
+  log(`${resolved.binary} ${args.join(" ")}`, true);
 
   return new Promise((resolve) => {
     const child = spawn(resolved.binary, args, { cwd });
@@ -118,10 +121,12 @@ export function formatText(
       finish({ status: "failed" });
     });
     child.on("close", (code) => {
-      if (stderr) {
-        log(stderr.trim());
-      }
       const run = parseRun(stderr);
+      if (stderr) {
+        // Routine diagnostics of a finished run only with `origami.trace`;
+        // the stderr of a failed run is the only record of why.
+        log(stderr.trim(), code === 0 || code === 2 || code === 5);
+      }
       if (code === 0 || code === 5) {
         const changed = run?.files[0]?.changed ?? stdout !== text;
         if (!changed || stdout.length === 0) {

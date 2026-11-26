@@ -10,6 +10,7 @@ import * as vscode from "vscode";
 import { execFile } from "node:child_process";
 import * as path from "node:path";
 import * as fs from "node:fs";
+import type { Log } from "./format";
 
 export interface Resolved {
   binary: string;
@@ -19,7 +20,7 @@ export interface Resolved {
 export class BinaryResolver {
   private cache = new Map<string, Promise<Resolved | undefined>>();
 
-  constructor(private readonly extensionPath: string, private readonly log: (m: string) => void) {}
+  constructor(private readonly extensionPath: string, private readonly log: Log) {}
 
   invalidate(): void {
     this.cache.clear();

@@ -11,7 +11,7 @@ import * as vscode from "vscode";
 import * as path from "node:path";
 import { BinaryResolver } from "./binary";
 import { computeEdits } from "./edits";
-import { formatText, TextOutcome } from "./format";
+import { formatText, Log, TextOutcome } from "./format";
 import { decode, encode, SCHEME } from "./previewUri";
 
 /** Timeout of a preview request; longer than for format-on-save, since the
@@ -32,7 +32,7 @@ export type ApplyResult = "applied" | "unchanged" | "closed" | "failed" | "none"
 
 export interface PreviewDeps {
   resolver: BinaryResolver;
-  log: (m: string) => void;
+  log: Log;
   /** Problems panel and status bar for an outcome. */
   report: (document: vscode.TextDocument, outcome: TextOutcome, timeoutMs: number) => void;
   /** Status bar when no origami binary satisfies required_version. */

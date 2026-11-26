@@ -17,8 +17,10 @@ const SELECTOR: vscode.DocumentSelector = [
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("origami");
-  const log = (m: string) => {
-    if (vscode.workspace.getConfiguration("origami").get<boolean>("trace")) {
+  // Errors are always logged; lines marked `verbose` (command lines, routine
+  // stderr) only with `origami.trace`.
+  const log = (m: string, verbose = false) => {
+    if (!verbose || vscode.workspace.getConfiguration("origami").get<boolean>("trace")) {
       output.appendLine(m);
     }
   };

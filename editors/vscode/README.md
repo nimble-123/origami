@@ -54,8 +54,8 @@ In untrusted workspaces only the bundled binary is used.
 ## Settings
 
 * `origami.path`: path to an origami binary (machine scope).
-* `origami.trace`: log every command line and its stderr to the output
-  channel `origami`.
+* `origami.trace`: also log every command line and its stderr to the output
+  channel `origami`. Errors are always logged there.
 
 Problems from origami (structural errors, quarantined statements) appear in
 the Problems panel.
