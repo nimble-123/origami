@@ -1,25 +1,18 @@
 # origami: visual design
 
 The visual language for the website, the README, the diagrams and the VS Code
-extension. Everything here serves one idea:
+extension. The website speaks the language of current developer product
+sites: a dark ground, light used as a material, glass windows and tiles, one
+typeface for words and one for code. Everything still serves one idea:
 
 > **Every line break is a fold.** origami takes a long line of ABAP and folds
 > it into shape, and it can say why it folded where it did.
 
-The motif comes from origami crease patterns, the line drawings that show
-where a sheet is folded. By convention they draw **mountain folds in red** and
-**valley folds in blue**. origami uses the same vocabulary: blue marks what
-origami adds (a valley fold, a new line, a matched token), red marks what goes
-wrong or away (a token that differs, an error). Creases are dashed lines.
-
-The second idea is the editor's column. ABAP developers count line width in
-columns, so the page sets its headlines in a monospaced face: every letter is
-one column, and a headline folds at a column the way a statement does.
-
 The colors come from the [Tokyo Night](https://github.com/tokyo-night/tokyo-night-vscode-theme)
-themes for VS Code: **Tokyo Night Light** by day, **Tokyo Night** by night.
-Many ABAP developers already read code in these colors, so the page, the
-diagrams and the terminal look like their editor.
+theme for VS Code. Many ABAP developers already read code in these colors, so
+the page, the diagrams and the terminal look like their editor. Blue marks what
+origami adds (a new line, a matched token, the margin); red marks what goes
+wrong or away (a token that differs, a removed line).
 
 ## Audience and job
 
@@ -31,120 +24,143 @@ diagrams and the terminal look like their editor.
 
 ## Color
 
-Two themes, chosen by the reader's system setting (`prefers-color-scheme`).
-Every token has a value in both.
+The website is dark only (`color-scheme: dark`); there is no light theme. The
+README and its diagrams keep their light and dark files.
 
-| Token | Light (Tokyo Night Light) | Dark (Tokyo Night) | Use |
-|---|---|---|---|
-| `--paper` | `#D5D6DB` | `#16161E` | page background |
-| `--sheet` | `#E6E7ED` | `#1A1B26` | sheets: code, the journey's stage, the playground |
-| `--ink` | `#343B58` | `#C0CAF5` | text and lines |
-| `--ink-soft` | `#565A6E` | `#A9B1D6` | secondary text |
-| `--ink-dim` | `#6C6E75` | `#737AA2` | line numbers, steps not in view, disabled |
-| `--valley` | `#34548A` | `#7AA2F7` | valley fold: added lines, matched tokens, links, the margin, primary action |
-| `--mountain` | `#8C4351` | `#F7768E` | mountain fold: a token that differs, errors; used sparingly |
-| `--crease` | `#A8AAB6` | `#3B4261` | crease lines, borders, dividers |
-| `--valley-wash` | `#D1D5E1` | `#20303B` | hover and selected backgrounds, added-line background |
-| `--mountain-wash` | `#DBD3DA` | `#37222C` | background of a token that differs |
+| Token | Value | Use |
+|---|---|---|
+| `--bg` | `#0D0E14` | the ground |
+| `--bg-deep` | `#08090E` | the footer, the closing spotlight's ground |
+| `--surface`, `--surface-2` | `#16161E`, `#1A1B26` | windows, tiles, title bars |
+| `--code-bg` | `#12131B` | code blocks inside tiles |
+| `--head` | `#FFFFFF` | headlines |
+| `--text` | `#C0CAF5` | text, code |
+| `--text-2` | `#A9B1D6` | secondary text, the second tone of a heading |
+| `--text-3` | `#8B92B8` | labels that repeat something said elsewhere, comments |
+| `--line-no` | `#7C84AC` | line numbers |
+| `--blue` | `#7AA2F7` | added lines, matched tokens, the margin, focus, the primary glow |
+| `--violet` | `#BB9AF7` | keywords; keyword case in the layout marks |
+| `--cyan` | `#7DCFFF` | rule IDs and notes, spaces in the layout marks, the live measurement |
+| `--green` | `#9ECE6A` | strings; "formatted" status |
+| `--orange` | `#FF9E64` | numbers |
+| `--red` | `#F7768E` | a token that differs, removed lines, errors |
+| `--yellow` | `#E0AF68` | the middle window dot; "kept as written" (W001) |
+| `--line`, `--line-2`, `--line-3` | `rgba(192,202,245, .10 / .16 / .24)` | hairlines: dividers, window and tile edges, hover |
+| `--button` | `#E6E9F7` | the light primary button |
 
-Syntax colors in code, from the same themes:
-
-| Token | Light | Dark | Use |
-|---|---|---|---|
-| `--syn-keyword` | `#5A4A78` | `#BB9AF7` | ABAP keywords |
-| `--syn-string` | `#485E30` | `#9ECE6A` | string literals and templates; also marks what origami copies as it is |
-| `--syn-number` | `#965027` | `#FF9E64` | numbers |
-| `--syn-comment` | `#5F6272` | `#828BB8` | comments, italic |
-| `--syn-rule` | `#0F4B6E` | `#7DCFFF` | rule IDs in notes (`ABAP-CALL-001`) |
-
-The page and sheet values, `--ink`, the accents and the syntax colors are the
-theme's own. `--sheet` (light), `--crease` (light) and the light washes are
-mixed from them. Comments are lighter in the editor themes (`#9699A3`,
-`#565F89`); here they are raised to reach 4.5:1.
+Contrast on `--bg` (on `--surface-2` in brackets): white 19.3 (17.1),
+`--text` 11.9 (10.6), `--text-2` 9.1 (8.1), `--text-3` 6.3 (5.6),
+`--line-no` 5.3 (4.7), `--blue` 7.7 (6.8), `--red` 7.3 (6.5); every syntax
+color is above 7:1. The primary button's text on `--button` is 15.9:1.
 
 Rules:
 
-* Blue and red carry meaning. They are never decoration and never a gradient.
-* Text meets WCAG AA on `--paper` and `--sheet`: `--ink` 7.6:1 (light) and
-  11.1:1 (dark), `--valley` 5.2:1 and 7.1:1, every syntax color at least
-  4.5:1 on `--sheet`. `--ink-dim` (about 4:1) is for line numbers and labels
-  that repeat something said elsewhere.
+* Accents carry meaning; they never fill large areas and are never a rainbow.
+  Glows are the accent at low opacity, under or around an object.
 * Syntax colors appear only in code. Keywords are colored, not bold.
+* No light is ever drawn on body text.
 
 ## Type
 
 Two families, both variable, self-hosted as Latin WOFF2 (SIL OFL 1.1, see
-`THIRD_PARTY_NOTICES.md`):
+`THIRD_PARTY_NOTICES.md`) and preloaded:
 
-* **Martian Mono** (width 75–112.5, weight 100–800): headlines, the brand
-  name in the header, code, numbers in tables, notes. Headlines are set
-  condensed (width 75) and heavy (700–780), tight (−0.02em); code at width
-  100, weight 400. One letter is one column, so the hero's headline folds at
-  a column, like a statement, and code and headlines share one grid.
-* **Archivo** (weight 400–800): everything that is read: text, labels,
-  buttons. A plain grotesque with a slightly technical cut; it stays quiet
-  next to the monospaced headlines.
+* **Inter** (weight 400–700) for everything that is read: headlines, text,
+  labels, buttons. Large sizes are tracked tight: the hero −0.045em, section
+  headings −0.035em, tile headings −0.02em. The hero headline runs a vertical
+  gradient from white to `#A9B1D6`.
+* **Geist Mono** (weight 400–600) for code, commands, the terminal, rule IDs
+  and the numbers in the speed table. Ligatures are off
+  (`font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0`),
+  so `=>` and `->` stay two characters, as ABAP has them.
 
-Why these: in the browser, Schibsted Grotesk with Martian Mono (the earlier
-pair), Archivo expanded and condensed with JetBrains Mono, Bricolage
-Grotesque and Hanken Grotesk were set side by side with the hero and a code
-sample. A proportional headline reads as any product page; the monospaced,
-condensed headline is the only one that says "columns". JetBrains Mono turns
-`=>` into an arrow by default, which misstates ABAP. Martian Mono is kept for
-code; its width axis is new here and does the headlines.
+Scale (px): 12 · 13 · 14 · 15 · 17 (body) · 19 (lead) · 20 (tile heading) ·
+30–44 (section heading) · 44–76 (hero). Code is 12.5px (11.5px on phones),
+so the sample's 72 columns fit the hero's right pane. Section headings are
+two-tone: the first sentence white, the rest `--text-2`. Sentence case
+everywhere; numbers that change use tabular figures.
 
-Scale (ratio 1.333, from 17px): 12.75 · 17 · 22.7 · 30.2 · 40.3 · 53.7 ·
-71.6. The hero headline is sized to its column (20 columns on wide screens,
-14 on phones). Body text 17px / 1.6; the lede 22.7px. Sentence case
-everywhere; no all-caps labels, no small monospaced labels on non-code
-content. Prose at most 62 characters wide. Numbers that change use tabular
-figures.
+## Light
+
+Light is a material, used sparingly and large:
+
+* **The cone:** a conic gradient from the top centre of the hero (blue,
+  violet, cyan at under 50% opacity), blurred once by 46px. It breathes in on
+  load and then drifts in opacity only (18s, alternating), and pauses when
+  the hero is off screen.
+* **The grid:** 72px squares of `rgba(192,202,245,.045)` lines, masked to
+  fade out from the top centre.
+* **Glows:** under the hero window (a radial pool), around the primary
+  button, the window's outer shadow, the margin's tab, the speed bars, the
+  active tab underline, a node in the pipeline.
+* **The spotlight:** in the closing section a beam from above, a pool on the
+  floor and a horizon line; the crane stands in it.
+
+Only `opacity` and `transform` are animated; `filter` never is. The blurred
+layers are static.
 
 ## Layout
 
-* **Grid:** 12 columns, 1.5rem gaps, at most 76rem wide, side margins
-  `clamp(1rem, 4vw, 2.5rem)`.
-* **Space:** steps of 4px: 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8rem.
-  Sections are 4–7.5rem apart and separated by a crease.
-* **Order:** hero; the journey (five steps); what happens when the check
-  fails; the playground; speed and install side by side (stacked on
-  phones); the closing photograph; footer.
+* **Width:** at most 75rem; side margins `clamp(16px, 4vw, 32px)`.
+* **Space:** steps of 4px (4, 8, 12, 16, 24, 32, 48, 64, 96, 140). Sections
+  are 140px apart (96px on phones).
+* **Bento:** a 12-column grid of tiles with 16px gaps (spans 4, 5, 7, 8, 12);
+  one column below 56rem.
+* **Order:** nav; hero; "Works where you work" chips; three chapters (Layout
+  only, Checked every time, Explained); playground; speed; install; closing
+  spotlight; footer.
 
 ```
 1440                                          390
 +--------------------------------------+     +----------------------+
-| origami     How it works ... GitHub  |     | origami        Menu  |
+| origami   How it works ...  [Install]|     | origami        Menu  |
 +--------------------------------------+     +----------------------+
-| A long line of ABAP,      [crane]    |     |      [crane]         |
-| folded into shape.                   |     | A long line of       |
-| lede          $ brew install ...     |     | ABAP, folded         |
-+-------------------+------------------+     | into shape.          |
-| STAGE (pinned)    | 1 Read           |     | lede, install        |
-|  sheet: the call  |                  |     +----------------------+
-|  margin  | 72     | 2 Fold           |     | STAGE (pinned, 46%)  |
-|  foot: counter    |                  |     |  sheet, margin, foot |
-|  [crane]          | 3 Check          |     |  3 Check   [crane]   |
-|                   | 4 Explain        |     +----------------------+
-|                   | 5 Write          |     | the steps scroll     |
-+-------------------+------------------+     | beneath the stage    |
-| When the check fails (pipeline)      |     +----------------------+
-| Playground (full width)              |     | ...                  |
-| Speed (5 cols)  | Install (6 cols)   |
-| closing photograph                   |
-+--------------------------------------+
+|          ( 0.4.3  badge )            |     |   ( 0.4.3 badge )    |
+|        Format ABAP.                  |     |   Format ABAP.       |
+|        Change nothing else.          |     |   Change nothing     |
+|        sub-line                      |     |   else.              |
+|   [Install origami] [Try it]         |     |   [Install] [Try]    |
+|  +--------------------------------+  |     | +------------------+ |
+|  | o o o  file.abap  origami.toml |  |     | | As written       | |
+|  | As written | Folded   |72      |  |     | +------------------+ |
+|  |            |          |        |  |     | | Folded       |40 | |
+|  +-- tilted 14deg, fades out -----+  |     | +------------------+ |
+|  chips: VS Code  ADT  abapGit ...    |     | chips (wrap)         |
+| Layout only. ...                     |     | heading              |
+| [ before/after marks  ][ never   ]   |     | [tile]               |
+| Checked every time. ...              |     | [tile]               |
+| [ cursor + tamper     ][ 20 of 20]   |     | ...                  |
+| [ pipeline                       ]   |     |                      |
+| Explained. ...                       |     |                      |
+| [ terminal --review   ][ rules   ]   |     |                      |
+| Playground window (full width)       |     | tabs: code/formatted |
+| Speed: 4 numbers, bars tile          |     | 2 x 2 numbers        |
+| Install tabs        | usage          |     | stacked              |
+| Every line break is a fold.  [crane] |     | [crane]  copy        |
+| footer columns                       |     | footer               |
++--------------------------------------+     +----------------------+
 ```
 
-## Shape and line
+## Components
 
-* **Crease line:** a 1px dashed line in `--crease`, the divider between
-  sections and steps. A dashed `--valley` line is a fold origami makes: the
-  margin, the creases in the hero headline, the creases on the paper crane.
-* **Folded corner:** the one decorative device, a 22px triangle on the
-  journey's sheet. Once per view.
-* **Corners:** 4px on sheets and buttons; nothing is pill-shaped except the
-  start and end nodes of the pipeline diagram.
-* **No card grids.** Content sits on the paper in columns; only code, the
-  stage and the playground sit on sheets.
+* **Nav:** sticky; transparent at the top, glass (`rgba(13,14,20,.72)`,
+  16px backdrop blur) with a hairline once the page scrolls. Logo, links, a
+  light "Install" button. Below 56rem a "Menu" button opens a sheet; Escape,
+  a click outside or leaving it with Tab closes it.
+* **Badge:** a pill above the headline with the version in a blue tag. The
+  version is read by script from the release-please-marked Actions line in
+  the install section, so it has one source; without scripting the tag stays
+  hidden.
+* **Buttons:** 46px high, 10px corners. Primary: `--button` with a blue glow;
+  glass: a translucent fill with a hairline. Both press to 0.96.
+* **Windows:** 14px corners, a title bar with three dots (red, yellow,
+  green), a title or tabs in Geist Mono, a hairline, a deep shadow. The hero
+  window, the self-check, the terminal and the playground are windows.
+* **Tiles:** 20px corners, a dark vertical gradient, a 1px edge and a 1px
+  inner highlight at the top. A soft blue light follows the pointer over a
+  tile (fine pointers only).
+* **Chips:** pills with a hairline; text only, no logos of other products.
+* **Code blocks:** `--code-bg`, 12px corners, a hairline, a copy button.
 
 ## Logo
 
@@ -212,106 +228,64 @@ proof; a straight conversion of `#343B58` is C41 M33 Y0 K65.
 
 ## Imagery
 
-One subject: a real-looking paper crane, folded like the logo, in the three
-logo tones of the current theme, on a plain ground of the theme's paper.
-Soft light from the left, one shadow, the crane right of center so the left
-part stays empty for a headline. No text, props, hands or people.
+No photographs on the website. The 3D crane is the only image beyond the
+logo.
 
 | File (`docs/assets/`) | Use |
 | --- | --- |
-| `photos/fold-light.webp`, `photos/fold-dark.webp` | the closing photograph of the website ("Every line break is a fold"), light and dark, 1920×1072, 36 and 47 KB |
-| `social-preview.png` | the link preview, 1280×640: `fold-dark` with the headline, rendered from `site/og/og.html` with a headless browser |
-| `paper-fibre.webp` | 512px greyscale paper grain, the 3D crane's bump map and a faint grain in its colors; never on flat surfaces |
-| `photos/crane-light.webp`, `photos/crane-dark.webp`, `photos/crane-detail.webp` | the earlier photographs; no longer on the website |
+| `social-preview.png` | the link preview, 1280×640, rendered from `site/og/og.html` with a headless browser: the hero's ground, cone, grid and headline |
+| `paper-fibre.webp` | 512px greyscale paper grain, the 3D crane's bump map and a faint grain in its colors |
+| `photos/*.webp` | earlier photographs of a paper crane; no longer on the website |
 
-The photographs and the paper grain are generated with Nano Banana Pro
-(Gemini 3 Pro Image): the photographs from `logo.svg` as the reference and a
-prompt that names the hex values of the facets and the ground; the grain from
-a text prompt, then scaled, turned grey and raised in contrast. Keep the
-source files out of the repository; commit WebP at 75–86 quality, under
-80 KB each.
+The grain and the earlier photographs were generated with Nano Banana Pro
+(Gemini 3 Pro Image). Keep source files out of the repository; commit WebP
+under 80 KB each.
 
 ## 3D crane
 
-The website draws the logo as a crane of real paper in WebGL
-(`site/crane.js`, three.js r170 in `site/vendor/`).
+The closing section draws the logo as a crane of real paper in WebGL
+(`site/crane.js`, three.js r170 in `site/vendor/`). It is the only WebGL on
+the page.
 
-* **Geometry:** the seven facets of `logo.svg`, each a thin, rigid sheet
-  (about 1% of the crane's width thick) with the logo's gaps between them.
-  Every facet hangs from a neighbour and turns about the edge they share: the
-  halves of the body about the middle, the wings, the neck and the tail about
-  the body, the head about the neck. Facets never bend.
-* **Fold:** one number from 0 to 1. At 0 it is a flat sheet of paper on the
-  table, seen from above at an angle: a sheet behind the facets closes the
-  gaps, the facets take the paper's color, and dashed `--valley` creases
-  mark the hinges;
-  as it folds, it stands up and the facets turn in stages: body, wings, neck
-  and tail, head. At 1 the crane stands.
-* **Materials and light:** matte paper in `--ink`, `--valley` and `--crease`,
-  read from the page's tokens, so it changes with the color scheme. A soft
-  key light from the upper left, a light close to the crane so the light
-  falls off across each facet, a sky light, and one soft shadow on the
-  ground. No glow, bloom, particles, gradients or glassy materials.
-* **Where:** one canvas for the page. It stands in the hero, then travels
-  with the scroll to the journey's stage, lies down flat for Read and folds
-  through Fold and Check to standing at Explain. In the hero it turns a
-  little toward the mouse, and a sideways drag turns it within limits and
-  lets it ease back; vertical swipes scroll the page.
-* **Limits:** loaded after the first paint; drawn only while something
-  moves (no idle frames), while it is on screen and the tab is visible; at
-  most 2 device pixels per CSS pixel. The canvas is decorative
-  (`aria-hidden`); its place is reserved, so nothing moves when it appears.
-  Without WebGL 2, with Save-Data, on devices that report less than 2 GB of
-  memory, or when the module fails to load, the page shows `logo.svg` /
-  `logo-dark.svg` instead, smaller than the headline.
-
-## The journey
-
-The heart of the website: one overlong statement (104 characters) through
-what origami does with it, in five numbered steps (the only numbered markers
-on the page, because it is a sequence). A stage stays pinned while the
-steps scroll past: on wide screens beside the steps, its centre on the line
-where the active step's text sits, with the sheet (code at 15px, as tall as
-its tallest state), the crane on the paper ground at its lower right, and a
-rail of the five steps (links, the current one marked); on phones at the top
-(half the screen), with a band of paper beneath it and the rail as numbers.
-A step takes about 85% of the screen height on wide screens and 62% on
-phones. Where the sheet cuts the long line, a tab says how many columns are
-out of view. Every state on the sheet is computed by origami in the page's
-worker; nothing is drawn from a script of the result.
-
-1. **Read:** the tokens from origami's lexer (`lex` in `origami_wasm`) get
-   their boxes one by one; a literal is marked as copied as it is.
-2. **Fold:** the line folds into the layout `review` returns for the width;
-   the margin can be dragged or moved with the keys (40 to 120); the sheet
-   uses the style `compact`, and says so.
-3. **Check:** the output is lexed again. Above the code, the line as
-   written; a cursor walks the tokens with the scroll, marks each token in
-   both rows at once with one line between the pair, leaves a quiet
-   `--valley` underline behind, and the counter counts up to "20 of 20 tokens
-   identical". "What if a token changed?" removes one space in the output, in
-   the page only, labelled as a simulation: the cursor stops at the token
-   that differs, the pair turns `--mountain`, the statement goes back to how
-   it was written, and W001 is quoted as `check.rs` reports it.
-4. **Explain:** the `--review` note under the construct, with its rule linked
-   to STYLE.md.
-5. **Write:** how long the run took in this browser.
+* **Geometry:** the seven facets of `logo.svg`, each a thin, rigid sheet with
+  the logo's gaps between them. Every facet hangs from a neighbour and turns
+  about the edge they share. Facets never bend.
+* **Fold:** one number from 0 to 1. At 0 it is a flat sheet on the floor, the
+  facets in the paper's tone with dashed blue creases at the hinges; at 1 the
+  crane stands. It folds up once (1.9s) when half of it is in view.
+* **Spotlight:** matte paper in `--text`, `--blue` and slate `#3B4261`; a key
+  light from the upper left, a light close to the crane, a sky light and one
+  soft shadow. A mirrored copy of the facets at 16% opacity is its reflection
+  on the floor, faded out by a mask on the canvas.
+* **Pointer:** it turns a little toward the mouse; a sideways drag turns it
+  within limits and eases back.
+* **Limits:** loaded when the closing section is 600px away; drawn only while
+  something moves (no idle frames), while on screen and the tab is visible;
+  at most 2 device pixels per CSS pixel; `aria-hidden`. Without WebGL 2, with
+  Save-Data, on devices that report less than 2 GB of memory, or when the
+  module fails to load, `logo-dark.svg` stands in the same light with a
+  faint mirrored reflection. Without scripting, the same.
 
 ## Motion
 
-* **One load moment:** the hero headline stands as one long line running off
-  the right edge, dashed creases appear at its break points, and it folds
-  into its lines (about 1.8 seconds, CSS only). The crane in the hero folds
-  up from its sheet with it.
-* **Scroll-linked:** the journey's stage follows the scroll position (a
-  scroll listener throttled to one update per frame, never a change to
-  native scrolling, no snapping), and the crane travels from the hero to the
-  stage. No fade-and-slide entrances anywhere.
-* **Answers to actions:** 150–220ms, `cubic-bezier(0.2, 0, 0, 1)`,
-  interruptible transitions on named properties; buttons press to 0.96.
-* **Reduced motion:** no load moment (the headline is shown folded), no
-  travel; the journey is a plain sequence of steps with static figures, the
-  same as without scripting.
+* **Easing:** `cubic-bezier(0.2, 0, 0, 1)` for everything.
+* **Hero, once on load (CSS):** badge, the two headline lines, the sub-line
+  and the buttons rise 14px and fade in, 600ms each, 70–80ms apart; the
+  window rises 60px into its tilt (900ms, from 380ms); the cone breathes in
+  (1.6s).
+* **Scroll:** the hero window lies down from 14° to flat and its bottom fade
+  opens as it rises through the screen (one update per frame, no change to
+  native scrolling, no pinning).
+* **Entrances:** headings and tiles rise 22px and fade in once, 560ms,
+  siblings 70ms apart, as they come into view.
+* **In the chapters:** the self-check's cursor walks the 20 tokens (70ms a
+  token) once when the tile is half in view; the terminal types the command
+  and then shows the output line by line, once.
+* **Loops:** only the cone's opacity drift; it pauses off screen.
+* **Feedback:** hover and press on every control, 150–250ms.
+* **Reduced motion:** no entrances, no tilt, no drift, no typing, no walk:
+  everything is shown in its final state. **Without scripting:** the same,
+  with the formatted views written into the page at build time.
 
 ## Voice
 
@@ -323,14 +297,18 @@ exclamation marks.
 
 ## Where it applies
 
-* **Website (`site/`):** `index.html` (hero, journey, check pipeline,
-  playground, speed, install, closing photograph) and `abap-cleaner.html`
-  (generated by `scripts/abap-cleaner-compare/build.py`), sharing the header,
-  `style.css` and `nav.js`. The no-script figures of the journey are the only
-  formatted output written into `index.html`; regenerate them when the style
-  changes.
+* **Website (`site/`):** `index.html` and `abap-cleaner.html` (generated by
+  `scripts/abap-cleaner-compare/build.py`), sharing the header, the footer,
+  `style.css` and `nav.js`.
+* **Formatted code on the website:** every formatted line comes from
+  origami. The samples live in one place, `site/samples/` (the hero's class,
+  its `origami.toml`, the captured `origami --review` output) and
+  `site/samples.js` (the single statements of the chapters). `site/build.sh`
+  runs `site/fill.mjs`, which formats them with the freshly built
+  `origami.wasm` and writes the views the page shows without scripting; with
+  scripting the page computes the same views live. After a formatter change,
+  run `site/samples/review.sh` for the terminal and rebuild.
 * **README:** logo, one sentence, badges, the animated terminal (light and
   dark), diagrams in light and dark SVG.
-* **Diagrams:** the benchmark charts and `pipeline*.svg` in the palette above
-  (light and dark SVG), crease-line frames, Martian Mono for code. On the
-  website the pipeline is drawn in the page as SVG with the page's tokens.
+* **Diagrams:** the benchmark charts and `pipeline*.svg` in the Tokyo Night
+  palette (light and dark SVG).
