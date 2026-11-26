@@ -9,9 +9,12 @@ use std::io::Write;
 use std::path::Path;
 
 /// Replaces the file `path` names. A symbolic link is followed, so the link
-/// stays a link and its target gets the new content.
+/// stays a link and its target gets the new content. A file the user cannot
+/// write is an error, as a rename would replace it regardless.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let path = &path.canonicalize()?;
+    // Opens without truncating: only checks the access.
+    std::fs::OpenOptions::new().write(true).open(path)?;
     let dir = path
         .parent()
         .filter(|d| !d.as_os_str().is_empty())

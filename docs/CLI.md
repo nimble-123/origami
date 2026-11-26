@@ -200,7 +200,7 @@ for the path `<internal>`.
 | E020 | error | invalid config file or value, or `required_version` mismatch | 3 | run | no |
 | E021 | error | invalid command-line usage | 3 | run | no |
 | E030 | error | file cannot be read | 4 | file | yes |
-| E031 | error | file cannot be written | 4 | file | yes |
+| E031 | error | file cannot be written (a read-only file is not replaced) | 4 | file | yes |
 | W001 | warning | unit quarantined by the self-check | 0 / 5 | file | yes |
 | W002 | warning | unit left as written because of the 255-character limit | 0 / 5 | file | yes |
 | W003 | warning | unknown statement formatted generically | 0 / 5 | file | yes |

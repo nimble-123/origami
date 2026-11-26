@@ -459,6 +459,35 @@ fn writing_through_a_symlink_keeps_the_link_and_formats_the_target() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn a_read_only_file_is_not_replaced_and_reports_e031() {
+    use std::os::unix::fs::PermissionsExt;
+    let d = dir();
+    write(d.path(), "a.prog.abap", "lv_a   =   1.\n");
+    let file = d.path().join("a.prog.abap");
+    fs::set_permissions(&file, fs::Permissions::from_mode(0o444)).unwrap();
+    // Root can write a 0444 file, so there is nothing to test as root.
+    if fs::OpenOptions::new().write(true).open(&file).is_ok() {
+        return;
+    }
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--diagnostics", "json", "a.prog.abap"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(4));
+    assert_eq!(
+        json_of(&out.stderr)["files"][0]["diagnostics"][0]["code"],
+        "E031"
+    );
+    assert_eq!(fs::read_to_string(&file).unwrap(), "lv_a   =   1.\n");
+    assert_eq!(
+        fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+        0o444
+    );
+}
+
 #[test]
 fn check_diff_prints_a_unified_diff_to_stdout() {
     let d = dir();
