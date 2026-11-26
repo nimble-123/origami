@@ -30,6 +30,14 @@ fn run(name: &str, text: &str) -> Explained {
     explain(text.as_bytes(), &hint(name), &Options::default(), &[])
 }
 
+/// In the compact style, where a call with several parameters breaks only
+/// for width (the aligned style always breaks it, ABAP-CALL-001).
+fn run_compact(name: &str, text: &str) -> Explained {
+    let mut opts = Options::default();
+    opts.lang.style = origami_core::Style::Compact;
+    explain(text.as_bytes(), &hint(name), &opts, &[])
+}
+
 fn render(e: &Explained) -> String {
     e.notes
         .iter()
@@ -88,7 +96,7 @@ fn statements_sharing_a_line_get_a_statement_note() {
 #[test]
 fn width_note_measures_the_statement() {
     let src = "rv_ok = zcl_check=>validate( iv_id = iv_id iv_date = iv_date iv_mode = iv_mode iv_flag = abap_false iv_x = 1 iv_y = 2 iv_z = 3 ).\n";
-    let e = run("z.prog.abap", src);
+    let e = run_compact("z.prog.abap", src);
     assert_eq!(e.notes.len(), 1, "{:#?}", e.notes);
     let BreakCause::Width { column, limit, .. } = e.notes[0].cause else {
         panic!("not a width note: {:?}", e.notes[0]);
@@ -204,7 +212,7 @@ fn rule_phrases_equal_the_explanation_lines_in_style_md() {
 #[test]
 fn a_long_call_gets_one_call_001_width_note() {
     let src = "rv_ok = zcl_check=>validate( iv_id = iv_id iv_date = iv_date iv_mode = iv_mode iv_flag = abap_false iv_x = 1 iv_y = 2 iv_z = 3 ).\n";
-    let e = run("z.prog.abap", src);
+    let e = run_compact("z.prog.abap", src);
     assert_eq!(e.notes.len(), 1, "{:#?}", e.notes);
     let n = &e.notes[0];
     assert_eq!(n.rule, Some("ABAP-CALL-001"));
