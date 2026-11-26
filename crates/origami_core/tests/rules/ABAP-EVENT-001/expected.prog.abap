@@ -9,6 +9,9 @@ AT SELECTION-SCREEN.
 START-OF-SELECTION.
   PERFORM load_data.
   WRITE: / 'Done'.
+  GET TIME.
+GET pernr LATE.
+  WRITE pernr-pernr.
 FORM load_data.
   DATA lt_flights TYPE STANDARD TABLE OF sflight WITH EMPTY KEY.
 ENDFORM.
