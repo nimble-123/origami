@@ -29,6 +29,26 @@ fn drop_space_always_is_x001() {
     assert!(r.output.is_none());
 }
 
+/// A file of comments only has no unit to quarantine; a mismatch there is
+/// still a mismatch.
+#[test]
+fn mismatch_without_units_is_x001() {
+    for (src, path) in [
+        (&b"\" hello world\n"[..], "z.prog.abap"),
+        (b"// hello world\n", "z.ddls.asddls"),
+    ] {
+        let mut opts = Options::default();
+        opts.fault = Some(Fault::DropSpaceAlways);
+        let r = format(src, &LanguageHint::Path(path.into()), &opts);
+        assert_eq!(r.status, Status::Error, "{path}: {:?}", r.output);
+        assert!(r.has(Code::X001), "{path}: {:?}", r.diagnostics);
+        assert!(r.output.is_none());
+        opts.fault = Some(Fault::DropSpaceOnce);
+        let r = format(src, &LanguageHint::Path(path.into()), &opts);
+        assert_eq!(r.output.as_deref(), Some(src), "{path}");
+    }
+}
+
 #[test]
 fn panic_is_x002() {
     std::panic::set_hook(Box::new(|_| {}));

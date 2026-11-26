@@ -38,6 +38,8 @@ equal when all of these hold:
    starts a line keeps its indentation too, so a second run sees the same
    unit and makes the same choice (idempotency).
 3. If the check still fails, the result is X001: no output is written, exit 70.
+   A mismatch in a file without units (comments only) has no unit to
+   quarantine, so it ends here too.
 
 Tests: `crates/origami_core/tests/safety.rs` (run with
 `--features fault-injection`).

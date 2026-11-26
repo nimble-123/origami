@@ -85,7 +85,7 @@ fn run_at(
     let mut output = apply_fault(second.output.clone(), opts, 1);
     let mut opaque = BTreeSet::new();
     let still = problems(src, lang, &second, &output);
-    if still.bad.is_empty() && !still.long.is_empty() {
+    if still.bad.is_empty() && !still.unowned_bad && !still.long.is_empty() {
         let third = format(src, lang, opts, &quarantine, &still.long, identity, explain);
         output = apply_fault(third.output.clone(), opts, 2);
         second = third;
@@ -96,7 +96,8 @@ fn run_at(
     // lengthen a line, and a line no unit owns cannot be quarantined. Then
     // the whole file stays as written (INVARIANTS 1.5), checked like any
     // other output.
-    let whole_file_fallback = last.bad.is_empty() && (!last.long.is_empty() || last.unowned_long);
+    let whole_file_fallback =
+        last.bad.is_empty() && !last.unowned_bad && (!last.long.is_empty() || last.unowned_long);
     if whole_file_fallback {
         output = src.text().to_string();
         last = problems(src, lang, &second, &output);
@@ -208,6 +209,9 @@ pub(crate) fn relex(lang: Language, text: &str) -> Result<TokenStream, Diagnosti
 struct Problems {
     /// Units with token mismatches.
     bad: BTreeSet<UnitId>,
+    /// A mismatch that no unit owns (a file without units): nothing can be
+    /// quarantined, so it stands until X001.
+    unowned_bad: bool,
     /// (ABAP) Units with new overlong lines.
     long: BTreeSet<UnitId>,
     /// (ABAP) A new overlong line that no unit owns (a file without units).
@@ -216,7 +220,7 @@ struct Problems {
 
 impl Problems {
     fn is_empty(&self) -> bool {
-        self.bad.is_empty() && self.long.is_empty() && !self.unowned_long
+        self.bad.is_empty() && !self.unowned_bad && self.long.is_empty() && !self.unowned_long
     }
 }
 
@@ -230,13 +234,17 @@ fn problems(src: &SourceText, lang: Language, r: &LangResult, output: &str) -> P
         Err(_) => {
             bad.extend(r.units.iter().map(|u| u.id));
             return Problems {
+                unowned_bad: bad.is_empty(),
                 bad,
                 long,
                 unowned_long,
             };
         }
     };
+    let mut unowned_bad = false;
     if let Err(ms) = equivalent(&r.input_tokens, src.text(), &out_stream, output) {
+        // `unit_of` finds a unit for every token unless there is none.
+        unowned_bad = r.units.is_empty();
         for m in ms {
             if let Some(u) = r.unit_of(m.input_index) {
                 bad.insert(u);
@@ -252,7 +260,7 @@ fn problems(src: &SourceText, lang: Language, r: &LangResult, output: &str) -> P
             }
         }
     }
-    if lang == Language::Abap && bad.is_empty() {
+    if lang == Language::Abap && bad.is_empty() && !unowned_bad {
         let out_index = LineIndex::new(output);
         let in_index = LineIndex::new(src.text());
         // Whether an input line is over 255; tokens come in input order, so
@@ -322,6 +330,7 @@ fn problems(src: &SourceText, lang: Language, r: &LangResult, output: &str) -> P
     }
     Problems {
         bad,
+        unowned_bad,
         long,
         unowned_long,
     }
