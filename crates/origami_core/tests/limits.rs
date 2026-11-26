@@ -154,6 +154,39 @@ fn input_over_the_size_limit_is_left_as_written() {
     assert_eq!(r.output.as_deref(), Some(src.as_bytes()));
 }
 
+/// The size limit comes before content sniffing, which lexes the input: a
+/// language detected from content gives the same W004 as a named one.
+#[test]
+fn input_over_the_size_limit_is_not_sniffed() {
+    let src = "a ".repeat(MAX_INPUT_LEN / 2 + 1);
+    for hint in [
+        LanguageHint::None,
+        LanguageHint::CdsFamily,
+        LanguageHint::Path("z.acds".into()),
+        LanguageHint::StdinPath("z.acds".into()),
+        LanguageHint::LanguageId("acds".into()),
+    ] {
+        let start = Instant::now();
+        let r = format(src.as_bytes(), &hint, &Options::default());
+        assert!(
+            start.elapsed() < BOUND,
+            "{hint:?}: took {:?}",
+            start.elapsed()
+        );
+        assert_eq!(r.status, Status::Unchanged, "{hint:?}: {:?}", r.diagnostics);
+        assert!(r.has(Code::W004), "{hint:?}: {:?}", r.diagnostics);
+        assert_eq!(r.language, None, "{hint:?}");
+        assert_eq!(r.output.as_deref(), Some(src.as_bytes()), "{hint:?}");
+    }
+    let r = format(
+        src.as_bytes(),
+        &LanguageHint::Path("z.ddls.asddls".into()),
+        &Options::default(),
+    );
+    assert!(r.has(Code::W004), "{:?}", r.diagnostics);
+    assert_eq!(r.language, Some(Language::Ddls));
+}
+
 #[test]
 fn output_over_the_size_limit_is_left_as_written() {
     // 100 levels at indent 8 turn 6-byte lines into lines of up to 806.
