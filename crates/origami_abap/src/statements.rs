@@ -5136,10 +5136,22 @@ fn call_with_groups(p: &mut P) -> Option<Doc> {
                 } else {
                     p.t(name)
                 };
-                rows.push(b::row(
-                    vec![name_doc],
-                    vec![p.sp(eq), p.t(eq), p.sp(eq + 1), value],
-                ));
+                let mut tail = vec![p.sp(eq), p.t(eq), p.sp(eq + 1), value];
+                // RFC: `EXCEPTIONS system_failure = 1 MESSAGE msg`.
+                let m = p.pos;
+                if p.is(k, "EXCEPTIONS")
+                    && p.is(m, "MESSAGE")
+                    && !p.glued(m)
+                    && !p.is(m + 1, "=")
+                    && m + 1 < p.end
+                {
+                    tail.push(p.sp(m));
+                    tail.push(p.kw(m));
+                    p.pos = m + 1;
+                    tail.push(p.sp(p.pos));
+                    tail.push(p.expr()?);
+                }
+                rows.push(b::row(vec![name_doc], tail));
             }
             if rows.is_empty() {
                 return None;

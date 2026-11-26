@@ -33,3 +33,4 @@ IF lv_remote = abap_true.
     EXPORTING
       iv_id = lv_id.
 ENDIF.
+CALL FUNCTION 'Z_FLIGHT_READ' DESTINATION lv_dest EXCEPTIONS system_failure = 1 MESSAGE lv_msg communication_failure = 2 MESSAGE lv_msg OTHERS = 3.
