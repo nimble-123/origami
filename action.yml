@@ -63,11 +63,31 @@ runs:
           fi
         fi
         if [ "$tag" = latest ]; then
-          tag=$(gh release view --repo "$REPO" --json tagName -q .tagName)
+          # release-please publishes the release when it tags, and the
+          # release workflow attaches the binaries some time later. Take the
+          # newest release that has the binary and its checksum for this
+          # runner, not simply the newest release.
+          releases=$(gh api "repos/${REPO}/releases?per_page=30" --jq '.[] | select(.draft | not) | select(.prerelease | not) | [.tag_name, (.assets | map(.name) | join(" "))] | @tsv')
+          tag=""
+          while IFS=$'\t' read -r candidate assets; do
+            for asset in $assets; do
+              if [[ "$asset" =~ ^origami-.+-${triple}(\.exe)?$ ]] && [[ " $assets " == *" $asset.sha256 "* ]]; then
+                tag="$candidate"
+                break 2
+              fi
+            done
+          done <<< "$releases"
+          if [ -z "$tag" ]; then
+            echo "origami: none of the 30 newest releases of $REPO has a binary and a .sha256 file for $triple. Pin a release with the version input." >&2
+            exit 1
+          fi
         fi
         dir="$RUNNER_TEMP/origami"
         mkdir -p "$dir"
-        gh release download "$tag" --repo "$REPO" --pattern "origami-*-${triple}*" --dir "$dir" --clobber
+        if ! gh release download "$tag" --repo "$REPO" --pattern "origami-*-${triple}*" --dir "$dir" --clobber; then
+          echo "origami: cannot download the binary for $triple from release $tag of $REPO. The release may not have its assets yet (they are attached some time after the release is created), or it has none for this platform." >&2
+          exit 1
+        fi
         cd "$dir"
         if command -v sha256sum >/dev/null; then sha256sum -c ./*.sha256; else shasum -a 256 -c ./*.sha256; fi
         bin=$(ls origami-* | grep -v '\.sha256$' | head -1)

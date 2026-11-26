@@ -37,6 +37,11 @@ commit SHA or used at a branch or another floating ref, the binary version is
 not pinned with it: the action prints a warning (it does not fail) and
 installs the newest release. Set `version: v0.4.2` to pin the binary as well.
 
+"The newest release" means the newest one that has a binary and a `.sha256`
+file for the runner: release-please creates a release when it tags, and the
+binaries are attached some time later, so the action skips a release that has
+none yet. It fails, with a message, if none of the 30 newest releases has one.
+
 ## GitLab CI
 
 ```yaml
