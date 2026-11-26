@@ -818,6 +818,32 @@ If a line does not fit, the general width rules apply.
 **Compact:** not aligned; `CLEAR:` and `FREE:` follow ABAP-CHAIN-001, `SORT`
 and `CATCH` stay on one line when they fit.
 
+### ABAP-ALIGN-010: Key components after `WITH KEY`
+Milestone: M5
+Explanation: one key component per line
+
+Approved by the maintainer, Nils Lutz, on 2026-11-26, as ABAP Cleaner's
+"Align parameters and components" with its default options. In
+`READ TABLE` and `DELETE TABLE`, two or more key components after
+`WITH KEY`, `WITH TABLE KEY` or `WITH KEY name COMPONENTS` always go one per
+line, aligned under the first one, with their `=` signs aligned
+(ABAP-ALIGN-001). The additions after the last component (`BINARY SEARCH`,
+`INTO …`, `TRANSPORTING …`) stay behind it. One component, a dynamic
+component `( name ) = …`, `WITH KEY = value` and a comment inside leave the
+statement to the general rules.
+
+```abap
+READ TABLE lt_flights INTO ls_flight WITH KEY carrid = lv_carrid
+                                              connid = lv_connid BINARY SEARCH.
+READ TABLE lt_flights INTO ls_flight WITH KEY primary_key COMPONENTS carrid = lv_carrid
+                                                                     connid = lv_connid.
+DELETE TABLE lt_flights WITH TABLE KEY carrid = lv_carrid
+                                       connid = lv_connid.
+READ TABLE lt_flights INTO ls_flight WITH KEY carrid = lv_carrid.
+```
+
+**Compact:** not aligned; the statement breaks only for width.
+
 ### ABAP-EVENT-001: Event blocks
 Milestone: M4
 
