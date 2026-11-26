@@ -218,6 +218,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
       m.map = t;
       m.needsUpdate = true;
     }
+    dirty = true;
     wake();
   });
   const dash = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
@@ -286,6 +287,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     hemi.intensity = dark.matches ? 1.0 : 1.45;
     key.intensity = dark.matches ? 1.5 : 1.6;
     near.intensity = dark.matches ? 5 : 6;
+    dirty = true;
     wake();
   }
 
@@ -324,7 +326,6 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
   let running = false;
   let onScreen = true;
   let last = 0;
-  let lastDraw = 0;
   let first = true;
   const t0 = moment?.t0 ?? performance.now();
   // Arriving after the load moment: no fold to replay.
@@ -357,8 +358,8 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     // The creases show while the sheet is (nearly) flat.
     dash.opacity = creaseShown * (1 - smooth(0.04, 0.3, fold)) * 0.95;
 
-    // Turning: toward the pointer, by dragging, and a slow sway. The crane
-    // stays on the ground: paper on a table does not hover.
+    // Turning: toward the pointer and by dragging. At rest it is still and
+    // nothing is drawn: no idle frames. Paper on a table does not hover.
     const tau = 0.35;
     const yaw = view.pointerYaw + view.dragYaw;
     const pitch = view.pointerPitch + view.dragPitch;
@@ -370,21 +371,18 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
       view.pitch = approach(view.pitch, pitch, dt, drag ? 0.06 : tau);
       busy ||= Math.abs(view.yaw - yaw) > 0.0005 || Math.abs(view.pitch - pitch) > 0.0005;
     }
-    // Only the slow sway is moving: 20 frames a second are enough.
-    if (!busy && !first && !dirty && now - lastDraw < 50) return !reduceMotion;
+    // Nothing moved since the last frame: draw nothing, and stop the loop.
+    if (!busy && !first && !dirty) return false;
     dirty = false;
-    lastDraw = now;
-    const s = now / 1000;
-    const sway = reduceMotion ? 0 : 1;
     const lie = lieOf(fold);
     aim(lie);
-    crane.rotation.set(view.pitch - lie * Math.PI * 0.49, BASE_YAW * (1 - lie) + view.yaw + sway * 0.035 * Math.sin(s * 0.6), 0);
+    crane.rotation.set(view.pitch - lie * Math.PI * 0.49, BASE_YAW * (1 - lie) + view.yaw, 0);
     renderer.render(scene, camera);
     if (first) {
       first = false;
       box.classList.add("on");
     }
-    return busy || !reduceMotion;
+    return busy;
   }
 
   function frame(now) {
