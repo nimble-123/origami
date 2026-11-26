@@ -43,7 +43,7 @@
         <dt>ABAP Cleaner</dt>
         <dd>1.29.2, default profile reduced to its 47 layout rules with their default options (<a href="https://github.com/nimble-123/origami/tree/main/scripts/abap-cleaner-compare">how</a>). Checked on 2026-11-23 on the 1,964 ABAP and 144 CDS files of the test corpus: these rules change no code and delete no comment; the only reordering is a closing bracket moved in front of a comment or pragma.</dd>
         <dt>origami</dt>
-        <dd>origami 0.3.1 (style edition 2026), default settings (style <code>aligned</code>).</dd>
+        <dd>origami 0.4.1 (style edition 2026), default settings (style <code>aligned</code>).</dd>
         <dt>Both</dt>
         <dd>Line width 120, keywords in upper case, indent 2.</dd>
       </dl>
@@ -57,7 +57,7 @@
       
       <section class="cmp" id="calls" aria-labelledby="calls-title">
         <h3 id="calls-title">Method calls</h3>
-        <p>Both hang the parameters behind the opening bracket, pad the parameter keywords to the longest one and align the <code>=</code> signs across all of them. A call with two or more parameter keywords puts each keyword on its own line in both tools.</p>
+        <p>Both hang the parameters behind the opening bracket, pad the parameter keywords to the longest one and align the <code>=</code> signs across all of them. A call with two or more parameters puts each on its own line, and one with two or more keywords each keyword, even when the call would fit on one line.</p>
         <div class="cmp-pane before"><div class="pane-label">Before</div><pre class="sheet code-block" tabindex="0"><code>lo_service-&gt;read( exporting iv_id = lv_id importing es_data = ls_data ).
 lo_service-&gt;check( exporting iv_id = lv_id ).
 data(lv_result) = lo_calculator-&gt;calculate( iv_amount = lv_amount iv_currency = lv_currency iv_date = sy-datum iv_rounding = abap_true ).</code></pre></div>
@@ -124,7 +124,8 @@ mt_items = <span class="kw">VALUE</span> #( ( id = <span class="num-lit">1</span
                     ( id = <span class="num-lit">2</span> name = <span class="str">`Beta`</span> ) ).</code></pre></div>
           <div class="cmp-pane ours"><div class="pane-label">origami</div><pre class="sheet code-block" tabindex="0"><code>lv_count = lines( lt_flights ).
 lo_service-&gt;read( <span class="kw">EXPORTING</span> iv_id = lv_id ).
-mt_items = <span class="kw">VALUE</span> #( ( id = <span class="num-lit">1</span> name = <span class="str">`Alpha`</span> ) ( id = <span class="num-lit">2</span> name = <span class="str">`Beta`</span> ) ).</code></pre></div>
+mt_items = <span class="kw">VALUE</span> #( ( id = <span class="num-lit">1</span> name = <span class="str">`Alpha`</span> )
+                    ( id = <span class="num-lit">2</span> name = <span class="str">`Beta`</span> ) ).</code></pre></div>
         </div>
       </section>
       <section class="cmp" id="declarations" aria-labelledby="declarations-title">
@@ -158,7 +159,7 @@ types: begin of ty_item, id type i, name type string, end of ty_item.</code></pr
       </section>
       <section class="cmp" id="signatures" aria-labelledby="signatures-title">
         <h3 id="signatures-title">Method signatures</h3>
-        <p>Both keep the first section keyword behind the method name and align the names and types in a table. When the table does not fit behind the name, origami starts it on the next line; ABAP Cleaner lets the line run past the width.</p>
+        <p>Both align the section keywords, names and types in a table. origami always starts the table on the line below the method name; ABAP Cleaner keeps the first keyword where the input has it, here behind the name.</p>
         <div class="cmp-pane before"><div class="pane-label">Before</div><pre class="sheet code-block" tabindex="0"><code>class zcl_rates definition public final create public.
   public section.
     methods calculate importing iv_amount type p iv_currency type waers iv_date type d returning value(rv_result) type p raising zcx_calc_error.
@@ -177,11 +178,12 @@ endclass.</code></pre></div>
 <span class="kw">ENDCLASS</span>.</code></pre></div>
           <div class="cmp-pane ours"><div class="pane-label">origami</div><pre class="sheet code-block" tabindex="0"><code><span class="kw">CLASS</span> zcl_rates <span class="kw">DEFINITION</span> <span class="kw">PUBLIC</span> <span class="kw">FINAL</span> <span class="kw">CREATE</span> <span class="kw">PUBLIC</span>.
   <span class="kw">PUBLIC</span> <span class="kw">SECTION</span>.
-    <span class="kw">METHODS</span> calculate <span class="kw">IMPORTING</span> iv_amount        <span class="kw">TYPE</span> p
-                                iv_currency      <span class="kw">TYPE</span> waers
-                                iv_date          <span class="kw">TYPE</span> d
-                      <span class="kw">RETURNING</span> <span class="kw">VALUE</span>(rv_result) <span class="kw">TYPE</span> p
-                      <span class="kw">RAISING</span>   zcx_calc_error.
+    <span class="kw">METHODS</span> calculate
+      <span class="kw">IMPORTING</span> iv_amount        <span class="kw">TYPE</span> p
+                iv_currency      <span class="kw">TYPE</span> waers
+                iv_date          <span class="kw">TYPE</span> d
+      <span class="kw">RETURNING</span> <span class="kw">VALUE</span>(rv_result) <span class="kw">TYPE</span> p
+      <span class="kw">RAISING</span>   zcx_calc_error.
 
     <span class="kw">METHODS</span> reset.
 <span class="kw">ENDCLASS</span>.</code></pre></div>
@@ -377,9 +379,10 @@ define view entity ZI_Travel
     <span class="com">&quot;! @parameter iv_carrier           | Airline</span>
     <span class="com">&quot;! @parameter iv_connection_number | Flight number</span>
     <span class="com">&quot;! @raising   zcx_not_found        | No such flight</span>
-    <span class="kw">METHODS</span> get_flight <span class="kw">IMPORTING</span> iv_carrier           <span class="kw">TYPE</span> s_carr_id
-                                 iv_connection_number <span class="kw">TYPE</span> s_conn_id
-                       <span class="kw">RAISING</span>   zcx_not_found.
+    <span class="kw">METHODS</span> get_flight
+      <span class="kw">IMPORTING</span> iv_carrier           <span class="kw">TYPE</span> s_carr_id
+                iv_connection_number <span class="kw">TYPE</span> s_conn_id
+      <span class="kw">RAISING</span>   zcx_not_found.
 
     <span class="kw">METHODS</span> get_name        <span class="kw">REDEFINITION</span>.
     <span class="kw">METHODS</span> get_description <span class="kw">REDEFINITION</span>.
@@ -409,14 +412,81 @@ define view entity ZI_Travel
 <span class="kw">ENDCLASS</span>.</code></pre></div>
         </div>
       </section>
+      <section class="cmp" id="constructors" aria-labelledby="constructors-title">
+        <h3 id="constructors-title">Constructor expressions, SORT and CATCH</h3>
+        <p>Both put each component of a <code>VALUE</code> or <code>NEW</code> expression and of a table expression on its own line once there are two, each table row on its own line, the rows of a <code>FOR</code> below the iteration, and each sort field and exception class on its own line. ABAP Cleaner leaves <code>REDUCE</code> as written; origami puts <code>INIT</code>, <code>FOR</code> and <code>NEXT</code> below each other.</p>
+        <div class="cmp-pane before"><div class="pane-label">Before</div><pre class="sheet code-block" tabindex="0"><code>ls_flight = <span class="kw">VALUE</span> #( carrier_id = <span class="str">&#x27;LH&#x27;</span> connection_id = <span class="str">&#x27;0400&#x27;</span> flight_date = sy-datum ).
+mt_items = <span class="kw">VALUE</span> #( ( id = <span class="num-lit">1</span> name = <span class="str">`Alpha`</span> ) ( id = <span class="num-lit">2</span> name = <span class="str">`Beta`</span> ) ).
+mt_items = <span class="kw">VALUE</span> #( <span class="kw">BASE</span> mt_items ( id = <span class="num-lit">3</span> name = <span class="str">`Gamma`</span> ) ).
+mt_ids = <span class="kw">VALUE</span> #( <span class="kw">FOR</span> ls_item <span class="kw">IN</span> mt_items <span class="kw">WHERE</span> ( id &gt; <span class="num-lit">1</span> ) ( ls_item-id ) ).
+lv_total = <span class="kw">REDUCE</span> i( <span class="kw">INIT</span> sum = <span class="num-lit">0</span> <span class="kw">FOR</span> ls_item <span class="kw">IN</span> mt_items <span class="kw">NEXT</span> sum = sum + ls_item-id ).
+<span class="kw">DATA</span>(ls_alpha) = mt_items[ id = <span class="num-lit">1</span> name = <span class="str">`Alpha`</span> ].
+lo_log = <span class="kw">NEW</span> zcl_log( iv_object = <span class="str">&#x27;ZFLIGHT&#x27;</span> iv_subobject = <span class="str">&#x27;BOOKING&#x27;</span> ).
+<span class="kw">SORT</span> mt_items <span class="kw">BY</span> name <span class="kw">ASCENDING</span> id <span class="kw">DESCENDING</span>.
+<span class="kw">TRY</span>.
+    lo_log-&gt;save( ).
+  <span class="kw">CATCH</span> zcx_log_full zcx_log_locked <span class="kw">INTO</span> <span class="kw">DATA</span>(lx_error).
+    <span class="kw">CLEAR</span>: ls_flight, mt_items.
+<span class="kw">ENDTRY</span>.</code></pre></div>
+        <div class="cmp-pair">
+          <div class="cmp-pane "><div class="pane-label">ABAP Cleaner, layout rules</div><pre class="sheet code-block" tabindex="0"><code>ls_flight = <span class="kw">VALUE</span> #( carrier_id    = <span class="str">&#x27;LH&#x27;</span>
+                     connection_id = <span class="str">&#x27;0400&#x27;</span>
+                     flight_date   = sy-datum ).
+mt_items = <span class="kw">VALUE</span> #( ( id = <span class="num-lit">1</span> name = <span class="str">`Alpha`</span> )
+                    ( id = <span class="num-lit">2</span> name = <span class="str">`Beta`</span> ) ).
+mt_items = <span class="kw">VALUE</span> #( <span class="kw">BASE</span> mt_items
+                    ( id = <span class="num-lit">3</span> name = <span class="str">`Gamma`</span> ) ).
+mt_ids = <span class="kw">VALUE</span> #( <span class="kw">FOR</span> ls_item <span class="kw">IN</span> mt_items <span class="kw">WHERE</span> ( id &gt; <span class="num-lit">1</span> )
+                  ( ls_item-id ) ).
+lv_total = <span class="kw">REDUCE</span> i( <span class="kw">INIT</span> sum = <span class="num-lit">0</span> <span class="kw">FOR</span> ls_item <span class="kw">IN</span> mt_items <span class="kw">NEXT</span> sum = sum + ls_item-id ).
+<span class="kw">DATA</span>(ls_alpha) = mt_items[ id   = <span class="num-lit">1</span>
+                           name = <span class="str">`Alpha`</span> ].
+lo_log = <span class="kw">NEW</span> zcl_log( iv_object    = <span class="str">&#x27;ZFLIGHT&#x27;</span>
+                      iv_subobject = <span class="str">&#x27;BOOKING&#x27;</span> ).
+<span class="kw">SORT</span> mt_items <span class="kw">BY</span> name <span class="kw">ASCENDING</span>
+                 id <span class="kw">DESCENDING</span>.
+<span class="kw">TRY</span>.
+    lo_log-&gt;save( ).
+  <span class="kw">CATCH</span> zcx_log_full
+        zcx_log_locked <span class="kw">INTO</span> <span class="kw">DATA</span>(lx_error).
+    <span class="kw">CLEAR</span>: ls_flight,
+           mt_items.
+<span class="kw">ENDTRY</span>.</code></pre></div>
+          <div class="cmp-pane ours"><div class="pane-label">origami</div><pre class="sheet code-block" tabindex="0"><code>ls_flight = <span class="kw">VALUE</span> #( carrier_id    = <span class="str">&#x27;LH&#x27;</span>
+                     connection_id = <span class="str">&#x27;0400&#x27;</span>
+                     flight_date   = sy-datum ).
+mt_items = <span class="kw">VALUE</span> #( ( id = <span class="num-lit">1</span> name = <span class="str">`Alpha`</span> )
+                    ( id = <span class="num-lit">2</span> name = <span class="str">`Beta`</span> ) ).
+mt_items = <span class="kw">VALUE</span> #( <span class="kw">BASE</span> mt_items
+                    ( id = <span class="num-lit">3</span> name = <span class="str">`Gamma`</span> ) ).
+mt_ids = <span class="kw">VALUE</span> #( <span class="kw">FOR</span> ls_item <span class="kw">IN</span> mt_items <span class="kw">WHERE</span> ( id &gt; <span class="num-lit">1</span> )
+                  ( ls_item-id ) ).
+lv_total = <span class="kw">REDUCE</span> i( <span class="kw">INIT</span> sum = <span class="num-lit">0</span>
+                     <span class="kw">FOR</span> ls_item <span class="kw">IN</span> mt_items
+                     <span class="kw">NEXT</span> sum = sum + ls_item-id ).
+<span class="kw">DATA</span>(ls_alpha) = mt_items[ id   = <span class="num-lit">1</span>
+                           name = <span class="str">`Alpha`</span> ].
+lo_log = <span class="kw">NEW</span> zcl_log( iv_object    = <span class="str">&#x27;ZFLIGHT&#x27;</span>
+                      iv_subobject = <span class="str">&#x27;BOOKING&#x27;</span> ).
+<span class="kw">SORT</span> mt_items <span class="kw">BY</span> name <span class="kw">ASCENDING</span>
+                 id <span class="kw">DESCENDING</span>.
+<span class="kw">TRY</span>.
+    lo_log-&gt;save( ).
+  <span class="kw">CATCH</span> zcx_log_full
+        zcx_log_locked <span class="kw">INTO</span> <span class="kw">DATA</span>(lx_error).
+    <span class="kw">CLEAR</span>: ls_flight,
+           mt_items.
+<span class="kw">ENDTRY</span>.</code></pre></div>
+        </div>
+      </section>
     </section>
 
     <section id="rules" class="band" aria-labelledby="rules-title">
       <div class="section-head">
         <h2 id="rules-title">Every ABAP Cleaner rule</h2>
-        <p>ABAP Cleaner 1.29.2 has 100 rules. 53 of them change code, comments or names; origami never does that, it checks its own output token by token. Of the other 47, origami does 28 the same way and covers 15 with its own layout; 4 have no counterpart.</p>
+        <p>ABAP Cleaner 1.29.2 has 100 rules. 53 of them change code, comments or names; origami never does that, it checks its own output token by token. Of the other 47, origami does 32 the same way and covers 14 with its own layout; 1 have no counterpart.</p>
       </div>
-      <ul class="legend"><li><span class="badge yes">Same</span> origami does the same: <strong>28</strong></li><li><span class="badge own">Own layout</span> origami covers this with its own layout: <strong>15</strong></li><li><span class="badge no">No</span> layout rule origami does not have: <strong>4</strong></li><li><span class="badge goal">Not a goal</span> changes code, comments or names, which origami never does: <strong>53</strong></li></ul>
+      <ul class="legend"><li><span class="badge yes">Same</span> origami does the same: <strong>32</strong></li><li><span class="badge own">Own layout</span> origami covers this with its own layout: <strong>14</strong></li><li><span class="badge no">No</span> layout rule origami does not have: <strong>1</strong></li><li><span class="badge goal">Not a goal</span> changes code, comments or names, which origami never does: <strong>53</strong></li></ul>
       <div class="table-wrap" tabindex="0">
         <table class="rules">
           <caption class="sr-only">ABAP Cleaner rules and origami</caption>
@@ -497,18 +567,18 @@ define view entity ZI_Travel
 </tbody>
 <tbody><tr class="group"><th colspan="4" scope="rowgroup">Alignment</th></tr>
 <tr><td><span class="rule-name">Align ABAP Doc</span><code class="rule-id">ALIGN_ABAP_DOC</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-doc-001">ABAP-DOC-001</a> Only the blanks after the tag and before | change; not aligned if a line would exceed the width.</td></tr>
-<tr><td><span class="rule-name">Align METHODS declarations</span><code class="rule-id">ALIGN_METHODS_DECLARATION</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-methods-001">ABAP-METHODS-001</a> A table that does not fit behind the method name starts on the next line.</td></tr>
+<tr><td><span class="rule-name">Align METHODS declarations</span><code class="rule-id">ALIGN_METHODS_DECLARATION</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-methods-001">ABAP-METHODS-001</a> The table always starts below the method name, as ABAP Cleaner keeps it when the input breaks there.</td></tr>
 <tr><td><span class="rule-name">Align METHODS ... FOR TESTING</span><code class="rule-id">ALIGN_METHODS_FOR_TESTING</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-005">ABAP-ALIGN-005</a> Not aligned if a line would exceed the width.</td></tr>
 <tr><td><span class="rule-name">Align METHODS ... REDEFINITION</span><code class="rule-id">ALIGN_METHODS_REDEFINITION</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-006">ABAP-ALIGN-006</a> Not aligned if a line would exceed the width.</td></tr>
 <tr><td><span class="rule-name">Align ALIASES ... FOR ...</span><code class="rule-id">ALIGN_ALIASES_FOR</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-007">ABAP-ALIGN-007</a> Not aligned if a line would exceed the width.</td></tr>
-<tr><td><span class="rule-name">Align declarations</span><code class="rule-id">ALIGN_DECLARATIONS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-decl-001">ABAP-DECL-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-003">ABAP-ALIGN-003</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-008">ABAP-ALIGN-008</a> TYPE, VALUE and READ-ONLY columns; LENGTH and DECIMALS stay part of the type.</td></tr>
+<tr><td><span class="rule-name">Align declarations</span><code class="rule-id">ALIGN_DECLARATIONS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-decl-001">ABAP-DECL-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-003">ABAP-ALIGN-003</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-008">ABAP-ALIGN-008</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-decl-002">ABAP-DECL-002</a> TYPE, VALUE and READ-ONLY columns; LENGTH and DECIMALS stay part of the type.</td></tr>
 <tr><td><span class="rule-name">Align assignments to the same object</span><code class="rule-id">ALIGN_ASSIGNMENTS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-004">ABAP-ALIGN-004</a> Not across a chain; not aligned if a line would exceed the width.</td></tr>
 <tr><td><span class="rule-name">Align keywords with second word of first line</span><code class="rule-id">ALIGN_WITH_SECOND_WORD</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-indent-001">ABAP-INDENT-001</a> Continuation lines use a fixed indent of one level.</td></tr>
-<tr><td><span class="rule-name">Align CLEAR:, FREE:, SORT and CATCH</span><code class="rule-id">ALIGN_CLEAR_FREE_AND_SORT</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-chain-001">ABAP-CHAIN-001</a> A chain that fits stays on one line; otherwise one item per line, aligned after the colon.</td></tr>
+<tr><td><span class="rule-name">Align CLEAR:, FREE:, SORT and CATCH</span><code class="rule-id">ALIGN_CLEAR_FREE_AND_SORT</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-009">ABAP-ALIGN-009</a></td></tr>
 <tr><td><span class="rule-name">Align SELECT clauses</span><code class="rule-id">ALIGN_SELECT_CLAUSES</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-sql-001">ABAP-SQL-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-indent-001">ABAP-INDENT-001</a> Each clause starts its own line, one level deeper, when the statement does not fit.</td></tr>
 <tr><td><span class="rule-name">Align SELECT ... FROM ... JOIN</span><code class="rule-id">ALIGN_SELECT_FROM</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-sql-001">ABAP-SQL-001</a> A JOIN starts its own clause line; ON conditions are not aligned.</td></tr>
 <tr><td><span class="rule-name">Align SELECT lists</span><code class="rule-id">ALIGN_SELECT_LISTS</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-sql-003">ABAP-SQL-003</a> Lists with complex fields one field per line, AS aligned; simple lists on one line if they fit (not derived from the rest of the file).</td></tr>
-<tr><td><span class="rule-name">Align parameters and components</span><code class="rule-id">ALIGN_PARAMETERS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-call-001">ABAP-CALL-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-call-002">ABAP-CALL-002</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-001">ABAP-ALIGN-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-002">ABAP-ALIGN-002</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-value-001">ABAP-VALUE-001</a> A call with several parameters stays on one line if it fits.</td></tr>
+<tr><td><span class="rule-name">Align parameters and components</span><code class="rule-id">ALIGN_PARAMETERS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-call-001">ABAP-CALL-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-call-002">ABAP-CALL-002</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-001">ABAP-ALIGN-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-align-002">ABAP-ALIGN-002</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-value-001">ABAP-VALUE-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-value-002">ABAP-VALUE-002</a> A table row too wide for its column breaks into its components instead of moving left; READ TABLE … WITH KEY is not aligned.</td></tr>
 <tr><td><span class="rule-name">Align logical expressions</span><code class="rule-id">ALIGN_LOGICAL_EXPRESSIONS</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-cond-001">ABAP-COND-001</a> Breaks before AND and OR at a fixed indent; operands are not aligned in columns.</td></tr>
 <tr><td><span class="rule-name">Align conditional expressions</span><code class="rule-id">ALIGN_COND_EXPRESSIONS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-cond-002">ABAP-COND-002</a> A COND with one WHEN is joined onto one line when it fits.</td></tr>
 <tr><td><span class="rule-name">Align FORM declarations</span><code class="rule-id">ALIGN_FORM_DECLARATION</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#abap-form-001">ABAP-FORM-001</a> Each section on its own line, parameters one level deeper.</td></tr>
@@ -534,10 +604,10 @@ define view entity ZI_Travel
 </tbody>
 <tbody><tr class="group"><th colspan="4" scope="rowgroup">CDS alignment</th></tr>
 <tr><td><span class="rule-name">Align view parameters</span><code class="rule-id">DDL_ALIGN_ENTITY_PARAMETERS</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#cds-head-001">CDS-HEAD-001</a> View parameters go one level deeper; they are not aligned in columns.</td></tr>
-<tr><td><span class="rule-name">Align source parameters</span><code class="rule-id">DDL_ALIGN_SOURCE_PARAMETERS</code></td><td class="num">–</td><td><span class="badge no">No</span></td><td>Line breaks inside a header clause are kept as written.</td></tr>
-<tr><td><span class="rule-name">Align function parameters after =&gt;</span><code class="rule-id">DDL_ALIGN_FUNCTION_PARAMETERS</code></td><td class="num">–</td><td><span class="badge no">No</span></td><td>Function parameters are not aligned.</td></tr>
+<tr><td><span class="rule-name">Align source parameters</span><code class="rule-id">DDL_ALIGN_SOURCE_PARAMETERS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#cds-align-002">CDS-ALIGN-002</a> Spaces next to the brackets are kept as written.</td></tr>
+<tr><td><span class="rule-name">Align function parameters after =&gt;</span><code class="rule-id">DDL_ALIGN_FUNCTION_PARAMETERS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#cds-align-003">CDS-ALIGN-003</a></td></tr>
 <tr><td><span class="rule-name">Align logical expressions in views</span><code class="rule-id">DDL_ALIGN_LOGICAL_EXPRESSIONS</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#cds-head-001">CDS-HEAD-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#dcl-grant-001">DCL-GRANT-001</a> A long condition breaks before and / or; operands are not aligned in columns.</td></tr>
-<tr><td><span class="rule-name">Align name list and GROUP BY list</span><code class="rule-id">DDL_ALIGN_FIELD_LISTS</code></td><td class="num">–</td><td><span class="badge no">No</span></td><td>Name lists and GROUP BY lists are not aligned.</td></tr>
+<tr><td><span class="rule-name">Align name list and GROUP BY list</span><code class="rule-id">DDL_ALIGN_FIELD_LISTS</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#cds-align-004">CDS-ALIGN-004</a> After a define view name list, as select from starts its own line.</td></tr>
 <tr><td><span class="rule-name">Align JOINs and ASSOCIATIONs</span><code class="rule-id">DDL_ALIGN_DATA_SOURCES</code></td><td class="num">–</td><td><span class="badge own">Own layout</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#cds-head-001">CDS-HEAD-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#cds-align-001">CDS-ALIGN-001</a> Associations align as and on; joins are not aligned.</td></tr>
 <tr><td><span class="rule-name">Align select list</span><code class="rule-id">DDL_ALIGN_SELECT_LIST</code></td><td class="num">–</td><td><span class="badge yes">Same</span></td><td><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#cds-key-001">CDS-KEY-001</a> <a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#cds-align-001">CDS-ALIGN-001</a> A case element is not padded.</td></tr>
 </tbody>

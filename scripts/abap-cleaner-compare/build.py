@@ -33,8 +33,9 @@ EXAMPLES = [
     ("01-calls.abap", "Method calls",
      "Both hang the parameters behind the opening bracket, pad the parameter "
      "keywords to the longest one and align the <code>=</code> signs across "
-     "all of them. A call with two or more parameter keywords puts each "
-     "keyword on its own line in both tools."),
+     "all of them. A call with two or more parameters puts each on its own "
+     "line, and one with two or more keywords each keyword, even when the "
+     "call would fit on one line."),
     ("02-long-lines.abap", "Lines longer than the limit",
      "origami breaks every statement that does not fit into the line width: "
      "before <code>AND</code> and <code>OR</code>, and before each SQL clause. "
@@ -49,10 +50,9 @@ EXAMPLES = [
      "<code>DATA</code> statements and put each item of a chain on its own "
      "line."),
     ("05-signatures.abap", "Method signatures",
-     "Both keep the first section keyword behind the method name and align "
-     "the names and types in a table. When the table does not fit behind the "
-     "name, origami starts it on the next line; ABAP Cleaner lets the line "
-     "run past the width."),
+     "Both align the section keywords, names and types in a table. origami "
+     "always starts the table on the line below the method name; ABAP Cleaner "
+     "keeps the first keyword where the input has it, here behind the name."),
     ("06-comments-blank-lines.abap", "Comments and blank lines",
      "Both keep the spaces in front of an end-of-line comment, add a space "
      "after <code>\"</code> when a letter or digit follows, and keep at most "
@@ -76,6 +76,14 @@ EXAMPLES = [
      "<code>COND</code> and a <code>SELECT</code> list with aliases, indent "
      "the SQL clauses by two, align the method signature in a table and add "
      "blank lines between the sections and declaration groups."),
+    ("11-constructors.abap", "Constructor expressions, SORT and CATCH",
+     "Both put each component of a <code>VALUE</code> or <code>NEW</code> "
+     "expression and of a table expression on its own line once there are "
+     "two, each table row on its own line, the rows of a <code>FOR</code> "
+     "below the iteration, and each sort field and exception class on its "
+     "own line. ABAP Cleaner leaves <code>REDUCE</code> as written; origami "
+     "puts <code>INIT</code>, <code>FOR</code> and <code>NEXT</code> below "
+     "each other."),
 ]
 
 # ---- origami's answer to each ABAP Cleaner rule ----------------------------
@@ -106,29 +114,28 @@ MAP = {
     "ALIGN_ABAP_DOC": ("yes", ["ABAP-DOC-001"],
         "Only the blanks after the tag and before | change; not aligned if a line would exceed the width."),
     "ALIGN_METHODS_DECLARATION": ("yes", ["ABAP-METHODS-001"],
-        "A table that does not fit behind the method name starts on the next line."),
+        "The table always starts below the method name, as ABAP Cleaner keeps it when the input breaks there."),
     "ALIGN_METHODS_FOR_TESTING": ("yes", ["ABAP-ALIGN-005"],
         "Not aligned if a line would exceed the width."),
     "ALIGN_METHODS_REDEFINITION": ("yes", ["ABAP-ALIGN-006"],
         "Not aligned if a line would exceed the width."),
     "ALIGN_ALIASES_FOR": ("yes", ["ABAP-ALIGN-007"],
         "Not aligned if a line would exceed the width."),
-    "ALIGN_DECLARATIONS": ("yes", ["ABAP-DECL-001", "ABAP-ALIGN-003", "ABAP-ALIGN-008"],
+    "ALIGN_DECLARATIONS": ("yes", ["ABAP-DECL-001", "ABAP-ALIGN-003", "ABAP-ALIGN-008", "ABAP-DECL-002"],
         "TYPE, VALUE and READ-ONLY columns; LENGTH and DECIMALS stay part of the type."),
     "ALIGN_ASSIGNMENTS": ("yes", ["ABAP-ALIGN-004"],
         "Not across a chain; not aligned if a line would exceed the width."),
     "ALIGN_WITH_SECOND_WORD": ("own", ["ABAP-INDENT-001"],
         "Continuation lines use a fixed indent of one level."),
-    "ALIGN_CLEAR_FREE_AND_SORT": ("own", ["ABAP-CHAIN-001"],
-        "A chain that fits stays on one line; otherwise one item per line, aligned after the colon."),
+    "ALIGN_CLEAR_FREE_AND_SORT": ("yes", ["ABAP-ALIGN-009"], ""),
     "ALIGN_SELECT_CLAUSES": ("own", ["ABAP-SQL-001", "ABAP-INDENT-001"],
         "Each clause starts its own line, one level deeper, when the statement does not fit."),
     "ALIGN_SELECT_FROM": ("own", ["ABAP-SQL-001"],
         "A JOIN starts its own clause line; ON conditions are not aligned."),
     "ALIGN_SELECT_LISTS": ("own", ["ABAP-SQL-003"],
         "Lists with complex fields one field per line, AS aligned; simple lists on one line if they fit (not derived from the rest of the file)."),
-    "ALIGN_PARAMETERS": ("yes", ["ABAP-CALL-001", "ABAP-CALL-002", "ABAP-ALIGN-001", "ABAP-ALIGN-002", "ABAP-VALUE-001"],
-        "A call with several parameters stays on one line if it fits."),
+    "ALIGN_PARAMETERS": ("yes", ["ABAP-CALL-001", "ABAP-CALL-002", "ABAP-ALIGN-001", "ABAP-ALIGN-002", "ABAP-VALUE-001", "ABAP-VALUE-002"],
+        "A table row too wide for its column breaks into its components instead of moving left; READ TABLE … WITH KEY is not aligned."),
     "ALIGN_LOGICAL_EXPRESSIONS": ("own", ["ABAP-COND-001"],
         "Breaks before AND and OR at a fixed indent; operands are not aligned in columns."),
     "LOGICAL_OPERATOR_POSITION": ("yes", ["ABAP-COND-001"], "AND and OR always start the line."),
@@ -143,11 +150,12 @@ MAP = {
         "Runs of spaces shrink to one; no space is added or removed next to a bracket."),
     "DDL_ALIGN_ENTITY_PARAMETERS": ("own", ["CDS-HEAD-001"],
         "View parameters go one level deeper; they are not aligned in columns."),
-    "DDL_ALIGN_SOURCE_PARAMETERS": ("no", [], "Line breaks inside a header clause are kept as written."),
-    "DDL_ALIGN_FUNCTION_PARAMETERS": ("no", [], "Function parameters are not aligned."),
+    "DDL_ALIGN_SOURCE_PARAMETERS": ("yes", ["CDS-ALIGN-002"], "Spaces next to the brackets are kept as written."),
+    "DDL_ALIGN_FUNCTION_PARAMETERS": ("yes", ["CDS-ALIGN-003"], ""),
     "DDL_ALIGN_LOGICAL_EXPRESSIONS": ("own", ["CDS-HEAD-001", "DCL-GRANT-001"],
         "A long condition breaks before and / or; operands are not aligned in columns."),
-    "DDL_ALIGN_FIELD_LISTS": ("no", [], "Name lists and GROUP BY lists are not aligned."),
+    "DDL_ALIGN_FIELD_LISTS": ("yes", ["CDS-ALIGN-004"],
+        "After a define view name list, as select from starts its own line."),
     "DDL_ALIGN_DATA_SOURCES": ("own", ["CDS-HEAD-001", "CDS-ALIGN-001"],
         "Associations align as and on; joins are not aligned."),
     "DDL_ALIGN_SELECT_LIST": ("yes", ["CDS-KEY-001", "CDS-ALIGN-001"],
