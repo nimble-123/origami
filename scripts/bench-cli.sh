@@ -35,7 +35,7 @@ done < "$LIST"
 
 for ext in clas.abap ddls.asddls ddlx.asddlxs dcls.asdcls bdef.asbdef srvd.srvdsrv; do
   # Median-sized file of this type.
-  m=$(grep "\.${ext}\$" "$LIST" | while IFS= read -r f; do
+  m=$({ grep "\.${ext}\$" "$LIST" || true; } | while IFS= read -r f; do
         printf '%s %s\n' "$(wc -l < "$f" | tr -d ' ')" "$f"
       done | sort -n | awk '{ a[NR] = $2 } END { if (NR) print a[int((NR + 1) / 2)] }')
   [ -z "$m" ] && continue
