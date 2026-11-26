@@ -65,12 +65,14 @@ write `--changed=REF path…` or put the paths first (`origami src/
   `✗` error with a code frame, `!` warnings; at most three W003 lines per
   file), a summary line and the next step. Colors only when stderr is a
   terminal; `NO_COLOR` turns them off, `CLICOLOR_FORCE=1` on. The layout is
-  for people and may change between releases.
+  for people and may change between releases. In the human and agent
+  formats, control characters in file names are shown escaped (`\x1b`).
 * **agent**: for AI agents. First line `origami: N files, …`; then one line
   per finding, prefixed `ERROR` / `WARN` with `path:line:column`, code,
   message and a fix hint, and `CHANGE` / `FORMATTED` per changed file; W003
-  only as one `NOTE` count; last line `NEXT: …` says what to do. Stable
-  within a major version.
+  only as one `NOTE` count; last line `NEXT: …` says what to do. Paths in
+  the suggested command are shell-quoted when needed. Stable within a major
+  version.
 * **json**: the schema in `schemas/diagnostics.v1.json` (frozen).
 * **sarif**: SARIF 2.1.0. `artifactLocation.uri` is the path as a
   percent-encoded URI reference with forward slashes; a diagnostic that

@@ -558,6 +558,43 @@ fn sarif_uris_are_percent_encoded_and_pseudo_paths_have_no_location() {
 }
 
 #[test]
+fn agent_next_command_quotes_paths() {
+    let d = dir();
+    write(d.path(), "my dir/a.prog.abap", "lv_a   =   1.\n");
+    write(d.path(), "b.prog.abap", "lv_b   =   2.\n");
+    write(d.path(), "it's.prog.abap", "lv_c   =   3.\n");
+    let out = origami()
+        .current_dir(d.path())
+        .args(["--check", "--diagnostics", "agent"])
+        .output()
+        .unwrap();
+    let err = String::from_utf8(out.stderr).unwrap();
+    let next = err.lines().last().unwrap();
+    // Sorted by path, so the order is fixed.
+    assert_eq!(
+        next,
+        "NEXT: run `origami b.prog.abap 'it'\\''s.prog.abap' 'my dir/a.prog.abap'` to apply the formatting."
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn file_names_with_control_characters_are_escaped_in_text_output() {
+    let d = dir();
+    write(d.path(), "a\x1b[31m.prog.abap", "lv_a   =   1.\n");
+    for format in ["human", "agent"] {
+        let out = origami()
+            .current_dir(d.path())
+            .args(["--check", "--diagnostics", format])
+            .output()
+            .unwrap();
+        let err = String::from_utf8(out.stderr).unwrap();
+        assert!(!err.contains('\x1b'), "{format}: {err:?}");
+        assert!(err.contains("a\\x1b[31m.prog.abap"), "{format}: {err:?}");
+    }
+}
+
+#[test]
 fn check_diff_prints_a_unified_diff_to_stdout() {
     let d = dir();
     write(d.path(), "z.prog.abap", "lv_a   =   1.\n");

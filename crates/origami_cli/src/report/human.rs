@@ -100,7 +100,7 @@ fn write_file(
         .filter(|d| d.severity < Severity::Error && d.code != Code::W003)
         .collect();
     let w003: Vec<&Reported> = diags.iter().filter(|d| d.code == Code::W003).collect();
-    let path = st.bold(&f.path);
+    let path = st.bold(&super::escape_controls(&f.path));
     if f.status == Status::Error {
         let internal = errors.iter().any(|d| d.severity == Severity::Internal);
         let label = if internal {
