@@ -11,6 +11,7 @@ import { execFile } from "node:child_process";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import type { Log } from "./format";
+import { findOnPath } from "./pathSearch";
 import { classifyProbe, Probe } from "./probe";
 
 export interface Resolved {
@@ -102,7 +103,12 @@ export class BinaryResolver {
         return { result: { binary: setting, configPath }, transient: false };
       }
       if (configPath) {
-        candidates.push(process.platform === "win32" ? "origami.exe" : "origami");
+        // By absolute path: a bare name would let Windows pick an origami.exe
+        // from the workspace folder, which is the working directory.
+        const onPath = findOnPath("origami");
+        if (onPath) {
+          candidates.push(onPath);
+        }
       }
     }
     candidates.push(this.bundled());
