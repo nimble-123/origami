@@ -71,6 +71,7 @@ fn is_event(words: &[String]) -> bool {
                         | "DATASET"
                         | "LOCALE"
                         | "PARAMETER"
+                        | "PERMISSIONS"
                         | "PF-STATUS"
                         | "PROPERTY"
                         | "REFERENCE"

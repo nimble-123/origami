@@ -857,8 +857,8 @@ processing block (`FORM`, `MODULE`, `FUNCTION`, `CLASS`, `INTERFACE`).
 Proposed for approval by the maintainer: the logical database event
 `GET node [LATE] [FIELDS …]` is an event block too. It is one outside a
 processing block, unless the word after `GET` is one of `BADI`, `BIT`,
-`CURSOR`, `DATASET`, `LOCALE`, `PARAMETER`, `PF-STATUS`, `PROPERTY`,
-`REFERENCE`, `RUN` or `TIME`, which start other statements.
+`CURSOR`, `DATASET`, `LOCALE`, `PARAMETER`, `PERMISSIONS`, `PF-STATUS`,
+`PROPERTY`, `REFERENCE`, `RUN` or `TIME`, which start other statements.
 
 ```abap
 START-OF-SELECTION.
