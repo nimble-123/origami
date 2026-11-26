@@ -4782,15 +4782,39 @@ fn eml(p: &mut P) -> Option<Doc> {
         head.push(p.operand()?);
     }
     let op_level = if plural { 2 } else { 1 };
+    let aligned = p.c.style == Style::Aligned;
+    let read = p.is(start, "READ");
     let mut lines: Vec<EmlLine> = Vec::new();
     let mut op_open = false;
     let mut op_has_data = false;
+    // Aligned style: the last line is an `ENTITY` line without operation.
+    let mut entity_line = false;
     while !p.at_end() {
         let i = p.pos;
         if p.glued(i) || p.kind(i) != WORD {
             return None;
         }
         let w = p.upper(i);
+        // Aligned style: `READ … ENTITY x BY \_assoc` keeps the association
+        // with the entity (on its line, or in the head of `READ ENTITY`).
+        if aligned
+            && read
+            && w == "BY"
+            && !op_open
+            && (entity_line || (!plural && lines.is_empty()))
+        {
+            let mut docs = vec![p.sp(i), p.kw(i)];
+            p.pos = i + 1;
+            docs.push(p.sp(p.pos));
+            docs.push(p.expr()?);
+            match lines.last_mut() {
+                Some(l) if entity_line => l.content.extend(docs),
+                _ => head.extend(docs),
+            }
+            entity_line = false;
+            continue;
+        }
+        entity_line = false;
         match w.as_str() {
             "ENTITY" if plural => {
                 let kw = p.kw(i);
@@ -4804,6 +4828,7 @@ fn eml(p: &mut P) -> Option<Doc> {
                     data: vec![],
                 });
                 op_open = false;
+                entity_line = true;
             }
             "FAILED" | "REPORTED" | "MAPPED" | "RESULT" | "LINK" => {
                 let level = if matches!(w.as_str(), "RESULT" | "LINK") {
@@ -4828,11 +4853,21 @@ fn eml(p: &mut P) -> Option<Doc> {
                 p.pos += 1;
                 let sp = p.sp(p.pos);
                 let value = p.expr()?;
-                let sep = p.ln(i);
-                lines
-                    .last_mut()?
-                    .data
-                    .push((sep, b::concat(vec![kw, sp, value])));
+                if aligned {
+                    // Aligned style: `WITH …` and `FROM …` on their own line.
+                    lines.push(EmlLine {
+                        level: op_level,
+                        first: i,
+                        content: vec![kw, sp, value],
+                        data: vec![],
+                    });
+                } else {
+                    let sep = p.ln(i);
+                    lines
+                        .last_mut()?
+                        .data
+                        .push((sep, b::concat(vec![kw, sp, value])));
+                }
                 op_has_data = true;
             }
             "CREATE" | "UPDATE" | "DELETE" | "EXECUTE" | "BY" | "FIELDS" | "ALL" | "FROM"
