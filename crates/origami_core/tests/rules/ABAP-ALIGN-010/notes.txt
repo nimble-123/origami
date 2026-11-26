@@ -1,0 +1,4 @@
+1: ABAP-ALIGN-010: one key component per line
+3: ABAP-ALIGN-010: one key component per line
+5: ABAP-ALIGN-010: one key component per line
+7: ABAP-ALIGN-010: one key component per line

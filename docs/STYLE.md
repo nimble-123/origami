@@ -819,7 +819,7 @@ If a line does not fit, the general width rules apply.
 and `CATCH` stay on one line when they fit.
 
 ### ABAP-ALIGN-010: Key components after `WITH KEY`
-Milestone: M5
+Milestone: M4
 Explanation: one key component per line
 
 Approved by the maintainer, Nils Lutz, on 2026-11-26, as ABAP Cleaner's

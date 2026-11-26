@@ -2375,6 +2375,16 @@ fn keyword_statement(p: &mut P, spec: &Spec) -> Option<Doc> {
         p.c.reset(saved);
         p.pos = start + spec.lead.len();
     }
+    if p.c.style == Style::Aligned
+        && (spec.lead == ["READ", "TABLE"] || (spec.lead == ["DELETE"] && p.is(start + 1, "TABLE")))
+    {
+        let saved = p.c.mark();
+        if let Some(body) = with_key(p, start, spec) {
+            return Some(b::concat(vec![b::concat(head), body, p.period()]));
+        }
+        p.c.reset(saved);
+        p.pos = start + spec.lead.len();
+    }
     if p.c.style == Style::Aligned && matches!(spec.lead, ["SORT"] | ["CATCH"]) {
         let saved = p.c.mark();
         if let Some(body) = one_per_line(p, start, spec) {
@@ -2461,6 +2471,96 @@ fn raise_exporting(p: &mut P, start: usize, spec: &Spec) -> Option<Doc> {
         head,
         b::cont(vec![p.hl(exp), b::align_broken(rows)]),
     ]))
+}
+
+/// `READ TABLE … WITH [TABLE] KEY [k COMPONENTS] a = 1 b = 2 …` and
+/// `DELETE TABLE … WITH TABLE KEY …`, aligned style (ABAP-ALIGN-010): two
+/// or more key components one per line, aligned under the first; the
+/// additions after the last one stay behind it. `None` for other forms.
+fn with_key(p: &mut P, start: usize, spec: &Spec) -> Option<Doc> {
+    let from = p.pos;
+    if (from..p.end).any(|k| p.c.commented[k] || p.c.eol_commented[k]) {
+        return None;
+    }
+    // `WITH [TABLE] KEY` at bracket depth 0.
+    let mut k = from;
+    let with = loop {
+        if k >= p.end {
+            return None;
+        }
+        match p.kind(k) {
+            LPAREN | LBRACKET => k = p.matching(k)? + 1,
+            _ if p.is(k, "WITH") && !p.glued(k) => break k,
+            _ => k += 1,
+        }
+    };
+    let n_kw = if p.is(with + 1, "TABLE") && p.is(with + 2, "KEY") {
+        3
+    } else if p.is(with + 1, "KEY") {
+        2
+    } else {
+        return None;
+    };
+    let mut docs = Vec::new();
+    if with > from {
+        let end = p.end;
+        p.end = with;
+        let head = spec_body(p, spec, true);
+        p.end = end;
+        docs.push(head?);
+    }
+    for i in with..with + n_kw {
+        docs.push(p.sp(i));
+        docs.push(p.kw(i));
+    }
+    k = with + n_kw;
+    // `WITH KEY name COMPONENTS`
+    if p.kind(k) == WORD && !p.glued(k + 1) && p.is(k + 1, "COMPONENTS") {
+        docs.push(p.sp(k));
+        docs.push(p.t(k));
+        docs.push(p.sp(k + 1));
+        docs.push(p.kw(k + 1));
+        k += 2;
+    }
+    // Key components: a name (with glued tokens) and `= value`.
+    let row_at = |p: &P, k: usize| -> Option<usize> {
+        if p.kind(k) != WORD || p.glued(k) {
+            return None;
+        }
+        let mut e = k + 1;
+        while e < p.end && p.glued(e) {
+            e += 1;
+        }
+        (p.is(e, "=") && !p.glued(e)).then_some(e)
+    };
+    let first = k;
+    let mut rows: Vec<AlignItem> = Vec::new();
+    while let Some(eq) = row_at(p, k) {
+        let mut name = Vec::new();
+        for i in k..eq {
+            name.push(p.t(i));
+        }
+        p.pos = eq + 1;
+        let value = p.expr()?;
+        rows.push(b::row(name, vec![p.sp(eq), p.t(eq), p.sp(eq + 1), value]));
+        k = p.pos;
+    }
+    if rows.len() < 2 {
+        return None;
+    }
+    // The additions after the last component stay on its line.
+    if k < p.end {
+        p.pos = k;
+        let tail = spec_body(p, spec, true)?;
+        if let Some(AlignItem::Row(r)) = rows.last_mut() {
+            r.tail.push(tail);
+        }
+    }
+    p.pos = p.end;
+    p.c.span(start, p.end, "ABAP-ALIGN-010");
+    docs.push(p.sp(first));
+    docs.push(b::hang(vec![b::align_broken(rows)]));
+    Some(b::concat(docs))
 }
 
 /// `SORT itab BY a b` and `CATCH cx_a cx_b`, aligned style (ABAP-ALIGN-009):
