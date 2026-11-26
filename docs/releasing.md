@@ -11,6 +11,7 @@ lists what to create to turn the other steps on.
 
 | Job | Result |
 |---|---|
+| `version` | The tag must equal the version in `Cargo.toml` and `editors/vscode/package.json`; otherwise nothing is built. |
 | `build` | Binaries for 7 targets (macOS x64/arm64, Windows x64/arm64, Linux gnu x64/arm64, Linux musl x64). Signed and notarized (macOS) or signed (Windows) when the credentials exist. |
 | `smoke` | Starts every binary on a runner of its own platform, prints `--version`, formats a fixture. A binary that does not run stops the release. |
 | `vsix` | One VS Code extension package per target, with the binary inside. |

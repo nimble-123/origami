@@ -10,6 +10,7 @@ name: Release
 # Job layout (each job has only the permissions it needs; secrets are passed
 # to the single step that uses them, never to build steps):
 #
+#   version -> the tag must match Cargo.toml and editors/vscode/package.json
 #   build   -> binaries per target (+ signing, notarization)
 #   smoke   -> runs every binary on a native runner
 #   vsix    -> packages the VS Code extension per target
@@ -28,8 +29,32 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  version:
+    # A tag that disagrees with the manifests would ship binaries and
+    # packages that report another version than the release.
+    name: Check the version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tag matches the manifests
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          cargo=$(sed -n '/^\[workspace\.package\]/,/^\[/ s/^version *= *"\([^"]*\)".*/\1/p' Cargo.toml)
+          vscode=$(jq -r .version editors/vscode/package.json)
+          echo "tag: $tag, Cargo.toml: $cargo, package.json: $vscode"
+          status=0
+          [ "$cargo" = "$tag" ] || { echo "::error::Tag $GITHUB_REF_NAME does not match the workspace version in Cargo.toml ($cargo)."; status=1; }
+          [ "$vscode" = "$tag" ] || { echo "::error::Tag $GITHUB_REF_NAME does not match the version in editors/vscode/package.json ($vscode)."; status=1; }
+          exit $status
+
   build:
     name: Build ${{ matrix.target }}
+    needs: version
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
