@@ -1,9 +1,9 @@
-// The paper crane in the hero: the seven facets of docs/assets/logo.svg as
-// rigid sheets of paper that fold about their shared edges (three.js r170,
-// vendor/). app.js loads this module when the page is idle and ties the fold
-// to the margin of the hero sheet: one line is almost flat, more line breaks
-// fold the crane further. Decorative: the canvas is aria-hidden and the page
-// works without it (app.js shows the logo instead).
+// The paper crane in the closing spotlight: the seven facets of
+// docs/assets/logo.svg as rigid sheets of paper that fold about their shared
+// edges (three.js r170, vendor/), with its reflection on the floor. app.js
+// loads this module as the closing section comes near; the crane folds up
+// from a flat sheet once it is in view. Decorative: the canvas is
+// aria-hidden and the page works without it (app.js shows the logo).
 
 import {
   BufferGeometry,
@@ -172,7 +172,9 @@ const approach = (v, to, dt, tau) => to + (v - to) * Math.exp(-dt / tau);
  * moment ({ t0, crease, fold, foldFor } in ms) or null. `onFail`: called when
  * WebGL stops working; the crane is then gone.
  */
-export function mount(box, { target = 0.7, moment = null, reduceMotion = false, onFail = () => {} }) {
+export function mount(box, { reduceMotion = false, onFail = () => {} }) {
+  const target = 1;
+  const moment = null;
   const renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: "low-power" });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
   renderer.outputColorSpace = SRGBColorSpace;
@@ -226,6 +228,20 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
   // The crane turns as one; the facets fold inside it.
   const crane = new Group();
   scene.add(crane);
+  // The reflection on the floor: the same facets, mirrored below the ground,
+  // faint (its fade is a mask on the canvas, style.css).
+  const mirrorRoot = new Group();
+  mirrorRoot.scale.y = -1;
+  const mirror = new Group();
+  mirrorRoot.add(mirror);
+  scene.add(mirrorRoot);
+  const ghost = (m) => {
+    const g = m.clone();
+    g.transparent = true;
+    g.opacity = 0.16;
+    g.depthWrite = false;
+    return g;
+  };
   // Flat, the facets are one sheet of paper: a sheet behind them closes the
   // gaps, and the facets take the paper's color; folding, the sheet goes
   // and the facets take their own colors.
@@ -243,6 +259,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     const sheet = 1 - smooth(0.01, 0.08, fold);
     backing.material.opacity = sheet;
     backing.visible = sheet > 0.01;
+    for (const p of parts) p.image.material.color.copy(p.mesh.material.color);
   }
   const byId = new Map(FACETS.map((f) => [f.id, f]));
   const parts = FACETS.map((f) => {
@@ -252,6 +269,9 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     mesh.castShadow = true;
     mesh.matrixAutoUpdate = false;
     crane.add(mesh);
+    const image = new Mesh(mesh.geometry, ghost(materials[f.role]));
+    image.matrixAutoUpdate = false;
+    mirror.add(image);
     // One crease per hinge; the two halves of the body share theirs.
     let crease = null;
     if (f.id !== "bodyR") {
@@ -263,7 +283,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     }
     const a = v3(f.hinge[0]);
     const axis = v3(f.hinge[1]).sub(a).normalize();
-    return { f, mesh, crease, a, axis, local: new Matrix4(), world: new Matrix4() };
+    return { f, mesh, image, crease, a, axis, local: new Matrix4(), world: new Matrix4() };
   });
   const partOf = new Map(parts.map((p) => [p.f.id, p]));
 
@@ -283,6 +303,8 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
       p.world.copy(parent ? parent.world : IDENTITY).multiply(p.local);
       p.mesh.matrix.copy(p.world);
       p.mesh.matrixWorldNeedsUpdate = true;
+      p.image.matrix.copy(p.world);
+      p.image.matrixWorldNeedsUpdate = true;
       // A crease lies on its parent: it is where the facet turns.
       if (p.crease) {
         p.crease.matrix.copy(parent ? parent.world : IDENTITY);
@@ -296,20 +318,21 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
   function colors() {
     const css = getComputedStyle(document.documentElement);
     const get = (n) => new Color(css.getPropertyValue(n).trim());
-    base.ink.copy(get("--ink"));
-    base.valley.copy(get("--valley"));
-    base.crease.copy(get("--crease"));
-    // The paper of the flat sheet: the sheet color by day, a lighter slate
-    // by night, so it stands off the dark ground.
-    base.paper.copy(dark.matches ? get("--crease").lerp(get("--ink-dim"), 0.35) : get("--sheet").lerp(new Color(0xffffff), 0.45));
+    // The logo's dark tones: ink, valley blue, slate for the crease facets.
+    base.ink.copy(get("--text"));
+    base.valley.copy(get("--blue"));
+    base.crease.copy(new Color(0x3b4261));
+    // The flat sheet: a lighter slate, so it stands off the dark ground.
+    base.paper.copy(new Color(0x3b4261).lerp(new Color(0x737aa2), 0.35));
     backing.material.color.copy(base.paper);
     tint(fold);
-    dash.color.copy(get("--valley"));
-    ground.material.color.copy(dark.matches ? new Color(0x000000) : get("--ink"));
-    ground.material.opacity = dark.matches ? 0.55 : 0.2;
-    hemi.intensity = dark.matches ? 1.0 : 1.45;
-    key.intensity = dark.matches ? 1.5 : 1.6;
-    near.intensity = dark.matches ? 5 : 6;
+    dash.color.copy(get("--blue"));
+    for (const p of parts) p.image.material.color.copy(p.mesh.material.color);
+    ground.material.color.copy(new Color(0x000000));
+    ground.material.opacity = 0.5;
+    hemi.intensity = 1.0;
+    key.intensity = 1.6;
+    near.intensity = 5;
     dirty = true;
     wake();
   }
@@ -343,8 +366,10 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
   }
 
   // ---- state and loop --------------------------------------------------------
-  let fold = moment ? 0 : target;
-  let goal = target;
+  // Flat until the section is in view, then it folds up once.
+  let fold = reduceMotion ? target : 0;
+  let goal = fold;
+  let unfoldAt = null;
   let creaseShown = moment ? 0 : 1;
   let running = false;
   let onScreen = true;
@@ -360,6 +385,12 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
 
   let dirty = true;
   function step(now) {
+    if (unfoldAt != null) {
+      const k = Math.min(1, (now - unfoldAt) / 1900);
+      goal = fold = k;
+      if (k >= 1) unfoldAt = null;
+      dirty = true;
+    }
     const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.016);
     last = now;
     const t = now - t0;
@@ -401,12 +432,13 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     const lie = lieOf(fold);
     aim(lie);
     crane.rotation.set(view.pitch - lie * Math.PI * 0.49, BASE_YAW * (1 - lie) + view.yaw, 0);
+    mirror.rotation.copy(crane.rotation);
     renderer.render(scene, camera);
     if (first) {
       first = false;
       box.classList.add("on");
     }
-    return busy;
+    return busy || unfoldAt != null;
   }
 
   function frame(now) {
@@ -447,7 +479,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
       wake();
       return;
     }
-    if (reduceMotion || !fine.matches || e.pointerType !== "mouse" || !box.classList.contains("grab")) return;
+    if (reduceMotion || !fine.matches || e.pointerType !== "mouse") return;
     const r = canvas.getBoundingClientRect();
     const nx = (e.clientX - (r.left + r.width / 2)) / innerWidth;
     const ny = (e.clientY - (r.top + r.height / 2)) / innerHeight;
@@ -456,7 +488,7 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
     wake();
   }
   function onPointerDown(e) {
-    if (reduceMotion || !box.classList.contains("grab") || (e.pointerType === "mouse" && e.button !== 0)) return;
+    if (reduceMotion || (e.pointerType === "mouse" && e.button !== 0)) return;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, on: false };
   }
   function onPointerUp(e) {
@@ -478,10 +510,14 @@ export function mount(box, { target = 0.7, moment = null, reduceMotion = false, 
   let disposed = false;
   const ro = new ResizeObserver(size);
   ro.observe(box);
-  const io = new IntersectionObserver(([e]) => {
-    onScreen = e.isIntersecting;
-    wake();
-  });
+  const io = new IntersectionObserver(
+    ([e]) => {
+      onScreen = e.isIntersecting;
+      if (e.intersectionRatio > 0.45 && fold === 0 && unfoldAt == null && !reduceMotion) unfoldAt = performance.now();
+      wake();
+    },
+    { threshold: [0, 0.5] },
+  );
   io.observe(box);
   const onVisibility = () => wake();
   document.addEventListener("visibilitychange", onVisibility);

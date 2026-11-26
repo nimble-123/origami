@@ -138,7 +138,8 @@ export function submit(channel, job) {
 
 function dispatch() {
   if (!formatter.ready || formatter.inflight || !formatter.queue.size) return;
-  const channel = formatter.queue.has("journey") ? "journey" : formatter.queue.keys().next().value;
+  // The hero and the check answer a gesture: they go first.
+  const channel = ["hero", "check", "check-lex"].find((c) => formatter.queue.has(c)) ?? formatter.queue.keys().next().value;
   const job = formatter.queue.get(channel);
   formatter.queue.delete(channel);
   const id = formatter.nextId++;

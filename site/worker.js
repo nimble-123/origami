@@ -82,6 +82,9 @@ const ops = {
 const ready = loadWasm().then(
   (exports) => {
     wasm = exports;
+    // A few runs first, so the times the page shows are of a warm formatter,
+    // as in an editor that has formatted a file before.
+    for (let i = 0; i < 3; i++) review("CLASS zcl_a IMPLEMENTATION.\n  METHOD a.\n    lv_a = 1.\n  ENDMETHOD.\nENDCLASS.\n", { cds: false, width: 120, lower: false, compact: false });
     postMessage({ type: "ready" });
   },
   () => postMessage({ type: "load-error" }),

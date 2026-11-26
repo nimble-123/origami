@@ -1,6 +1,7 @@
-// origami website, the entry module: copy buttons, tabs, the playground, the
-// install tabs, the live speed measurement, and the journey (journey.js),
-// all served by one worker (format.js, worker.js).
+// origami website, the entry module: entrances, the light on the tiles, copy
+// buttons, tabs, the playground, the install tabs, the live speed
+// measurement and the closing crane; the hero (hero.js) and the chapters
+// (chapters.js). One worker formats for all of them (format.js, worker.js).
 
 import {
   $,
@@ -11,11 +12,13 @@ import {
   formatMs,
   formatter,
   paint,
+  reduceMotion,
   request,
   startWorker,
   submit,
 } from "./format.js";
-import { journey } from "./journey.js";
+import { hero } from "./hero.js";
+import { chapters } from "./chapters.js";
 
 for (const a of document.querySelectorAll("[data-repo-path]")) {
   a.href = `${REPO}/blob/main/${a.dataset.repoPath}`;
@@ -514,7 +517,7 @@ function scrollers() {
       if (scrolls) {
         target.tabIndex = 0;
         target.setAttribute("role", "region");
-        target.setAttribute("aria-label", target.querySelector("title, img")?.textContent.split(":")[0] || "Diagram");
+        target.setAttribute("aria-label", "Diagram");
       } else {
         target.removeAttribute("tabindex");
         target.removeAttribute("role");
@@ -579,9 +582,99 @@ function mineRow(ms) {
   row.querySelector(".b").style.width = `${pct}%`;
 }
 
-journey();
+// ---- entrances: once, as a group comes into view --------------------------
+
+function entrances() {
+  if (reduceMotion || !("IntersectionObserver" in window)) return;
+  const items = [...document.querySelectorAll("[data-rise]")];
+  // Siblings in a group follow each other by 70 ms.
+  for (const el of items) {
+    const group = [...el.parentElement.children].filter((c) => c.hasAttribute("data-rise"));
+    el.style.setProperty("--d", `${Math.min(5, group.indexOf(el)) * 70}ms`);
+  }
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        e.target.classList.add("in");
+        io.unobserve(e.target);
+      }
+    },
+    { rootMargin: "0px 0px -8% 0px" },
+  );
+  // Whatever is already on screen comes in at once.
+  document.documentElement.classList.add("rise");
+  for (const el of items) io.observe(el);
+}
+
+// ---- a light that follows the pointer over a tile ---------------------------
+
+function tileLight() {
+  if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  let raf = 0;
+  let last = null;
+  addEventListener(
+    "pointermove",
+    (e) => {
+      last = e;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const tile = last.target.closest?.(".tile");
+        if (!tile) return;
+        const r = tile.getBoundingClientRect();
+        tile.style.setProperty("--mx", `${Math.round(last.clientX - r.left)}px`);
+        tile.style.setProperty("--my", `${Math.round(last.clientY - r.top)}px`);
+      });
+    },
+    { passive: true },
+  );
+}
+
+// ---- the version in the badge: from the release-please line ----------------
+
+function version() {
+  const m = $("inst-actions-code")?.textContent.match(/origami@v(\d+\.\d+\.\d+)/);
+  const tag = $("version");
+  if (!m || !tag) return;
+  tag.textContent = m[1];
+  tag.hidden = false;
+}
+
+// ---- the closing crane: loaded as its section comes near --------------------
+
+function closingCrane() {
+  const box = $("crane-box");
+  if (!box) return;
+  const still = () => box.classList.add("still");
+  const conn = navigator.connection;
+  if (conn?.saveData || (navigator.deviceMemory && navigator.deviceMemory < 2)) return still();
+  const probe = document.createElement("canvas");
+  // three.js r170 needs WebGL 2.
+  const gl = probe.getContext("webgl2");
+  if (!gl) return still();
+  gl.getExtension("WEBGL_lose_context")?.loseContext();
+  const io = new IntersectionObserver(
+    ([e]) => {
+      if (!e.isIntersecting) return;
+      io.disconnect();
+      import("./crane.js")
+        .then((m) => m.mount(box, { reduceMotion, onFail: still }))
+        .catch(still);
+    },
+    { rootMargin: "600px 0px" },
+  );
+  io.observe(box);
+}
+
+version();
+entrances();
+tileLight();
+hero();
+chapters();
 playground();
 installTabs();
 scrollers();
 speed();
+closingCrane();
 startWorker();

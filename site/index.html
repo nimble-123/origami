@@ -4,12 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
-  <title>origami: a formatter for ABAP and CDS</title>
-  <meta name="description" content="origami formats ABAP and CDS: line breaks, indentation, spaces and letter case, nothing else. It checks its own output token by token and says why it broke each line.">
-  <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#d5d6db" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#16161e" media="(prefers-color-scheme: dark)">
-  <meta property="og:title" content="origami: a formatter for ABAP and CDS">
+  <title>origami: format ABAP, change nothing else</title>
+  <meta name="description" content="origami formats ABAP and CDS: line breaks, indentation, spaces and keyword case, nothing else. It checks its own output token by token and says why it broke each line.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0d0e14">
+  <meta property="og:title" content="origami: format ABAP, change nothing else">
   <meta property="og:description" content="Layout only, checked token by token, with a reason for every line break. Try it in your browser.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://nimble-123.github.io/origami/">
@@ -19,8 +18,8 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="preload" href="fonts/martian-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
   <script src="nav.js" defer></script>
   <script src="keywords.js" defer></script>
@@ -32,10 +31,7 @@
   <header class="top">
     <div class="top-in">
       <a class="brand" href="./" aria-label="origami home">
-        <picture>
-          <source srcset="assets/logo-small-dark.svg" media="(prefers-color-scheme: dark)">
-          <img src="assets/logo-small.svg" alt="" width="32" height="32">
-        </picture>
+        <img src="assets/logo-small-dark.svg" alt="" width="26" height="26">
         <span>origami</span>
       </a>
       <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">
@@ -43,284 +39,295 @@
         <span>Menu</span>
       </button>
       <nav id="site-nav" aria-label="Sections">
-        <a href="#journey" data-sections="journey safety">How it works</a>
+        <a href="#layout" data-sections="layout check explain">How it works</a>
         <a href="#playground" data-sections="playground">Playground</a>
         <a href="#speed" data-sections="speed">Speed</a>
-        <a href="#install" data-sections="install">Install</a>
         <a href="abap-cleaner.html">vs ABAP Cleaner</a>
         <a href="https://github.com/nimble-123/origami">GitHub</a>
+        <a class="nav-cta" href="#install" data-sections="install">Install</a>
       </nav>
     </div>
   </header>
 
   <main id="main">
+    <!-- ======================================================== hero -->
     <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-light" aria-hidden="true"><div class="grid-bg"></div><div class="cone"></div><div class="pool"></div></div>
       <div class="hero-copy">
-        <!-- The headline is a line that folds: set in a monospaced face, so
-             every letter takes one column. Each word knows its column on the
-             long line (--lx) and in the folded lines; style.css moves it. -->
-        <h1 id="hero-title" class="fold-title"><span class="w w1">A</span> <span class="w w2">long</span> <span class="w w3">line</span> <span class="w w4">of</span><br class="br-3"> <span class="w w5">ABAP,</span><br class="br-2"> <span class="w w6">folded</span><br class="br-3"> <span class="w w7">into</span> <span class="w w8">shape.</span><span class="crease c2" aria-hidden="true"></span><span class="crease c3a" aria-hidden="true"></span><span class="crease c3b" aria-hidden="true"></span></h1>
-        <p class="lede">origami formats ABAP and CDS. It changes line breaks, indentation, spaces and letter case, nothing else, and it checks its own output token by token before it writes a file.</p>
-        <div class="hero-actions">
-          <div class="install-line">
-            <code id="brew-cmd">brew install nimble-123/tap/origami</code>
-            <button class="copy" type="button" data-copy="#brew-cmd" aria-label="Copy install command">
-              <svg class="icon icon-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
-              <svg class="icon icon-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
-            </button>
-          </div>
-          <p class="hero-links"><a href="#journey">Follow one line through origami</a> <a href="#playground">Format your own code</a></p>
+        <a class="badge" href="https://github.com/nimble-123/origami/blob/main/CHANGELOG.md"><span class="badge-tag" id="version" hidden></span><span>Checks its own output, token by token</span></a>
+        <h1 id="hero-title"><span class="l1">Format ABAP.</span> <span class="l2">Change nothing else.</span></h1>
+        <p class="sub">origami folds long ABAP and CDS lines into shape, then checks that every token of your code is still the same before it writes a file.</p>
+        <div class="cta">
+          <a class="btn primary" href="#install">Install origami</a>
+          <a class="btn glass" href="#playground">Try it in the browser</a>
         </div>
       </div>
-      <!-- The crane's place in the hero; crane.js draws it in WebGL, the
-           logo stands in without it. -->
-      <div class="crane-slot crane-hero" id="crane-hero" aria-hidden="true">
-        <picture class="crane-still">
-          <source srcset="assets/logo-dark.svg" media="(prefers-color-scheme: dark)">
-          <img src="assets/logo.svg" alt="" width="256" height="256" fetchpriority="low">
-        </picture>
-      </div>
-    </section>
 
-    <section class="journey" id="journey" aria-labelledby="journey-title">
-      <div class="section-head">
-        <h2 id="journey-title">One line through origami</h2>
-        <p>One call, 104 characters long, and what origami does with it, step by step. <span class="live-only">Everything on the sheet is computed by origami itself, compiled to WebAssembly and running in this page.</span></p>
-      </div>
-
-      <div class="journey-grid">
-        <!-- The stage: pinned while the steps scroll past (app.js). Without
-             scripting or with reduced motion it stays hidden and every step
-             shows its own figure instead. -->
-        <div class="stage" id="stage" hidden>
-          <nav class="rail" id="rail" aria-label="Steps">
-            <a href="#step-read"><b>1</b><span>Read</span></a>
-            <a href="#step-fold"><b>2</b><span>Fold</span></a>
-            <a href="#step-check"><b>3</b><span>Check</span></a>
-            <a href="#step-explain"><b>4</b><span>Explain</span></a>
-            <a href="#step-write"><b>5</b><span>Write</span></a>
-          </nav>
-          <div class="stage-sheet sheet fold" id="stage-sheet">
-            <div class="row-in" id="row-in" aria-hidden="true"><div class="row-in-track" id="row-in-track"></div></div>
-            <div class="code-scroll" id="code-scroll">
-              <div class="code-canvas" id="code-canvas">
-                <div class="tokens" id="tokens" aria-hidden="true"></div>
-                <div class="margin" id="margin" role="slider" tabindex="-1" aria-label="Line width" aria-orientation="horizontal" aria-valuemin="40" aria-valuemax="120" aria-valuenow="72" aria-valuetext="line width 72" aria-disabled="true" aria-describedby="step-fold-text">
-                  <span class="margin-label" id="margin-width">72</span>
-                  <span class="margin-grip"></span>
+      <div class="hero-stage" id="hero-stage">
+        <div class="window hero-window" id="hero-window">
+          <div class="win-bar">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <div class="win-tabs" role="tablist" aria-label="Files">
+              <button type="button" role="tab" id="tab-src" aria-selected="true" aria-controls="hero-panes">zcl_flight_check.clas.abap</button>
+              <button type="button" role="tab" id="tab-toml" aria-selected="false" aria-controls="hero-toml" tabindex="-1">origami.toml</button>
+            </div>
+            <span class="win-status" id="hero-status" aria-live="off">Formatted by origami</span>
+          </div>
+          <div class="hero-panes" id="hero-panes" role="tabpanel" aria-labelledby="tab-src">
+            <div class="pane pane-in">
+              <p class="pane-title">As written</p>
+              <div class="code rows fade-right" id="hero-in"><!-- fill:hero-in --><!-- /fill --></div>
+            </div>
+            <div class="pane pane-out">
+              <p class="pane-title">Folded by origami</p>
+              <div class="out-scroll" id="hero-scroll">
+                <div class="out-canvas" id="hero-canvas">
+                  <div class="code rows" id="hero-out"><!-- fill:hero-out --><!-- /fill --></div>
+                  <div class="margin" id="margin" role="slider" tabindex="0" aria-label="Line width" aria-orientation="horizontal" aria-valuemin="40" aria-valuemax="120" aria-valuenow="72" aria-valuetext="line width 72" aria-disabled="true" hidden>
+                    <span class="margin-label" id="margin-width">72</span>
+                    <span class="margin-grip"></span>
+                  </div>
                 </div>
               </div>
             </div>
-            <span class="edge edge-l" id="edge-l" aria-hidden="true"></span>
-            <span class="edge edge-r" id="edge-r" aria-hidden="true"></span>
-            <svg class="stage-links" id="stage-links" aria-hidden="true"></svg>
-            <p class="stage-foot" id="stage-foot" aria-live="off"></p>
           </div>
-          <div class="crane-slot crane-stage" id="crane-stage" aria-hidden="true"></div>
+          <div class="toml" id="hero-toml" role="tabpanel" aria-labelledby="tab-toml" hidden>
+            <pre class="code"><span class="com"># origami.toml</span>
+line_width = <span class="num" id="toml-width">72</span></pre>
+          </div>
         </div>
-
-        <ol class="steps" id="steps">
-          <li class="step" id="step-read" data-step="0">
-            <h3><span class="step-n" aria-hidden="true">1</span> Read</h3>
-            <p>origami lexes the statement into tokens. What sits inside a literal, a comment or a pragma is copied as it is, character for character; here that is the literal <code>'A'</code>.</p>
-            <p class="step-live" id="read-live" aria-live="polite"></p>
-            <!-- Fallbacks without scripting, from origami 0.4.3 (style
-                 "compact", line width 72). Regenerate them with
-                 origami --review on the call below, with line_width = 72 and
-                 style = "compact" in origami.toml. They are the only
-                 formatted output written into this page. -->
-            <figure class="step-figure">
-              <pre class="sheet"><span class="kw">DATA</span>(ls_rule) = zcl_flight_rules=&gt;get( iv_carrier = is_flight-carrid iv_date = sy-datum iv_mode = <span class="str">'A'</span> ).</pre>
-              <figcaption>One statement, 20 tokens, 104 characters on one line.</figcaption>
-            </figure>
-          </li>
-          <li class="step" id="step-fold" data-step="1">
-            <h3><span class="step-n" aria-hidden="true">2</span> Fold</h3>
-            <p id="step-fold-text">It lays the statement out for the line width. At 72 the call would end at column 103, so it folds: one parameter per line, aligned. Drag the margin on the sheet, or focus it and use the arrow keys, to try another width.</p>
-            <p class="step-aside">The sheet uses the style <code>compact</code>, which keeps a call on one line while it fits; the default style, <code>aligned</code>, puts each parameter on its own line at every width.</p>
-            <figure class="step-figure">
-              <pre class="sheet"><span class="kw">DATA</span>(ls_rule) = zcl_flight_rules=&gt;get( iv_carrier = is_flight-carrid
-                                       iv_date    = sy-datum
-                                       iv_mode    = <span class="str">'A'</span> ).</pre>
-              <figcaption>Formatted at line width 72.</figcaption>
-            </figure>
-          </li>
-          <li class="step" id="step-check" data-step="2">
-            <h3><span class="step-n" aria-hidden="true">3</span> Check</h3>
-            <p>Before anything is written, origami lexes its own output again and compares it with the input, token by token: the same tokens in the same order, glued or spaced as before. Only whitespace, line breaks and the case of keywords may differ.</p>
-            <p class="step-live" id="check-live" aria-live="polite"></p>
-            <div class="tamper" id="tamper" hidden>
-              <button class="button" type="button" id="tamper-button" aria-pressed="false">What if a token changed?</button>
-              <p class="tamper-note">A simulation of a formatter bug, in this page only: it removes the space in front of <code>sy-datum</code> in the output. If the check finds a difference, origami prints the statement again as it was written and reports W001, as on the sheet. If it still differs, the file stays unchanged (X001).</p>
-            </div>
-            <figure class="step-figure">
-              <pre class="sheet checked"><u class="kw">DATA</u><u>(</u><u>ls_rule</u><u>)</u> <u>=</u> <u>zcl_flight_rules</u><u>=&gt;</u><u>get</u><u>(</u> <u>iv_carrier</u> <u>=</u> <u>is_flight-carrid</u>
-                                       <u>iv_date</u>    <u>=</u> <u>sy-datum</u>
-                                       <u>iv_mode</u>    <u>=</u> <u class="str">'A'</u> <u>)</u><u>.</u></pre>
-              <figcaption>20 of 20 tokens identical: the output has the same tokens as the input.</figcaption>
-            </figure>
-          </li>
-          <li class="step" id="step-explain" data-step="3">
-            <h3><span class="step-n" aria-hidden="true">4</span> Explain</h3>
-            <p>Below each construct it broke, <code>origami --review</code> names the rule and the column the line would have ended at. Each rule is written down in <a data-repo-path="docs/STYLE.md" href="#">STYLE.md</a>.</p>
-            <figure class="step-figure">
-              <pre class="sheet note"><span class="note-mark">↳</span> ABAP-CALL-001: one parameter per line, because the call would end at column 103 (limit 72)</pre>
-            </figure>
-          </li>
-          <li class="step" id="step-write" data-step="4">
-            <h3><span class="step-n" aria-hidden="true">5</span> Write</h3>
-            <p>Only then is the file written. In VS Code, <em>origami: Preview Changes</em> shows the same changes in the diff view first.</p>
-            <p class="step-live" id="write-live" aria-live="polite"></p>
-            <p><a href="#speed">How fast that is on real files</a></p>
-          </li>
-        </ol>
+        <p class="hero-hint" id="hero-hint" hidden>Drag the blue margin, or use the arrow keys on it: origami formats the class again at that width.</p>
       </div>
     </section>
 
-    <section class="safety" id="safety" aria-labelledby="safety-title">
-      <div class="section-head">
-        <h2 id="safety-title">When the check fails, your code stays as it is</h2>
-        <p>The check runs on every file, every time. Nothing else may differ between input and output than whitespace, line breaks and letter case.</p>
-      </div>
-      <figure class="pipeline">
-        <div class="pipeline-scroll" data-scroll>
-          <svg class="pipeline-svg" viewBox="0 0 880 300" role="img" aria-labelledby="pipeline-title">
-            <title id="pipeline-title">Your file is lexed, parsed and laid out, and printed. The self-check compares the tokens with the input: if they are the same, the file is written; if not, the statement is kept as written and printed again; if it still differs, the file stays unchanged with error X001.</title>
-            <defs><marker id="p-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z"/></marker></defs>
-            <g class="p-node"><rect x="1" y="40" width="110" height="52" rx="26"/><text x="56" y="63">Your file</text><text class="p-sub" x="56" y="80">ABAP or CDS</text></g>
-            <g class="p-node"><rect x="146" y="40" width="110" height="52" rx="4"/><text x="201" y="63">Lex</text><text class="p-sub" x="201" y="80">tokens</text></g>
-            <g class="p-node"><rect x="291" y="40" width="130" height="52" rx="4"/><text x="356" y="63">Lay out</text><text class="p-sub" x="356" y="80">line width</text></g>
-            <g class="p-node"><rect x="456" y="40" width="110" height="52" rx="4"/><text x="511" y="63">Print</text><text class="p-sub" x="511" y="80">output</text></g>
-            <g class="p-node p-check"><path d="M651 22 L700 66 L651 110 L602 66 Z"/><text x="651" y="63">Same</text><text x="651" y="78">tokens?</text></g>
-            <g class="p-node p-good"><rect x="749" y="40" width="130" height="52" rx="26"/><text x="814" y="63">File written</text><text class="p-sub" x="814" y="80">formatted</text></g>
-            <g class="p-node p-hold"><rect x="586" y="160" width="130" height="52" rx="4"/><text x="651" y="183">Keep as written</text><text class="p-sub" x="651" y="200">W001</text></g>
-            <g class="p-node p-bad"><rect x="586" y="246" width="130" height="52" rx="26"/><text x="651" y="269">File unchanged</text><text class="p-sub" x="651" y="286">X001</text></g>
-            <g class="p-edges">
-              <path d="M111 66 H140"/><path d="M256 66 H285"/><path d="M421 66 H450"/><path d="M566 66 H596"/>
-              <path class="p-yes" d="M700 66 H743"/>
-              <path class="p-no" d="M651 110 V154"/>
-              <path class="p-again" d="M586 186 H511 V98"/>
-              <path class="p-no" d="M651 212 V240"/>
-            </g>
-            <g class="p-labels"><text x="704" y="58">same</text><text x="664" y="136">different</text><text x="470" y="150">print again</text><text x="664" y="230">still different</text></g>
-          </svg>
-        </div>
-        <p class="scroll-hint" aria-hidden="true">Scroll sideways to see the whole diagram.</p>
-      </figure>
-      <ul class="facts">
-        <li><strong>A statement origami does not understand</strong> keeps its own line breaks. It is re-indented with its block and reported as W003.</li>
-        <li><strong>A file with a structural error</strong>, such as a missing period or an unclosed <code>IF</code>, is never touched. You get the line and column instead.</li>
-        <li><strong>Embedded languages</strong> (AMDP, native SQL, macros) are copied byte for byte.</li>
+    <!-- ======================================================== strip -->
+    <section class="strip" aria-label="Where origami works">
+      <p>Works where you work</p>
+      <ul class="chips">
+        <li>VS Code</li><li>ADT for VS Code</li><li>abapGit</li><li>GitHub Actions</li><li>GitLab CI</li><li>Azure Pipelines</li><li>pre-commit</li><li>MCP for agents</li>
       </ul>
     </section>
 
+    <!-- ======================================================== layout only -->
+    <section class="chapter" id="layout" aria-labelledby="layout-title">
+      <h2 class="two" id="layout-title" data-rise>Layout only. <span>Line breaks, indentation, spaces and keyword case. Nothing else, ever.</span></h2>
+      <div class="bento">
+        <article class="tile span-7" data-rise>
+          <h3>What origami may change</h3>
+          <p>The same statements, before and after. Every mark below is something origami changed; every word is still the one you wrote.</p>
+          <div class="window inner">
+            <div class="win-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="win-title">report.prog.abap</span></div>
+            <div class="layout-cmp">
+              <div class="code before"><p class="pane-title">As written</p><pre><!-- fill:layout-in --><!-- /fill --></pre></div>
+              <div class="code after"><p class="pane-title">Formatted</p><div class="marks" id="layout-out"><!-- fill:layout-out --><!-- /fill --></div></div>
+            </div>
+          </div>
+          <ul class="legend">
+            <li><span class="key br">↵</span> line break</li>
+            <li><span class="key indent">··</span> indentation</li>
+            <li><span class="key ws">·</span> spaces</li>
+            <li><span class="key case">IF</span> keyword case</li>
+          </ul>
+        </article>
+        <article class="tile span-5" data-rise>
+          <h3>What it never touches</h3>
+          <p>Tokens, their order and every comment stay exactly as you wrote them.</p>
+          <ul class="never">
+            <li><strong>Literals, comments and pragmas</strong> are copied character for character.</li>
+            <li><strong>Embedded languages</strong> (AMDP, native SQL, macros) are copied byte for byte.</li>
+            <li><strong>A statement origami does not understand</strong> keeps its own line breaks. It is re-indented with its block and reported as W003.</li>
+            <li><strong>A file with a structural error</strong>, such as a missing period or an unclosed <code>IF</code>, is never touched. You get the line and column instead.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ======================================================== checked -->
+    <section class="chapter" id="check" aria-labelledby="check-title">
+      <h2 class="two" id="check-title" data-rise>Checked every time. <span>Before a file is written, origami reads its own output back and compares it with yours, token by token.</span></h2>
+      <div class="bento">
+        <article class="tile span-8 tile-check" data-rise>
+          <div class="window inner">
+            <div class="win-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="win-title">The self-check, on one call</span></div>
+            <div class="check-body">
+              <p class="pane-title">As written</p>
+              <div class="check-in code" id="check-in" aria-hidden="true"></div>
+              <p class="pane-title">Formatted, lexed again</p>
+              <pre class="check-out code" id="check-out"><!-- fill:check-out --><!-- /fill --></pre>
+              <svg class="check-link" id="check-link" aria-hidden="true"></svg>
+              <p class="check-foot" id="check-foot" aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="tamper" id="tamper" hidden>
+            <button class="btn glass small" type="button" id="tamper-button" aria-pressed="false">What if a token changed?</button>
+            <p>A simulation of a formatter bug, in this page only: it removes the space in front of <code>sy-datum</code> in the output. origami's check finds the difference, prints the statement again as it was written and reports W001. If it still differs, the file stays unchanged (X001).</p>
+          </div>
+        </article>
+        <article class="tile span-4 tile-count" data-rise>
+          <p class="big"><span id="count-now"><!-- fill:check-count --><!-- /fill --></span> <span class="of">of</span> <span id="count-all"><!-- fill:check-count --><!-- /fill --></span></p>
+          <p class="big-label" id="count-label">tokens identical</p>
+          <p>Only whitespace, line breaks and the case of keywords may differ. The check runs on every file, every time.</p>
+        </article>
+        <article class="tile span-12 tile-pipe" data-rise>
+          <h3>When the check finds a difference</h3>
+          <div class="pipe-scroll" data-scroll>
+            <ol class="pipe">
+              <li><span class="node">Your file</span></li>
+              <li><span class="node">Lex</span></li>
+              <li><span class="node">Lay out</span></li>
+              <li><span class="node">Print</span></li>
+              <li><span class="node q">Same tokens?</span></li>
+              <li class="yes"><span class="why">same</span><span class="node ok">File written</span></li>
+            </ol>
+            <ol class="pipe pipe-no">
+              <li><span class="why">different</span><span class="node hold">Statement kept as written, W001</span></li>
+              <li><span class="why">still different</span><span class="node bad">File left unchanged, X001</span></li>
+            </ol>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ======================================================== explained -->
+    <section class="chapter" id="explain" aria-labelledby="explain-title">
+      <h2 class="two" id="explain-title" data-rise>Explained. <span>Below each construct it breaks, origami names the rule and the column the line would have ended at.</span></h2>
+      <div class="bento">
+        <article class="tile span-8 tile-term" data-rise>
+          <div class="window inner term">
+            <div class="win-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="win-title center">Terminal</span></div>
+            <pre class="term-body" id="term"><span class="prompt">$</span> <span class="cmd" id="term-cmd">origami --review zcl_flight_check.clas.abap</span>
+<span id="term-out"><!-- fill:review --><!-- /fill --></span></pre>
+          </div>
+        </article>
+        <article class="tile span-4" data-rise>
+          <h3>Before anything is written</h3>
+          <p><code>origami --review</code> shows the changes it would make and why. In VS Code, <em>origami: Preview Changes</em> opens the same changes in the diff view, with <em>Apply</em>.</p>
+          <h3 class="later">Every rule, written down</h3>
+          <p>63 rules, each with examples, in <a data-repo-path="docs/STYLE.md" href="#">STYLE.md</a>. The ones on this page:</p>
+          <ul class="rules-chips">
+            <li><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#:~:text=ABAP-CALL-001">ABAP-CALL-001</a></li>
+            <li><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#:~:text=ABAP-COND-001">ABAP-COND-001</a></li>
+            <li><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#:~:text=ABAP-CASE-001">ABAP-CASE-001</a></li>
+            <li><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#:~:text=ABAP-INDENT-001">ABAP-INDENT-001</a></li>
+            <li><a href="https://github.com/nimble-123/origami/blob/main/docs/STYLE.md#:~:text=ABAP-ALIGN-001">ABAP-ALIGN-001</a></li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ======================================================== playground -->
     <section id="playground" class="playground" aria-labelledby="pg-title">
-      <div class="section-head">
-        <h2 id="pg-title">Try it on your code</h2>
-        <p>Paste ABAP or CDS, or open a file. It runs in your browser: origami compiled to WebAssembly, nothing is uploaded.</p>
-      </div>
+      <h2 class="two" id="pg-title" data-rise>Try it on your code. <span>Paste ABAP or CDS, or open a file. origami runs in your browser as WebAssembly; nothing is uploaded.</span></h2>
 
-      <div class="pg-controls" role="group" aria-label="Playground settings">
-        <label class="pg-example">Example
-          <select id="pg-example">
-            <option value="call">ABAP class</option>
-            <option value="sql">ABAP SQL</option>
-            <option value="cds">CDS view</option>
-          </select>
-        </label>
-        <div class="seg" role="radiogroup" aria-labelledby="pg-lang-label">
-          <span class="seg-label" id="pg-lang-label">Language</span>
-          <label><input type="radio" name="pg-lang" value="abap" checked><span>ABAP</span></label>
-          <label><input type="radio" name="pg-lang" value="cds"><span>CDS family</span></label>
+      <div class="window pg-window" data-rise>
+        <div class="win-bar pg-bar">
+          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <div class="pg-controls" role="group" aria-label="Playground settings">
+            <label class="pg-example"><span>Example</span>
+              <select id="pg-example">
+                <option value="call">ABAP class</option>
+                <option value="sql">ABAP SQL</option>
+                <option value="cds">CDS view</option>
+              </select>
+            </label>
+            <div class="seg" role="radiogroup" aria-labelledby="pg-lang-label">
+              <span class="seg-label" id="pg-lang-label">Language</span>
+              <label><input type="radio" name="pg-lang" value="abap" checked><span>ABAP</span></label>
+              <label><input type="radio" name="pg-lang" value="cds"><span>CDS</span></label>
+            </div>
+            <div class="seg" role="radiogroup" aria-labelledby="pg-width-label">
+              <span class="seg-label" id="pg-width-label">Width</span>
+              <label><input type="radio" name="pg-width" value="80"><span>80</span></label>
+              <label><input type="radio" name="pg-width" value="100"><span>100</span></label>
+              <label><input type="radio" name="pg-width" value="120" checked><span>120</span></label>
+            </div>
+            <div class="seg" role="radiogroup" aria-labelledby="pg-case-label">
+              <span class="seg-label" id="pg-case-label">Keywords</span>
+              <label><input type="radio" name="pg-case" value="upper" checked><span>UPPER</span></label>
+              <label><input type="radio" name="pg-case" value="lower"><span>lower</span></label>
+            </div>
+            <div class="seg" role="radiogroup" aria-labelledby="pg-style-label">
+              <span class="seg-label" id="pg-style-label">Style</span>
+              <label><input type="radio" name="pg-style" value="aligned" checked><span>aligned</span></label>
+              <label><input type="radio" name="pg-style" value="compact"><span>compact</span></label>
+            </div>
+          </div>
         </div>
-        <div class="seg" role="radiogroup" aria-labelledby="pg-width-label">
-          <span class="seg-label" id="pg-width-label">Line width</span>
-          <label><input type="radio" name="pg-width" value="80"><span>80</span></label>
-          <label><input type="radio" name="pg-width" value="100"><span>100</span></label>
-          <label><input type="radio" name="pg-width" value="120" checked><span>120</span></label>
-        </div>
-        <div class="seg" role="radiogroup" aria-labelledby="pg-case-label">
-          <span class="seg-label" id="pg-case-label">Keywords</span>
-          <label><input type="radio" name="pg-case" value="upper" checked><span>UPPER</span></label>
-          <label><input type="radio" name="pg-case" value="lower"><span>lower</span></label>
-        </div>
-        <div class="seg" role="radiogroup" aria-labelledby="pg-style-label">
-          <span class="seg-label" id="pg-style-label">Style</span>
-          <label><input type="radio" name="pg-style" value="aligned" checked><span>aligned</span></label>
-          <label><input type="radio" name="pg-style" value="compact"><span>compact</span></label>
-        </div>
-      </div>
 
-      <div class="pg-tabs" id="pg-tabs" role="tablist" aria-label="Playground" hidden>
-        <button type="button" role="tab" id="pg-tab-in" aria-controls="pg-pane-in" aria-selected="true">Your code</button>
-        <button type="button" role="tab" id="pg-tab-out" aria-controls="pg-pane-out" aria-selected="false" tabindex="-1">Formatted<span class="tab-badge" id="pg-badge" aria-hidden="true"></span><span class="sr-only" id="pg-badge-text" hidden>, new result</span></button>
-      </div>
+        <div class="pg-tabs" id="pg-tabs" role="tablist" aria-label="Playground" hidden>
+          <button type="button" role="tab" id="pg-tab-in" aria-controls="pg-pane-in" aria-selected="true">Your code</button>
+          <button type="button" role="tab" id="pg-tab-out" aria-controls="pg-pane-out" aria-selected="false" tabindex="-1">Formatted<span class="tab-badge" id="pg-badge" aria-hidden="true"></span><span class="sr-only" id="pg-badge-text" hidden>, new result</span></button>
+        </div>
 
-      <div class="pg" id="pg">
-        <div class="pg-pane" id="pg-pane-in">
-          <div class="pane-label">
-            <label for="pg-input">Your code</label>
-            <button id="pg-open" class="copy text" type="button">Open file</button>
-            <input id="pg-file" type="file" accept=".abap,.asddls,.asddlxs,.asdcls,.asbdef,.srvdsrv,.acds,.txt" hidden>
+        <div class="pg" id="pg">
+          <div class="pg-pane" id="pg-pane-in">
+            <div class="pane-label">
+              <label for="pg-input">Your code</label>
+              <button id="pg-open" class="link-btn" type="button">Open file</button>
+              <input id="pg-file" type="file" accept=".abap,.asddls,.asddlxs,.asdcls,.asbdef,.srvdsrv,.acds,.txt" hidden>
+            </div>
+            <div class="editor" id="pg-editor">
+              <pre id="pg-highlight" class="code-area" aria-hidden="true"></pre>
+              <textarea id="pg-input" class="code-area" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-describedby="pg-input-hint"></textarea>
+            </div>
+            <p id="pg-input-hint" class="sr-only">Tab inserts two spaces. Press Escape, then Tab, to move focus out of the editor. You can also drop a file here.</p>
           </div>
-          <div class="editor" id="pg-editor">
-            <pre id="pg-highlight" class="sheet code" aria-hidden="true"></pre>
-            <textarea id="pg-input" class="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-describedby="pg-input-hint"></textarea>
+          <div class="pg-pane" id="pg-pane-out">
+            <div class="pane-label">
+              <span id="pg-out-label">Formatted</span>
+              <button id="pg-copy" class="link-btn copy text" type="button" data-copy="#pg-output-text" aria-label="Copy formatted code" disabled>Copy</button>
+            </div>
+            <div id="pg-output" class="code-area output" role="region" tabindex="0" aria-labelledby="pg-out-label" aria-describedby="pg-status"></div>
+            <pre id="pg-output-text" hidden></pre>
           </div>
-          <p id="pg-input-hint" class="sr-only">Tab inserts two spaces. Press Escape, then Tab, to move focus out of the editor. You can also drop a file here.</p>
         </div>
-        <div class="pg-pane" id="pg-pane-out">
-          <div class="pane-label">
-            <span id="pg-out-label">Formatted</span>
-            <button id="pg-copy" class="copy text" type="button" data-copy="#pg-output-text" aria-label="Copy formatted code" disabled>Copy</button>
-          </div>
-          <div id="pg-output" class="sheet code output" role="region" tabindex="0" aria-labelledby="pg-out-label" aria-describedby="pg-status"></div>
-          <pre id="pg-output-text" hidden></pre>
-        </div>
+        <p id="pg-status" class="status">Loading origami…</p>
       </div>
-      <p id="pg-status" class="status">Loading origami…</p>
       <p class="noscript-note">The playground needs JavaScript. Install origami to try it locally.</p>
       <p id="announce" class="sr-only" role="status" aria-live="polite"></p>
     </section>
 
-    <div class="pair">
-      <section id="speed" class="speed" aria-labelledby="speed-title">
-        <div class="section-head">
-          <h2 id="speed-title">Fast enough for every save</h2>
-          <p>A median file takes 0.08 ms in a running editor or agent and 2.2 ms as a new process, start included; 99 % of files take under 5 ms. The 2,100-file test corpus takes 0.2 s, so format-on-save and pre-commit hooks stay out of your way.</p>
+    <!-- ======================================================== speed -->
+    <section id="speed" class="speed" aria-labelledby="speed-title">
+      <h2 class="two" id="speed-title" data-rise>Fast enough for every save. <span>A median file takes 0.08 ms in a running editor or agent and 2.2 ms as a new process, start included; 99 % of files take under 5 ms.</span></h2>
+      <dl class="numbers" data-rise>
+        <div><dt>median file, in a running editor</dt><dd>0.08 ms</dd></div>
+        <div><dt>median file, as a new process</dt><dd>2.2 ms</dd></div>
+        <div><dt>of files take under 5 ms</dt><dd>99 %</dd></div>
+        <div><dt>for the 2,100-file test corpus</dt><dd>0.2 s</dd></div>
+      </dl>
+      <div class="tile speed-tile" data-rise>
+        <table class="bars">
+          <caption>Time per call in milliseconds, median and 99th percentile. Bars show the median on a logarithmic scale.</caption>
+          <thead><tr><th scope="col">Run as</th><th scope="col" class="num">Median</th><th scope="col" class="num">99 %</th><th scope="col"><span class="sr-only">Chart</span></th></tr></thead>
+          <tbody>
+            <tr><th scope="row">origami in process</th><td class="num">0.08</td><td class="num">4.5</td><td class="bar" aria-hidden="true"><span class="b b-008"></span></td></tr>
+            <tr><th scope="row">origami through MCP</th><td class="num">0.22</td><td class="num">7.6</td><td class="bar" aria-hidden="true"><span class="b b-022"></span></td></tr>
+            <tr><th scope="row">origami in WebAssembly, Node</th><td class="num">0.26</td><td class="num">14</td><td class="bar" aria-hidden="true"><span class="b b-026"></span></td></tr>
+            <tr><th scope="row">origami as a new process</th><td class="num">2.2</td><td class="num">3.1</td><td class="bar" aria-hidden="true"><span class="b b-22"></span></td></tr>
+            <tr class="other"><th scope="row">ABAP Cleaner, warm JVM</th><td class="num">2.0</td><td class="num">59</td><td class="bar" aria-hidden="true"><span class="b b-20"></span></td></tr>
+            <tr class="other"><th scope="row">ABAP Cleaner, new JVM</th><td class="num">315</td><td class="num">355</td><td class="bar" aria-hidden="true"><span class="b b-315"></span></td></tr>
+          </tbody>
+        </table>
+        <div class="speed-foot">
+          <p>Apple M4. ABAP Cleaner also changes code; origami only changes layout (<a href="abap-cleaner.html">layout compared side by side</a>). <a data-repo-path="docs/benchmark.md" href="#">All measurements</a>, including the whole corpus and thread scaling.</p>
+          <div class="measure" id="measure" hidden>
+            <button class="btn glass small" type="button" id="measure-button">Measure it in this browser</button>
+            <p class="measure-out" id="measure-out" aria-live="polite">Formats the playground's code 200 times in WebAssembly, here, and adds the median to the table.</p>
+          </div>
         </div>
-        <figure class="latency">
-          <table class="bars">
-            <caption>Time per call, median and 99th percentile, in milliseconds</caption>
-            <thead><tr><th scope="col">Run as</th><th scope="col" class="num">Median</th><th scope="col" class="num">99 %</th><th scope="col"><span class="sr-only">Chart</span></th></tr></thead>
-            <tbody>
-              <tr><th scope="row">origami in process</th><td class="num">0.08</td><td class="num">4.5</td><td class="bar" aria-hidden="true"><span class="b b-008"></span></td></tr>
-              <tr><th scope="row">origami through MCP</th><td class="num">0.22</td><td class="num">7.6</td><td class="bar" aria-hidden="true"><span class="b b-022"></span></td></tr>
-              <tr><th scope="row">origami in WebAssembly, Node</th><td class="num">0.26</td><td class="num">14</td><td class="bar" aria-hidden="true"><span class="b b-026"></span></td></tr>
-              <tr><th scope="row">origami as a new process</th><td class="num">2.2</td><td class="num">3.1</td><td class="bar" aria-hidden="true"><span class="b b-22"></span></td></tr>
-              <tr class="other"><th scope="row">ABAP Cleaner, warm JVM</th><td class="num">2.0</td><td class="num">59</td><td class="bar" aria-hidden="true"><span class="b b-20"></span></td></tr>
-              <tr class="other"><th scope="row">ABAP Cleaner, new JVM</th><td class="num">315</td><td class="num">355</td><td class="bar" aria-hidden="true"><span class="b b-315"></span></td></tr>
-            </tbody>
-          </table>
-          <figcaption>Apple M4; the bars show the median on a logarithmic scale. ABAP Cleaner also changes code; origami only changes layout (<a href="abap-cleaner.html">layout compared side by side</a>). <a data-repo-path="docs/benchmark.md" href="#">All measurements</a>, including the whole corpus and thread scaling.</figcaption>
-        </figure>
-        <div class="measure" id="measure" hidden>
-          <button class="button" type="button" id="measure-button">Measure it in this browser</button>
-          <p class="measure-out" id="measure-out" aria-live="polite">Formats the playground's code 200 times in WebAssembly, here, and shows the median.</p>
-        </div>
-      </section>
+      </div>
+    </section>
 
-      <section id="install" class="install" aria-labelledby="install-title">
-        <div class="section-head">
-          <h2 id="install-title">Install</h2>
-          <p>A single binary for macOS, Linux and Windows. It reads <code>origami.toml</code> for line width, indentation and keyword case.</p>
-        </div>
-
+    <!-- ======================================================== install -->
+    <section id="install" class="install" aria-labelledby="install-title">
+      <h2 class="two" id="install-title" data-rise>Install. <span>A single binary for macOS, Linux and Windows. It reads <code>origami.toml</code> for line width, indentation and keyword case.</span></h2>
+      <div class="install-grid" data-rise>
         <div class="inst" id="inst">
           <section class="inst-panel" id="inst-brew" aria-labelledby="inst-brew-title">
             <h3 id="inst-brew-title">Homebrew</h3>
             <p>For macOS and Linux.</p>
-            <div class="sheet snippet">
+            <div class="snippet">
               <pre id="inst-brew-code">brew install nimble-123/tap/origami</pre>
               <button class="copy text" type="button" data-copy="#inst-brew-code" aria-label="Copy the Homebrew command">Copy</button>
             </div>
@@ -328,7 +335,7 @@
           <section class="inst-panel" id="inst-cargo" aria-labelledby="inst-cargo-title">
             <h3 id="inst-cargo-title">Cargo</h3>
             <p>On any platform with Rust. Release binaries for macOS, Linux and Windows, each with a <code>.sha256</code> file, are on the <a href="https://github.com/nimble-123/origami/releases">releases page</a>.</p>
-            <div class="sheet snippet">
+            <div class="snippet">
               <pre id="inst-cargo-code">cargo install abap-origami</pre>
               <button class="copy text" type="button" data-copy="#inst-cargo-code" aria-label="Copy the Cargo command">Copy</button>
             </div>
@@ -336,7 +343,7 @@
           <section class="inst-panel" id="inst-vscode" aria-labelledby="inst-vscode-title">
             <h3 id="inst-vscode-title">VS Code</h3>
             <p>Install the extension from the <a href="https://marketplace.visualstudio.com/items?itemName=nimble-123.abap-origami">Marketplace</a> or the <code>.vsix</code> in every release, then make origami the formatter. It works with ADT for VS Code and adds <em>origami: Preview Changes</em>.</p>
-            <div class="sheet snippet">
+            <div class="snippet">
               <pre id="inst-vscode-code">"[abap]": { "editor.defaultFormatter": "nimble-123.abap-origami" },
 "[acds]": { "editor.defaultFormatter": "nimble-123.abap-origami" },
 "editor.formatOnSave": true,
@@ -347,7 +354,7 @@
           <section class="inst-panel" id="inst-actions" aria-labelledby="inst-actions-title">
             <h3 id="inst-actions-title">GitHub Actions</h3>
             <p>Checks only the lines a pull request touches and shows findings as code-scanning annotations.</p>
-            <div class="sheet snippet">
+            <div class="snippet">
               <pre id="inst-actions-code"># .github/workflows/origami.yml
 on: [pull_request]
 permissions: { contents: read, security-events: write }
@@ -367,7 +374,7 @@ jobs:
           <section class="inst-panel" id="inst-ci" aria-labelledby="inst-ci-title">
             <h3 id="inst-ci-title">pre-commit / CI</h3>
             <p>A pre-commit hook that checks, or rewrites, the files you commit. GitLab CI and Azure Pipelines are in <a data-repo-path="docs/ci.md" href="#">the CI guide</a>.</p>
-            <div class="sheet snippet">
+            <div class="snippet">
               <pre id="inst-ci-code"># .pre-commit-config.yaml
 repos:
   - repo: https://github.com/nimble-123/origami
@@ -381,40 +388,55 @@ repos:
           <section class="inst-panel" id="inst-mcp" aria-labelledby="inst-mcp-title">
             <h3 id="inst-mcp-title">AI agents (MCP)</h3>
             <p><code>origami --mcp</code> runs an MCP server with the tools <code>format</code> and <code>format_files</code>; agents get compact diagnostics with a next step.</p>
-            <div class="sheet snippet">
+            <div class="snippet">
               <pre id="inst-mcp-code">claude mcp add origami -- origami --mcp</pre>
               <button class="copy text" type="button" data-copy="#inst-mcp-code" aria-label="Copy the MCP command">Copy</button>
             </div>
           </section>
         </div>
-
-        <div class="usage">
+        <div class="usage tile">
           <h3>Then, in a repository</h3>
-          <pre class="sheet snippet-plain">origami                  <span class="com"># format all ABAP and CDS files below .</span>
+          <pre class="usage-code">origami                  <span class="com"># format all ABAP and CDS files below .</span>
 origami --review         <span class="com"># show what would change, and why lines break</span>
 origami --check          <span class="com"># CI: exit 1 if anything would change</span>
 origami --changed main   <span class="com"># only lines changed against main (+ new files)</span></pre>
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
 
-    <section class="closing" aria-labelledby="fold-title">
-      <figure class="photo">
-        <picture>
-          <source srcset="assets/photos/fold-dark.webp" media="(prefers-color-scheme: dark)">
-          <img src="assets/photos/fold-light.webp" width="1920" height="1072" loading="lazy" alt="">
-        </picture>
-        <figcaption>
-          <h2 id="fold-title">Every line break is a fold</h2>
-          <p>origami takes a long line of ABAP and folds it into shape, and it can say why it folded where it did.</p>
-        </figcaption>
-      </figure>
+    <!-- ======================================================== closing -->
+    <section class="closing" id="closing" aria-labelledby="closing-title">
+      <div class="spot" aria-hidden="true"><div class="beam"></div><div class="floor"></div><div class="horizon"></div></div>
+      <div class="crane-box" id="crane-box" aria-hidden="true">
+        <div class="crane-still"><img src="assets/logo-dark.svg" alt="" width="256" height="256" loading="lazy"><img class="reflect" src="assets/logo-dark.svg" alt="" width="256" height="256" loading="lazy"></div>
+      </div>
+      <div class="closing-copy">
+        <h2 id="closing-title">Every line break is a fold.</h2>
+        <p>Install origami and fold your first long line in a minute.</p>
+        <div class="install-line">
+          <code id="brew-cmd">brew install nimble-123/tap/origami</code>
+          <button class="copy icon-btn" type="button" data-copy="#brew-cmd" aria-label="Copy install command">
+            <svg class="icon icon-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+            <svg class="icon icon-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+          </button>
+        </div>
+        <div class="cta"><a class="btn primary" href="#install">Install origami</a><a class="btn glass" href="#playground">Open the playground</a></div>
+      </div>
     </section>
   </main>
 
   <footer class="foot">
-    <p>origami is free software under MIT or Apache-2.0. The style is written down rule by rule in <a data-repo-path="docs/STYLE.md" href="#">STYLE.md</a>.</p>
-    <p class="foot-links"><a data-repo-path="docs/CLI.md" href="#">Command line</a> <a data-repo-path="CHANGELOG.md" href="#">Changelog</a> <a href="https://github.com/nimble-123/origami">Source</a></p>
+    <div class="foot-in">
+      <div class="foot-brand">
+        <a class="brand" href="./" aria-label="origami home"><img src="assets/logo-small-dark.svg" alt="" width="22" height="22"><span>origami</span></a>
+        <p>A layout-only formatter for ABAP and CDS. Free software under MIT or Apache-2.0.</p>
+      </div>
+      <nav class="foot-cols" aria-label="Footer">
+        <div><h2>Product</h2><a href="#layout">How it works</a><a href="#playground">Playground</a><a href="#speed">Speed</a><a href="#install">Install</a></div>
+        <div><h2>Docs</h2><a data-repo-path="docs/STYLE.md" href="#">Style rules</a><a data-repo-path="docs/CLI.md" href="#">Command line</a><a data-repo-path="docs/ci.md" href="#">CI guide</a><a data-repo-path="docs/benchmark.md" href="#">Benchmarks</a></div>
+        <div><h2>Project</h2><a href="https://github.com/nimble-123/origami">Source</a><a data-repo-path="CHANGELOG.md" href="#">Changelog</a><a href="abap-cleaner.html">vs ABAP Cleaner</a><a href="https://github.com/nimble-123/origami/releases">Releases</a></div>
+      </nav>
+    </div>
   </footer>
 </body>
 </html>
