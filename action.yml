@@ -41,7 +41,9 @@ runs:
         GH_TOKEN: ${{ inputs.token }}
         VERSION: ${{ inputs.version }}
         ACTION_REF: ${{ github.action_ref }}
-        REPO: ${{ github.action_repository }}
+        # github.action_repository is empty when the action is used by path
+        # (`uses: ./`); that is this repository.
+        REPO: ${{ github.action_repository || github.repository }}
         OS: ${{ runner.os }}
         ARCH: ${{ runner.arch }}
         REQUIRE_ATTESTATION: ${{ inputs.require-attestation }}

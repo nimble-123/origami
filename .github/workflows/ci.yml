@@ -169,6 +169,29 @@ jobs:
       - run: sh site/build.sh
       - run: node crates/origami_wasm/tests/smoke.mjs site/dist/origami.wasm
 
+  # The composite action (action.yml) against a released binary: download,
+  # checksum, attestation, run. Read-only and without secrets: the action only
+  # reads the public release with the workflow token, which a pull request
+  # from a fork has as well. The version is pinned on purpose, so that a new
+  # release cannot fail unrelated pull requests; raise it by hand when the
+  # action needs a newer binary.
+  action:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./
+        with:
+          version: v0.4.2
+          args: --check --no-config tests/action-fixture
+      - name: The pinned binary is the one that runs
+        run: origami --version | grep -q '^origami 0\.4\.2 '
+
   extension-os:
     name: extension (${{ matrix.os }})
     strategy:

@@ -120,3 +120,8 @@ that decision, with one exception: `site/build.sh` copies several of them
 (`site/{index.html,abap-cleaner.html,style.css,app.js,worker.js}` and files
 from `docs/assets/`), so a change to any of them still runs the `wasm` job,
 which builds the site, while the other code jobs are skipped.
+
+The `action` job runs the composite action itself (`uses: ./`) on
+`tests/action-fixture` with a pinned, released `version`, so that a change to
+`action.yml` is exercised before it ships. The pin is not updated by
+release-please; raise it by hand when the action needs a newer binary.
